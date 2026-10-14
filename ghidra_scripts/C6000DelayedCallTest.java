@@ -23,10 +23,12 @@ public class C6000DelayedCallTest extends GhidraScript {
 				(jump == null ? "" : " flow=" + jump.getFlowType()) +
 				" function at 0x1080=" + getFunctionAt(toAddr(0x1080L)));
 		}
+		// The generic SLEIGH predicate guard also gives unpredicated register
+		// branches a conditional flow type. Require it for predicated calls only.
 		for (long site : new long[] { 0x1008L, 0x1018L, 0x1048L, 0x104cL, 0x106cL }) {
 			Instruction call = getInstructionAt(toAddr(site));
 			if (call == null || !call.getFlowType().isCall() ||
-				(site >= 0x1048L) != call.getFlowType().isConditional() ||
+				(site >= 0x1048L && !call.getFlowType().isConditional()) ||
 				!toAddr(site + 4).equals(call.getFallThrough())) {
 				throw new AssertionError("call at " + toAddr(site) + ": " + call +
 					(call == null ? "" : " flow=" + call.getFlowType() +

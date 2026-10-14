@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.2 - 2026-10-13
+
 ### Added
 * `C6000JumpTableAnalyzer` recovers the TI compiler's switch dispatch
   (guarded `LDW` from an `MVK`/`MVKH` table, then `B`/`BNOP` through the

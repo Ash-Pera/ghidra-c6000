@@ -11,12 +11,13 @@ NOT_B1 = 0x5 << 28    # [!B1]
 
 # word, operand, registers before, expected after (pc: irp, nrp or next)
 CASES = [
-    (IRP, "IRP", {}, {"pc": "irp"}),
-    (IRP | B0, "IRP", {"B0": 1}, {"pc": "irp"}),
-    (IRP | B0, "IRP", {"B0": 0}, {"pc": "next"}),
-    (NRP, "NRP", {}, {"pc": "nrp"}),
-    (NRP | NOT_B1, "NRP", {"B1": 0}, {"pc": "nrp"}),
-    (NRP | NOT_B1, "NRP", {"B1": 1}, {"pc": "next"}),
+    (IRP, "IRP", {"CSR": 0x102, "TSR": 0x4}, {"pc": "irp", "CSR": 0x103, "TSR": 0x5}),
+    (IRP, "IRP", {"CSR": 0x101, "TSR": 0x5}, {"pc": "irp", "CSR": 0x100, "TSR": 0x4}),
+    (IRP | B0, "IRP", {"B0": 1, "CSR": 0x2, "TSR": 0x0}, {"pc": "irp", "CSR": 0x3, "TSR": 0x1}),
+    (IRP | B0, "IRP", {"B0": 0, "CSR": 0x2, "TSR": 0x0}, {"pc": "next", "CSR": 0x2, "TSR": 0x0}),
+    (NRP, "NRP", {"IER": 0x1, "TSR": 0x5}, {"pc": "nrp", "IER": 0x3, "TSR": 0x5}),
+    (NRP | NOT_B1, "NRP", {"B1": 0, "IER": 0x1}, {"pc": "nrp", "IER": 0x3}),
+    (NRP | NOT_B1, "NRP", {"B1": 1, "IER": 0x1}, {"pc": "next", "IER": 0x1}),
 ]
 
 

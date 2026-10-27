@@ -540,25 +540,25 @@ define pcodeop c6000_fp_status;
   i20=1 & i19=1 & i18=0 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
   i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { c6000_sem_b_ind(IRP); }
+  { c6000_sem_b_irp(); c6000_sem_b_ind(IRP); }
 :^Cond^"B.S2" "IRP" is c_is16=0 & Cond & creg!=0 & creg!=7 &
   i27=0 & i26=0 & i25=0 & i24=0 & i23=0 & i22=0 & i21=0 &
   i20=1 & i19=1 & i18=0 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
   i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { if (Cond == 0) goto inst_next; c6000_sem_b_ind(IRP); }
+  { if (Cond == 0) goto inst_next; c6000_sem_b_irp(); c6000_sem_b_ind(IRP); }
 :"B.S2" "NRP" is c_is16=0 & creg=0 & z=0 &
   i27=0 & i26=0 & i25=0 & i24=0 & i23=0 & i22=0 & i21=0 &
   i20=1 & i19=1 & i18=1 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
   i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { c6000_sem_b_ind(NRP); }
+  { c6000_sem_b_nrp(); c6000_sem_b_ind(NRP); }
 :^Cond^"B.S2" "NRP" is c_is16=0 & Cond & creg!=0 & creg!=7 &
   i27=0 & i26=0 & i25=0 & i24=0 & i23=0 & i22=0 & i21=0 &
   i20=1 & i19=1 & i18=1 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
   i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { if (Cond == 0) goto inst_next; c6000_sem_b_ind(NRP); }
+  { if (Cond == 0) goto inst_next; c6000_sem_b_nrp(); c6000_sem_b_ind(NRP); }
 
 @include "c6000_decode.sinc"
 define pcodeop c6000_sploop;

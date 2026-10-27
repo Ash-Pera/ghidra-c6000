@@ -4,6 +4,7 @@
 
 ### Fixed
 * Predicated `B IRP` and `B NRP` decode; they decoded as `B` through `B6` / `B7`.
+* `B IRP` restores GIE from PGIE and `B NRP` sets NMIE.
 
 ## 1.0.2 - 2026-10-13
 

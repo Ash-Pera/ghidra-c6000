@@ -717,7 +717,11 @@ def main():
                             sem = sem.replace(mem, "BaseReg")
                         if mem_mode >= 0x8:
                             sem += f" BaseReg = {mem};"
-                    if not fixed_pred:
+                    if not fixed_pred and mnem == "B" and ops and ops[0] != "BranchTarget":
+                        # A skip label after goto [t] makes the decompiler report
+                        # "Bad relative branch"; skip to inst_next (SPRUFE8B 3.12 B: else nop).
+                        sem = "if (Cond == 0) goto inst_next; %s" % sem
+                    elif not fixed_pred:
                         sem = "if (Cond == 0) goto <skip>; %s <skip>" % sem
                     if mnem == "B" and ops and ops[0] == "BranchTarget":
                         # Emit an unguarded direct branch for the always-true

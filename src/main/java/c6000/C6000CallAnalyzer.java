@@ -225,8 +225,13 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 					}
 					continue;
 				}
-				if (insn.getFlowType().isJump() || insn.getFlowType().isCall() ||
-					insn.getFlowType().isTerminal()) {
+				// A predicated jump falls through with B3 intact, unless the branch is in its
+				// delay slots: then B3 is that jump's return address. Any other flow ends B3.
+				boolean fallsThrough = predicate(insn) != null && insn.getFlowType().isJump() &&
+					!insn.getFlowType().isCall() && !insn.getFlowType().isTerminal() &&
+					!inWindow(insn, branch);
+				if (!fallsThrough && (insn.getFlowType().isJump() || insn.getFlowType().isCall() ||
+					insn.getFlowType().isTerminal())) {
 					regs.remove(program.getRegister("B3"));
 				}
 				track(insn, regs);
@@ -244,6 +249,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Instruction current = branch;
 			int cycles = 0;
 			int seen = 0;
+			boolean compact = branch.getLength() != 4;
 			boolean branchPacket = true;
 			try {
 				window: while (cycles < DELAY_CYCLES) {
@@ -263,6 +269,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 							if (!complementary(branch, next)) return null;
 							if (partner == null) partner = next;
 						}
+						if (next.getLength() != 4) compact = true;
 						track(next, regs);
 						packetCycles = Math.max(packetCycles, 1 + extraCycles(next));
 						current = next;
@@ -276,12 +283,16 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			}
 			if (partner != null && jumpArm(branch, partner)) return null;
 			long[] ret = regs.get(b3);
-			// B3 may be set before the branch too; the look-back forgets it at
-			// every earlier branch, so a known value here belongs to this call.
+			// B3 may be set before the branch too; the look-back forgets it at every
+			// earlier branch except a predicated jump outside whose window this branch lies.
 			if (ret == null || ret[1] != FULL) return null;
 			long branchAt = branch.getMinAddress().getOffset();
 			long windowEnd = current.getMaxAddress().getOffset() + 1;
 			if (ret[0] < branchAt + 4 || ret[0] > windowEnd + 8) return null;
+			boolean skew = compact || headerPacket(branch, windowEnd - 1) ||
+				headerPacket(branch, windowEnd);
+			// A call returns exactly at its window end; only compact packets skew the count.
+			if (ret[0] != windowEnd && !skew) return null;
 			Address callee = target == null ? null :
 				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
 			if (callee != null && !program.getMemory().contains(callee)) callee = null;
@@ -401,6 +412,43 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				if (o instanceof Address address) return address.getOffset();
 			}
 			return null;
+		}
+
+		/** True when {@code later} is in {@code jump}'s execute packet or five delay cycles. */
+		private boolean inWindow(Instruction jump, Instruction later) {
+			Instruction current = jump;
+			int cycles = 0;
+			boolean branchPacket = true;
+			try {
+				while (cycles < DELAY_CYCLES) {
+					int packetCycles = 1;
+					do {
+						if (branchPacket && !parallelWithNext(current)) break;
+						Instruction next = next(current);
+						if (next == null) return false;
+						if (next.getMinAddress().equals(later.getMinAddress())) return true;
+						packetCycles = Math.max(packetCycles, 1 + extraCycles(next));
+						current = next;
+					} while (parallelWithNext(current));
+					if (!branchPacket) cycles += packetCycles;
+					branchPacket = false;
+				}
+			}
+			catch (MemoryAccessException e) {
+				return false;
+			}
+			return false;
+		}
+
+		/** True when the fetch packet holding {@code at} has a compact header. */
+		private boolean headerPacket(Instruction near, long at) {
+			try {
+				Address base = near.getMinAddress().getNewAddress((at & ~31L) + 28);
+				return (program.getMemory().getInt(base) >>> 28) == 0xe;
+			}
+			catch (MemoryAccessException | ghidra.program.model.address.AddressOutOfBoundsException e) {
+				return false;
+			}
 		}
 
 		private Instruction next(Instruction current) {

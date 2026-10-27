@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Fixed
+* A `B` was taken for a call when `B3` pointed up to 8 bytes past its delay
+  window, so a jump whose delay slots, or the code before it, set `B3` for a
+  later call became a call: its local target became a function and the
+  caller's body was cut there. A call returns exactly at its window end, so
+  `B3` must now equal it; the 8-byte slack is kept only where a compact
+  fetch packet can skew the cycle count (`delayed-call.py`,
+  `C6000DelayedCallTest.java`).
+* The delayed-call look-back no longer forgets `B3` at a predicated jump: its
+  fall-through path keeps `B3`, so a call whose `B3` was loaded before such a
+  jump is recognised instead of being taken for a jump, which left the code
+  after it unreachable. A branch inside that jump's own delay slots does not
+  inherit the `B3`: there it is the jump's return address.
+
 ## 1.0.2 - 2026-10-13
 
 ### Added

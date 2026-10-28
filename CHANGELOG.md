@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Fixed
+* Add opt-in physical parallel-peer reports and reviewed-hash recovery of undefined
+  instructions while retaining existing code/data, context and annotations
+  (SPRUFE8B 3.5, 3.10.2, 3.10.4).
 * Add strict source-bound caller/store-tail traces with exact callee/caller byte
   ownership, native E3 store carry, and verified final caller E1 hazards
   (SPRUFE8B 3.5, 3.10, 4.2.3, 4.2.5, 4.2.6).

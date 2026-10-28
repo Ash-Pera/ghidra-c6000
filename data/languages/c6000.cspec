@@ -24,6 +24,7 @@
   <returnaddress>
     <register name="B3"/>
   </returnaddress>
+  <callotherfixup targetop="c6000_pipeline"><pcode dynamic="true"/></callotherfixup>
   <default_proto>
     <prototype name="__c6000" extrapop="0" stackshift="0" strategy="register">
       <input>

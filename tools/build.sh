@@ -92,7 +92,7 @@ for sla in "$ROOT"/data/languages/*.sla; do
 done
 
 note "building extension"
-( cd "$ROOT" && "$GHIDRA/support/gradle/gradlew" -q \
+( cd "$ROOT" && "$GHIDRA/support/gradle/gradlew" --no-watch-fs -q \
     -PGHIDRA_INSTALL_DIR="$GHIDRA" buildExtension )
 DIST="$(ls -t "$ROOT"/dist/*_C6000.zip 2>/dev/null | head -1)"
 [ -n "$DIST" ] || die "buildExtension produced no zip"

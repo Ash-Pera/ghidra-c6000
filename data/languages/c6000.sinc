@@ -87,6 +87,7 @@ define register offset=0x3000 size=4 [ contextreg ];
 # Synthetic execution address for Ghidra's p-code emulator.  C6000 exposes
 # PCE1 to instructions, while the emulator needs a distinct current PC.
 define register offset=0x3100 size=4 [ PC ];
+define register offset=0x3200 size=4 [ C6000_PIPE_RET ];
 
 # Every field is `noflow`: each describes the fetch packet that physically
 # contains the slot, so it must never be inherited from the instruction that
@@ -104,6 +105,7 @@ define context contextreg
   c_branch_terminal = (9,9) noflow # selected register branches after code discovery
   c_pfollow = (10,13) noflow # instructions parallel after this compact branch
   c_flow_delay = (15,22) noflow # proven delay window in bytes, set by the late return pass
+  c_schedule_entry = (23,23) noflow
   c_hdrpkt = (14,14) noflow # slot lies in a header-based (compact) fetch packet
 ;
 
@@ -530,6 +532,12 @@ define pcodeop c6000_fp_status;
 @endif
 @include "c6000_flow_delay.sinc"
 @include "c6000_semantics.sinc"
+define pcodeop c6000_pipeline;
+# The unreachable explicit build prevents SLEIGH from implicitly building the
+# operand BEFORE the userop. The native return hides the physical CFG; dynamic
+# injection supplies the exact scheduled CFG and its captured return target.
+:^instruction is c_schedule_entry=1 & instruction [ c_schedule_entry=0; c_flow_delay=0; ] { c6000_pipeline(); return [C6000_PIPE_RET]; build instruction; }
+with : c_schedule_entry=0 {
 # Figure F-8 pointer branches use op=110 (IRP) or 111 (NRP).
 # The op field overlaps the five-bit register field of Figure F-7; match
 # these fully encoded forms before the general B-register constructors.
@@ -569,3 +577,5 @@ define pcodeop c6000_spmask;
 define pcodeop c6000_spmaskr;
 @include "c6000_compact.sinc"
 @include "c6000_manual.sinc"
+
+}

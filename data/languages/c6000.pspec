@@ -3,6 +3,7 @@
 <processor_spec>
   <programcounter register="PC"/>
   <properties>
+    <property key="pcodeInjectLibraryClass" value="c6000.C6000PipelineInjectLibrary"/>
     <property key="c6000.packetSize" value="32"/>
     <property key="c6000.delaySlotsBranch" value="5"/>
     <property key="c6000.delaySlotsLoad" value="4"/>

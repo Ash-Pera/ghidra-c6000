@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Fixed
+* Add explicit per-function exact packet schedules for overlapping B/BNOP
+  transfers and E1/E2/E3/E4/E5 register and memory effects. Preserve raw exact
+  floating-point p-code, captured predicates/targets, delayed sticky flags,
+  same-packet old reads, and X-path stalls. Require a documented drained-entry
+  contract plus incoming E1 hazards; refuse unsupported phase contracts before
+  changing the listing. Transactional opt-in preserves annotations. See
+  [pipeline schedules](docs/pipeline-schedules.md) for coverage and limitations.
 * Recover proven unconditional B/BNOP delay windows (including IRP/NRP)
   in native p-code, accounting for parallel companions, multi-cycle NOPs,
   ADDKPC counts, PROT loads and compact packet headers. Sample targets and predicates

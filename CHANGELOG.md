@@ -1,61 +1,92 @@
 # Changelog
 
-## Unreleased
+## Unreleased (planned v1.0.5)
 
-### Fixed
+### Upgrade notes
+
+* All four C6000 language definitions are now version 1.1. Ghidra's native
+  migration rebuilds persisted instruction prototypes after the compact
+  operand fixes. Back up existing programs and annotations before upgrading;
+  see [migration notes](docs/internals.md#language-prototype-migration).
+* Full32 scalar move aliases now display their actual ADD/OR-zero encoding;
+  equal-source SUB and 40-bit MV retain their own identities. Identically
+  spelled short/long memory forms are exposed by `C6000EncodingInfo` and
+  `C6000ExportEncodingInfo.java` (SPRUFE8B 2.4, 3.9.3, 3.10.2).
+
+### Added
+
 * Add opt-in physical parallel-peer reports and reviewed-hash recovery of undefined
   instructions while retaining existing code/data, context and annotations
   (SPRUFE8B 3.5, 3.10.2, 3.10.4).
 * Add strict source-bound caller/store-tail traces with exact callee/caller byte
   ownership, native E3 store carry, and verified final caller E1 hazards
   (SPRUFE8B 3.5, 3.10, 4.2.3, 4.2.5, 4.2.6).
-* Resume normal post-loop dispatch at the documented SPKERNEL execution delay,
-  without an inferred six-cycle frontend refill; refuse buffered missed X-path
-  or AMR stalls, retain PM stalls, and prove dominated constant suffixes across
-  closed earlier control flow (SPRUFE8B p.481, 7.9.4, 7.12, 7.15.2).
-* Add explicit read-only closed direct-call traces with byte/ownership bounds,
-  raw p-code link proof and unchanged pending effects across call/return edges
-  (SPRUFE8B 3.5, 3.7, 3.10.2, 4.2); preserve ordinary function-schedule guards.
-* Schedule exact MPYLI integer products with E1 operand capture and simultaneous
-  E4 pair writeback; retain E1-only .M occupancy and reject conflicting result
-  write ports (SPRUFE8B MPYLI pp.344--345, 3.8.2).
-* Bump all C6000 language definitions to 1.1 so native Ghidra migration rebuilds persisted instruction-prototype partitions after compact operand fixes.
-* Capture updating-load addresses before base modification; preserve distinct E1 pointer and E5 data writes even when registers alias (SPRUFE8B 4.2.5/Table 4-10).
-* Prune only proved-impossible loading exits and predicate paths, using E1 snapshots and delayed counter interfaces; retain all unit and pending-return guards (SPRUFE8B 3.5, 3.8.8, 7.4.3, 7.9).
-* Schedule BDEC/BPOS from their raw predicate/counter decision through five delay cycles, with gated E1 decrement and cross-path hazards (SPRUFE8B pp.159-160,170-171).
-* Respect absolute five-bit compact move registers and fixed low comparison destinations, and use unscaled NDW offset/indirect addresses (SPRUFE8B G-1/G-2, D-7/D-9/D-10, C-9/C-11).
-* Capture ROTL operands in E1 and commit its result in E2 (SPRUFE8B pp.414-415).
-* Correct compact stack offsets, signed five-bit MVK, narrow-store widths and operand display (SPRUFE8B C-16, G-4, MVK/STB/STH entries).
-* Preserve full32 move encoding primitives and expose short/long address identity via `C6000EncodingInfo`; retain constant-copy recovery in call analysis (SPRUFE8B 2.4, 3.9.3, 3.10.2).
-* Reject conflicting multicycle NOP generators before native context priming and pipeline issue; preserve equal-count NOPs and whole execute-packet prefix timing (SPRUFE8B 3.5, 3.8.10, 3.8.11.5, 4.2.6).
-* Extend opt-in exact packet schedules with independent DP read ports, split
-  writes through E10, captured predicates and delayed status events. Refuse
-  changing repeated-read words. Add normal SPLOOP/D/W load/fetch/drain timing,
-  delayed ILC/RILC availability, SPMASK overlays, branch aborts and zero/one
-  iteration padding. Correct MVD E4, SPLOOPW counter preservation and predicate
-  sampling, displacement-BNOP restart recognition, and compact NOP counts
-  (SPRUFE8B 4.2, MVD pipeline, 7.4, 7.7–7.10, 7.14; Appendix H).
-  Reject invalid ILC setup/body accesses under SPRUFE8B 7.9.7. Nested reload
-  and loop interrupt/restart remain guarded in the packet compiler.
-* Add explicit per-function exact packet schedules for overlapping B/BNOP
-  transfers and E1/E2/E3/E4/E5 register and memory effects. Preserve raw exact
-  floating-point p-code, captured predicates/targets, delayed sticky flags,
-  same-packet old reads, and X-path stalls. Require a documented drained-entry
-  contract plus incoming E1 hazards; refuse unsupported phase contracts before
-  changing the listing. Transactional opt-in preserves annotations. See
-  [pipeline schedules](docs/pipeline-schedules.md) for coverage and limitations.
-* Recover proven unconditional B/BNOP delay windows (including IRP/NRP)
-  in native p-code, accounting for parallel companions, multi-cycle NOPs,
-  ADDKPC counts, PROT loads and compact packet headers. Sample targets and predicates
-  before delay work; keep tail stores and interrupt-enable restoration in
-  the owning function. Refuse nested transfers, defined data and other
-  function entries. Dry-run parsing and transactional recovery preserve
-  annotations, references and explicit fallthrough overrides.
-* CALLP executes its parallel companions before writing the side-specific
-  A3/B3 link, and links to the next execute packet rather than a fixed
-  `instruction + 24`. Correct mixed-width fallthrough using the proved
-  packet boundary. Generic Ghidra instruction stepping still has a
-  mixed-width delay-context limitation; listing p-code is tested directly.
+* Explicit per-function exact packet schedules preserve raw exact p-code,
+  captured predicates and targets, old parallel reads, delayed sticky flags,
+  X-path stalls and overlapping B/BNOP transfers. Supported phases extend
+  through E10, including independent DP read ports and split writes.
+  Enabling requires a documented drained entry and incoming E1 hazards,
+  preserves annotations transactionally, and refuses unsupported contracts
+  (SPRUFE8B 3.5, 3.8, 4.2). See [pipeline schedules](docs/pipeline-schedules.md).
+* Normal SPLOOP/D/W loading, fetch and drain states in the exact compiler,
+  including delayed ILC/RILC availability, SPMASK overlays, branch aborts and
+  zero/one-iteration padding. Nested reload and interrupt/restart remain
+  guarded there (SPRUFE8B 7.4, 7.7–7.10, 7.14).
+* Read-only closed direct-call traces carry pending effects across explicit
+  call/return windows, with byte hashes, ownership bounds and raw p-code link
+  proof. Ordinary function schedules retain their call and pending-return
+  guards (SPRUFE8B 3.5, 3.7, 3.10.2, 4.2).
+* `tools/verify.py` builds and tests the packaged extension in an isolated
+  Ghidra copy in both endian modes, retaining logs, completion markers and a
+  JSON summary with the archive SHA-256. `--with-ti` requires the additional
+  TI-assembled regressions. CI runs the core suite on all supported versions.
+* Archive checks require all four compiled languages, loader opinion, extension
+  JAR and compatibility metadata, and reject research, scratch and cache files.
+  Builds record the exact Gradle output path for subsequent verification.
+
+### Fixed
+
+* Verification scripts use the PcodeExecutor constructor and PcodeProgram
+  entry point shared by Ghidra 12.1.x and 12.2, so newer pipeline checks compile
+  on the full support matrix.
+* Recover proven unconditional B/BNOP delay windows, including IRP/NRP,
+  parallel companions, multicycle NOPs, ADDKPC, PROT loads and compact
+  headers. Targets and predicates are captured before delay work; tail stores
+  and interrupt-enable restoration remain in the owning function. Unsafe
+  windows are refused without changing annotations, references or explicit
+  fallthrough overrides (SPRUFE8B 3.5, 3.10.2, 4.2.6).
+* CALLP runs parallel companions before writing its A3/B3 link and links to
+  the next execute packet. Mixed-width native instruction stepping retains
+  a Ghidra delay-context limitation; listing p-code is tested directly.
+* Correct compact stack offsets, signed five-bit MVK, narrow-store widths,
+  operand display, absolute five-bit move registers, fixed low comparison
+  destinations and unscaled NDW offset/indirect addresses
+  (SPRUFE8B C-9/C-11/C-16, D-7/D-9/D-10, G-1/G-2/G-4, MVK/STB/STH).
+* Updating loads capture addresses before base modification and preserve
+  distinct E1 pointer and E5 data writes when registers alias
+  (SPRUFE8B 4.2.5/Table 4-10). Constant-copy recovery follows the corrected
+  full32 move primitives.
+* Schedule ROTL result writes in E2 and MPYLI pair writes simultaneously in
+  E4, with E1 operand capture, E1-only .M occupancy and conflicting write-port
+  refusals (SPRUFE8B pp. 344–345, 414–415, 3.8.2).
+* Schedule BDEC/BPOS from the raw predicate/counter decision through five
+  delay cycles, with gated E1 decrement and cross-path hazards
+  (SPRUFE8B pp. 159–160, 170–171).
+* Prune only proved-impossible loading exits and predicate paths, retaining
+  E1 snapshots, delayed counter visibility, unit checks and pending-return
+  guards. Prove dominated constant suffixes across closed earlier control
+  flow; reject invalid counted-loop ILC accesses (SPRUFE8B 3.5, 3.8.8,
+  7.4.3, 7.9.7).
+* Correct MVD E4 timing, SPLOOPW counter preservation and delayed predicate
+  sampling, displacement-BNOP restart recognition and compact NOP counts
+  (SPRUFE8B MVD pipeline, 7.7–7.10, 7.14, Appendix H).
+* Resume normal post-loop dispatch at the SPKERNEL execution delay without
+  an inferred six-cycle frontend refill. Refuse buffered missed X-path/AMR
+  stalls while retaining program-memory stalls
+  (SPRUFE8B p. 481, 7.9.4, 7.12, 7.15.2).
+* Reject conflicting multicycle NOP generators before context priming or
+  pipeline issue; preserve equal counts and whole execute-packet prefix timing
+  (SPRUFE8B 3.5, 3.8.10, 3.8.11.5, 4.2.6).
 
 ## 1.0.4 - 2026-10-27
 
@@ -110,9 +141,8 @@
 ### Added
 * `C6000JumpTableAnalyzer` recovers the TI compiler's switch dispatch
   (guarded `LDW` from an `MVK`/`MVKH` table, then `B`/`BNOP` through the
-  entry), which Ghidra's decompiler could not bound. On the CDJ-2000NXS DSP
-  all 9 such tables are recovered with their exact case counts; code outside
-  any function drops from 16,005 to 10,311 instructions.
+  entry), recovering bounded case targets and their function ownership when
+  Ghidra's decompiler cannot infer the table bounds.
 * CI builds and smoke-tests the extension against Ghidra 12.1.4 as well as
   12.1.3, and uploads one zip per version.
 
@@ -129,28 +159,25 @@
   fall-through and left their delay slots and the code after the return
   point undecoded.
 * Predicated `B` calls are recognised in the compiler's if/else call-pair
-  form (the other arm in the delay slots, `B3` set before the branch);
-  unrecognised predicated immediate calls on the CDJ-2000NXS DSP dropped
-  from 30 to 5, all overlapping-branch schedules that are not clear calls.
+  form, with the other arm in the delay slots and `B3` set before the branch.
+  Ambiguous overlapping-branch schedules remain conservative.
 * In a "call Y if p, else jump to X" pair only the call arm is a call; the
   jump arm (a register arm is always the call; otherwise the nearer target)
   stays a conditional jump, so the local else-block is no longer made a
-  function. 26 such arms on the CDJ-2000NXS DSP were wrongly calls.
+  function.
 * Register calls get their `MVK`/`MVKH` target reference in far more cases:
   the look-back now decodes undecoded delay slots and pointer-typed code
   words, follows register moves, skips oppositely predicated writes, and is
-  retried when earlier code appears. Register calls without a target on the
-  CDJ-2000NXS DSP dropped from 42 to 21; the rest load the target from
-  memory or another routine.
+  retried when preceding code is discovered. Targets loaded from memory or
+  supplied by another routine may remain unresolved.
 * Ghidra's heuristic non-returning-function discovery is disabled for the
   C6000 languages. It marked returning functions no-return because a call's
   delay slots and return point are not decoded until the call is
-  recognised, then cleared that code; 203 calls on the CDJ-2000NXS DSP lost
-  their fall-through this way.
+  recognised, then cleared code needed to establish their fall-through.
 
 ### Documentation
 * The README is now a short overview (install, quick start, features and
-  limitations, build, testing). Measured coverage and test fixtures moved to
+  limitations, build, testing). Verification guidance and test fixtures moved to
   `docs/verification.md`, packet, delay-slot, branch and ABI internals to
   `docs/internals.md`, and the detailed limitations (including the
   software-loop model) to `docs/limitations.md`.
@@ -170,12 +197,11 @@ First public release.
 * Broad 32-bit instruction decode generated from the SPRUFE8B section 3.12
   opcode tables, with unresolved encodings left undefined for investigation.
 * Compact 16-bit instruction decode driven by the fetch-packet header word,
-  covering most observed forms in SPRUFE8B appendices C.4, D.4, E.4, F.4,
+  covering supported forms in SPRUFE8B appendices C.4, D.4, E.4, F.4,
   G.3 and H.4; unsupported halfwords remain undefined.
 * The context fields are declared `noflow`. Without that attribute a compact
   slot reached by fall-through inherits the preceding instruction's decode
-  parameters and is decoded as a 32-bit instruction; this was the single
-  hardest bug in the port and is recorded here deliberately.
+  parameters and is decoded as a 32-bit instruction.
 * Modelled p-code semantics for the integer ALU, immediate construction,
   scalar loads and stores, single-precision floating point arithmetic and
   conversions, branches and calls; other decoded instructions lift to an
@@ -203,8 +229,7 @@ First public release.
   conflicting 32-bit opcode before predicate validation.
 * Signed immediates and `ADDKPC` operands use their documented fields; .L-unit
   five-bit constants use bits 22..18. Both directions of 32-bit `MVC` now move
-  between general and named control registers, including the firmware's
-  `FADCR` and `FMCR` boot instructions.
+  between general and named control registers, including `FADCR` and `FMCR`.
 * Immediate exports carry a four-byte width, so Ghidra's constant-propagation
   analyzers no longer receive zero-width p-code operands.
 * The register forms of `CLR`, `EXT`, `EXTU` and `SET` display their packed

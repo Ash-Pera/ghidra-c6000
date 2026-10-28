@@ -1,15 +1,12 @@
 # ghidra-c6000
 
 A free, open-source **Ghidra 12.x processor extension for the Texas Instruments
-TMS320C6000 DSP family** (C64x, C64x+, C67x, C67x+ and C674x). Ghidra has no
-C6000 support ([NationalSecurityAgency/ghidra#1807](https://github.com/NationalSecurityAgency/ghidra/issues/1807));
-this module adds decoding, including compact 16-bit fetch packets, p-code
-semantics for the decompiler, the C6000 C calling convention and C6000-specific
-analyzers. It was written to reverse-engineer the C674x DSP firmware of the
-Pioneer CDJ-2000NXS, independently from TI's public documentation
-(principally [SPRUFE8B](https://www.ti.com/lit/ug/sprufe8b/sprufe8b.pdf)); no
-disassembler source was copied, which is what allows the Apache-2.0 licence.
-See [`NOTICE.md`](NOTICE.md) for provenance.
+TMS320C6000 DSP family** (C64x, C64x+, C67x, C67x+ and C674x). It adds full32 and
+compact 16-bit decoding, p-code semantics for the decompiler, the C6000 C calling
+convention and C6000-specific analyzers. The implementation is based on TI's public
+documentation (principally [SPRUFE8B](https://www.ti.com/lit/ug/sprufe8b/sprufe8b.pdf));
+no disassembler source was copied, which is what allows the Apache-2.0 licence. See
+[`NOTICE.md`](NOTICE.md) for provenance.
 
 ## Install
 
@@ -18,9 +15,8 @@ See [`NOTICE.md`](NOTICE.md) for provenance.
    [build it](#build).
 2. In Ghidra: *File → Install Extensions*, **+**, pick the zip, restart Ghidra.
 
-Each zip is tied to the Ghidra version it was built against. Releases include
-builds for 12.1.3, 12.1.4 and 12.2; select the matching zip, or rebuild for
-another 12.x release.
+Each zip is tied to the Ghidra version it was built against. Releases include builds for
+12.1.3, 12.1.4 and 12.2; select the matching zip, or rebuild for another 12.x release.
 
 ## Quick start
 
@@ -35,30 +31,37 @@ another 12.x release.
 | `C6000:BE:32:default` | big-endian variant |
 | `C6000:LE:32:analysis` / `C6000:BE:32:analysis` | simplified single-precision p-code for *reading* float-heavy code; flag values are not suitable for emulation |
 
-A raw binary also needs an entry point before auto-analysis finds code. In
-the GUI, navigate to the address and run `C6000SetEntry.java` from Script
-Manager; in headless Ghidra, use `-preScript C6000SetEntry.java <hexaddr>`.
-The script rejects headless imports without an address or an address outside
-loaded memory.
-Compact packets decode only after the packet analyzer has primed the decode
-context, which auto-analysis does before disassembly.
+A raw binary also needs an entry point before auto-analysis finds code. In the GUI,
+navigate to the address and run `C6000SetEntry.java` from Script Manager; in headless
+Ghidra, use `-preScript C6000SetEntry.java <hexaddr>`. The script rejects headless
+imports without an address or an address outside loaded memory. Compact packets decode
+only after the packet analyzer has primed the decode context, which auto-analysis does
+before disassembly.
+
+When upgrading an existing program for v1.0.5, keep a packed backup first. The language
+version is now 1.1: Ghidra's native language migration rebuilds instruction prototypes
+after compact operand corrections. See the
+[migration notes](docs/internals.md#language-prototype-migration), including annotation
+and existing error-bookmark handling.
 
 ## Features and limitations
 
 | Area | State |
 |---|---|
 | 32-bit decode | broad SPRUFE8B §3.12 coverage, legacy `MVC`, C64x+ `LL`/`SL`/`CMTL`; unknown words stay undefined rather than guessed |
-| Compact 16-bit fetch packets | most observed forms decode, driven by the fetch-packet header (appendices C.4, D.4, E.4, F.4, G.3, H.4) |
+| Compact 16-bit fetch packets | supported forms decode using the fetch-packet header (appendices C.4, D.4, E.4, F.4, G.3, H.4) |
 | Branches and calls | PCE1-relative targets; delayed `B` + `ADDKPC` calls and `B3` returns recovered by analyzers |
 | P-code | integer ALU, multiplies, saturating and packed arithmetic, bit fields, linear and AMR circular addressing, loads/stores, single- and selected double-precision FP, compares, shifts, branches, `MVC`; no unimplemented-instruction placeholders remain |
 | Software loops (`SPLOOP` family) | decoded and annotated with bookmarks; a separate cycle scheduler replays loop buffers (`C6000LoopReplay.java`) |
+| Exact packet timing (explicit opt-in) | bounded per-function schedules for supported instruction phases, overlapping branches and normal software loops; unsupported contracts are refused |
 | Calling convention | TI C6000 C ABI (A4/B4/A6/B6… arguments, A4 return, B3 return address, B15 stack) |
 | Function ID | `tools/gen_fid.py` generator only; no database shipped (TI licence) |
 
 Main limitations:
 
-- Execute packets are not atomic: each instruction is lifted on its own, and
-  ordinary result latency and overlapping branch pipelines are not modelled.
+- Default instruction lifting handles each instruction separately; packet
+  parallelism and result latency require a supported, explicitly enabled
+  [exact packet schedule](docs/pipeline-schedules.md) with a proved entry contract.
   Proven unconditional B/BNOP windows and CALLP packet companions use native
   delay p-code; see the documented mixed-width emulator limitation.
 - Constant propagation is bounded to 512-byte windows to avoid heap
@@ -67,63 +70,72 @@ Main limitations:
   reciprocal-estimate seeds are not proven bit-exact.
 - Linked-word operations and `IDLE` lift to named events for an external
   monitor or scheduler.
-- Architecture-wide fidelity is not established: firmware coverage and oracle
-  samples are regression evidence, not a completeness proof.
+- Instruction and timing coverage is bounded by the documented models and
+  regression fixtures; it is not a complete hardware-emulation contract.
 
 More detail:
 
 - [docs/limitations.md](docs/limitations.md): every known limitation, including the software-loop model.
 - [docs/internals.md](docs/internals.md): compact packets, execute packets and delay slots, branch targets, analyzers, calling convention, source layout.
-- [docs/verification.md](docs/verification.md): measured firmware coverage, GNU-oracle comparisons, and the per-instruction test fixtures.
+- [docs/verification.md](docs/verification.md): reproducible checks, retained results, and optional corpus/GNU-oracle comparisons.
+- [docs/pipeline-schedules.md](docs/pipeline-schedules.md): exact timing contracts, supported phases and refusal boundaries.
 - [docs/software-loop-conformance.md](docs/software-loop-conformance.md): the software-loop behaviour contract for an emulator.
+- [docs/release.md](docs/release.md): v1.0.5 candidate notes and release checklist.
 
 ## Build
 
-Requirements: **Ghidra 12.x** and the JDK it declares in
-`Ghidra/application.properties` (`application.java.min`): **JDK 21** for 12.0 and
-12.1, **JDK 25** for 12.2. The build script selects this version when
-`JAVA_HOME` is unset and rejects an explicitly configured JDK that is too old.
+Requirements: **Ghidra 12.x** and the JDK it declares in `Ghidra/application.properties`
+(`application.java.min`): **JDK 21** for 12.0 and 12.1, **JDK 25** for 12.2. The build
+script selects this version when `JAVA_HOME` is unset and rejects an explicitly
+configured JDK that is too old.
 
 ```sh
 tools/build.sh                             # compile SLEIGH, build dist/*_C6000.zip
 tools/build.sh --install /path/to/ghidra   # ... and unzip it into <ghidra>/Ghidra/Extensions
 ```
 
-Set `GHIDRA_INSTALL_DIR` and `JAVA_HOME` if Ghidra and that JDK are not in
-Homebrew's default locations. The script exists because Gradle's
-`buildExtension` does **not** compile SLEIGH: a zip built without the `.sla`
-files installs cleanly and then fails at import with `Unsupported language`.
-`build.sh` compiles every `.slaspec` first and checks that the zip contains all
-four compiled language variants and the loader opinion.
+Set `GHIDRA_INSTALL_DIR` and `JAVA_HOME` if Ghidra and that JDK are not in Homebrew's
+default locations. The script exists because Gradle's `buildExtension` does **not**
+compile SLEIGH: a zip built without the `.sla` files installs cleanly and then fails at
+import with `Unsupported language`. `build.sh` compiles every `.slaspec` first and
+checks archive integrity, all four compiled language variants, the loader opinion,
+extension JAR and compatibility version. It also rejects local research, scratch and
+cache files. The verified zip path is recorded in `$GHIDRA_WORK/archive-path.txt`
+(`scratch/build/archive-path.txt` by default).
 
 ## Testing
 
-CI ([`build.yml`](.github/workflows/build.yml)) runs `tools/build.sh`, installs
-the zip into a fresh Ghidra (12.1.3, 12.1.4 and 12.2) and decodes a 48-byte synthetic
-image with `C6000CorpusTest.java`, requiring no undecoded slots and no
-zero-width p-code operands.
+```sh
+python3 tools/verify.py --jobs 2            # build and run LE/BE release regressions
+python3 tools/verify.py --with-ti --jobs 2  # also require TI-assembled fixtures
+```
+
+CI ([`build.yml`](.github/workflows/build.yml)) runs the same core suite on Ghidra
+12.1.3, 12.1.4 and 12.2. It checks the packaged extension in a fresh scratch
+installation, including decode, native flow, exact packet scheduling and floating-point
+execution. Logs and a JSON summary are retained. The additional TI-assembled checks
+require a local C6000 compiler/assembler.
 
 Beyond that, [docs/verification.md](docs/verification.md) describes:
 
 - `C6000CorpusTest.java`, which linearly decodes any image you pass (path, base,
   offset, length) and reports instruction counts, placeholders and undecoded
-  slots. No firmware is in this repository.
+  slots.
 - `tools/oracle_compare.py` and the `audit_*_oracle.py` scripts, which compare
-  listings against GNU `objdump -m tic6x` on firmware and on random 32-bit and
-  compact encoding samples.
+  listings against GNU `objdump -m tic6x` on supplied images and generated
+  full32 and compact encoding samples.
 - `tests/fixtures/*.py` generators plus matching `ghidra_scripts/C6000*Test.java`
   scripts, which execute p-code in Ghidra's emulator against expected results
   in both endian modes.
 
 ## Contributing
 
-Bug reports and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
-For a wrong decode or wrong semantics, please use the
+Bug reports and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). For a
+wrong decode or wrong semantics, please use the
 [issue template](https://github.com/geepot/ghidra-c6000/issues/new?template=wrong-decode.md)
 and include the address, the bytes, and what you expected.
 
 ## Licence
 
-Apache License 2.0; see [`LICENSE`](LICENSE) and [`NOTICE.md`](NOTICE.md).
-Ghidra is a separate Apache-2.0 project of the NSA; this extension is not part
-of it.
+Apache License 2.0; see [`LICENSE`](LICENSE) and [`NOTICE.md`](NOTICE.md). Ghidra is a
+separate Apache-2.0 project of the NSA; this extension is not part of it.

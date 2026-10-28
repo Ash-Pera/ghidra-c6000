@@ -1,155 +1,103 @@
 # Status and known limitations
 
-The short list is in the [README](../README.md#features-and-limitations); this
-page has the detail. The module is a working decoder with staged semantics.
+The extension provides instruction decode, p-code and C6000-specific analysis. Its
+models have different timing and execution guarantees. Use the
+[verification guide](verification.md) to check the behaviors you depend on.
 
-## Status by area
+## Decode and analysis
 
-| Area | State |
-|---|---|
-| 32-bit instruction decode (mnemonic, unit, operands, length) | broad SPRUFE8B §3.12 coverage, legacy `MVC`, and C64x+ linked-word `LL`/`SL`/`CMTL`; no nonfill gaps in the measured stage 2 payload or the stage 1 code region |
-| Instruction lengths and execute-packet framing | 2/4-byte lengths and compact layout context; execute packets are not atomic |
-| Branch / call targets (`B`, `BNOP`, `CALLP`, `BDEC`, `BPOS`) | modelled in the RAM address space, PCE1-relative per the manual; delayed `B` + `ADDKPC` calls and `B`/`BNOP` returns through B3 recovered by analyzers |
-| Compact 16-bit fetch packets | most observed slots decode, driven by packet-header context (see [internals](internals.md#compact-16-bit-fetch-packets)) |
-| P-code semantics | integer ALU and common multiplies, compact saturating arithmetic, immediates, bit-field operations, linear and AMR circular address arithmetic, scalar and doubleword loads/stores, single-precision arithmetic and conversions, selected double-precision arithmetic and conversions, compares, shifts, branches/calls, `MVC` |
-| Other decoded instructions | no generated `c6000_unimpl_<mnemonic>` calls remain; software-loop controls, `IDLE`, and C64x+ linked-word operations use named event userops; `DINT`/`RINT` update `TSR` and `CSR` interrupt-enable bits; `B IRP` restores GIE and `B NRP` sets NMIE, but the rest of the `ITSR`/`NTSR` to `TSR` restore is not modelled |
-| Function ID | generation script shipped; database not shipped (TI licence) |
-| Software loop controls | decoded and annotated; a separate cycle scheduler replays buffered packets and stage-boundary `ILC` changes, including predicate-driven `SPLOOPW` |
-| Architecture-wide fidelity | not yet established by firmware coverage; packet timing, selected floating-point status, and exact reciprocal seeds need further verification |
+**Coverage is not exhaustive.** Decode covers the documented full32 opcode maps and
+supported compact formats, including legacy MVC and C64x+ LL/SL/CMTL. Unknown encodings
+remain undefined. A successful sample or corpus run does not establish coverage of every
+architectural encoding.
 
-## Limitations
+**Compact decode needs packet context.** The packet analyzer normally primes it before
+disassembly. Tools that bypass auto-analysis must call `C6000PacketContext.prime` before
+decoding compact slots. The `noflow` context fields prevent one instruction's header
+parameters from leaking into another; see
+[compact packet internals](internals.md#compact-16-bit-fetch-packets).
 
-* **One recovered cross-stage function can still crash the native decompiler.**
-  In a fresh combined DSP analysis, the function at `0x11803100` fails with
-  both v1.0.3 and v1.0.4. The other 713 recovered functions completed within
-  30 seconds in the v1.0.4 verification run; see [verification](verification.md).
-* **Compact instructions decode via the header context**, which the Java
-  analyzer primes before disassembly. The context fields are marked `noflow`
-  so a compact slot reached by fall-through is not decoded with the previous
-  instruction's parameters; the price is that a tool which disassembles
-  without priming the context will not decode compact packets at all.
-* **Some architecture encodings may remain uncovered.** The [measured](verification.md) stage 2
-  payload and stage 1 code region have no undecoded nonfill slots, but those
-  images are not an exhaustive encoding test. The decoder leaves unknown words
-  undefined instead of guessing an instruction.
-* **Execute packets are not modelled as units** — see
-  [internals](internals.md#execute-packets-delay-slots-and-parallel-semantics).
-* **C64x+ linked-word operations need a memory monitor.** `LL` and `SL`
-  expose their CPU-visible load/store plus named link events. `CMTL` returns
-  its monitor-provided success value through a userop. Ghidra's instruction
-  emulator cannot decide another core's link state by itself.
-* **Delay modeling is bounded.** Proven unconditional B/BNOP windows and CALLP
-  packet companions use native delay p-code. Nested transfers, predicated full
-  windows, BDEC/BPOS, and existing delayed-call overrides remain conservative.
-  Loads/arithmetic still assign results without architectural write latency.
-  Stock Ghidra instruction stepping can fail on mixed-width delay windows;
-  direct listing p-code execution and decompilation have separate tests.
-* **Constant propagation is bounded to 512-byte windows.** This prevents the
-  observed stage 2 heap exhaustion and recovers the three checked stage 1
-  register-built call targets, but a value carried only across a longer span
-  may not produce a computed reference automatically.
-* **Misaligned aligned-word loads are outside the documented input domain.**
-  SPRUFE8B requires `LDW` addresses to be word aligned. Its p-code clears
-  the low two address bits so a propagated misaligned address cannot make
-  Ghidra's decompiler construct an invalid four-byte RAM range. Emulator
-  behavior for an actual misaligned `LDW` remains to be established.
-* **AMR updates are instruction-level.** `.D` effective addresses and
-  ADDA/SUBA results wrap for A4-A7/B4-B7, including BK0/BK1 selection and
-  bytewise wrapping of nonaligned transfers. Base writes occur after the
-  memory transfer so a store using the same register for its source and base
-  reads the old value. Packet timing for writes to AMR still needs a
-  cycle-aware execution model.
-* **Floating-point fidelity remains incomplete.** Some arithmetic still lacks
-  status-register side effects. `SPDP` and `DPSP` model their documented
-  special values and status flags; `DPSP` also uses the FADCR rounding mode.
-  `MPYSP2DP` handles signed special values and FMCR warning bits. `MPYSP`
-  uses the same input handling and rounds its result using FMCR. `MPYSPDP`
-  handles mixed-width special values and rounds its DP product using FMCR.
-  `ADDSP` and
-  `SUBSP` use FADCR rounding and warning bits, including the reversed `SUBSP`
-  opcodes and both `.L` and `.S` unit forms. `ADDDP` and `SUBDP` use FADCR;
-  `MPYDP` uses FMCR. Their finite arithmetic uses a quad-precision intermediate
-  to preserve DP rounding, and their status flags include denormal, NaN,
-  invalid, inexact, overflow, and underflow. `INTSP` and `INTSPU` also use
-  FADCR rounding and set INEX for rounded integer conversions.
-  The reciprocal estimate
-  instructions implement TI's special cases and FAUCR flags, and return an
-  eight-bit-accurate seed. TI does not publish the seed lookup table, so ordinary
-  estimates are not yet proven bit-exact against hardware. `MVC` uses
-  distinct control registers in its 32-bit forms; the compact `MVC` to `ILC`
-  is also modelled.
-* **SWE/SWENR exception transitions are instruction-level models.** For SWE,
-  `NRP = inst_next` is exact when SWE ends its execute packet. A packet-aware
-  executor is needed when SWE runs in parallel with NOP, and simultaneous
-  exception priority is not represented in p-code.
-* **RPACK2 documentation differs from its example:** the published execution
-  rule and compiler guide specify a saturating left shift, which yields
-  `0xFDB9` for the upper halfword of the sample `0xFEDCBA98`; the worked
-  example prints `0xFDBA`. The implementation follows the stated operation.
-* **Software loops:** `SPLOOP`, `SPLOOPD`, `SPLOOPW`, `SPKERNEL`,
-  `SPKERNELR`, `SPMASK`, and `SPMASKR` lift to named p-code userops with their
-  interval, encoded predicate selector, delay field, or unit mask. The selector
-  preserves which register the buffer evaluates at later stage boundaries.
-  The unconditional `SPLOOP`
-  also performs its initial nonzero `ILC` decrement. Both 16-bit and 32-bit
-  initiation intervals display their actual value (encoded value plus one).
-  `C6000SoftwareLoopAnalyzer` matches each disassembled loop start with its
-  kernel boundary and adds Info bookmarks at both addresses. The bookmarks
-  resolve the six-bit `SPKERNEL` field to stage/cycle delay using the loop's
-  initiation interval and show the source body, execute-packet count and
-  dynamic length in cycles, including `NOP n` idle cycles;
-  `SPMASK` bookmarks list the affected functional units. Source packets from
-  different stages overlay the same buffer slots, so their count may exceed
-  the buffer's 14-entry capacity. If an undecoded slot lies in the body, its
-  byte count appears in the bookmark instead of an exact packet count.
-  `C6000LoopBuffer` replays source and buffered instructions by cycle without
-  adding a false PC branch. It handles initiation interval overlap, source
-  `SPMASK` filtering, counted `SPLOOP`/`SPLOOPD` termination, the first-three-
-  cycle `SPLOOPD` grace period, and the three-cycle delayed `SPLOOPW`
-  predicate. `SPLOOPW` leaves `ILC` and `RILC` unchanged (SPRUFE8B 7.10). The callback exposes each cycle's operations
-  and `ILC` before and after stage boundaries. Zero- and one-iteration loops
-  issue idle cycles through the last loading-stage boundary when the body ends
-  partway through a stage. The detailed replay result gives the first cycle
-  of post-body program-memory fetch; each overlapping epilog cycle marks its
-  post-body fetch index. Given a caller-selected post-body execute packet,
-  `overlayPostBody` applies its `SPMASK` to buffered operations in that cycle.
-  For counted loops, a caller-supplied pending, unblocked interrupt signal can
-  start draining at an eligible stage boundary; the result preserves `ILC` and
-  keeps post-body fetch disabled. The result stops when the loop buffer finishes
-  draining, before pending pipeline writes and handler entry. `SPLOOPW` keeps
-  testing its delayed predicate during interrupt drain; if it ends the loop,
-  the result identifies the first post-body instruction as the interrupt target.
-  An `INTERRUPT_DRAINED` result yields an `InterruptHandoff` with the saved
-  `SPLOOP` packet address, `ILC`, and `SPLX` state. After the caller restores
-  architectural state, `replayCountedRestart` or `replayWhileRestart` pipes the
-  loop back up: source `SPMASK` suppresses program operations, buffered masked
-  operations execute, and `SPLOOPD` uses the `SPLOOP` initial test/decrement.
-  In Ghidra's Script Manager, run
-  `C6000LoopReplay.java` on a selected `SPLOOP`, or pass its address, initial
-  `ILC` (for counted loops) or number of true predicate samples (for
-  `SPLOOPW`), and a cycle limit as arguments. A fourth argument supplies the
-  initial `ILC` for a `SPLOOPW` trace or the first pending-interrupt cycle for a
-  counted trace. A fifth argument supplies the `SPLOOPW` pending-interrupt cycle.
-  Append `restart` after the interrupt argument to trace return with saved
-  `SPLX=1`.
-  For example,
-  `C6000LoopReplay.java 0xC00036A4 2 128` traces 48 cycles of the stage 2
-  loop at that address. `C6000LoopModelTest.java` checks all decoded loop
-  bodies in an imported image.
+**Constant propagation is bounded.** Each walk is limited to 512 bytes to bound memory
+use. A register-built target carried across a longer span, loaded from memory or
+supplied by another routine may remain unresolved. Raw imports also need an explicit
+entry before code discovery can begin.
 
-  The helper reports operation order and loop-control state. It does not
-  execute instruction p-code, retire instruction writes, enter handlers, or
-  choose the post-body packet after branches. Immediate reload is available
-  through its explicit RILC/predicate callback API; delayed reload still needs
-  additional state. Masked BNOP/ADDKPC restart keeps its idle cycles while
-  suppressing issue effects. [The loop conformance notes](software-loop-conformance.md)
-  specify the remaining emulator state. Native Ghidra decompilation displays
-  loop-control userops unless a supported function is explicitly enabled with
-  the [exact packet compiler](pipeline-schedules.md). That compiler executes
-  normal counted/while loops with instruction writeback phases; nested reload
-  and loop interrupt/restart remain unsupported there.
-* **Predication** is decoded, displayed and guards the modelled 32-bit p-code.
-  Compact predication and packet-wide parallel effects need further work.
-* The generic corpus is assembled from GNU binutils, whose tic6x assembler
-  covers less of the ISA than the manual; it is a regression oracle, not a
-  completeness proof.
+## Packet timing and control flow
+
+| Model | Supported behavior | Boundary |
+|---|---|---|
+| Default instruction p-code | Instruction effects and proved native B/BNOP/CALLP delay windows. | Parallel instructions are lifted individually; ordinary writeback latency is not scheduled. |
+| [Exact packet schedules](pipeline-schedules.md) | Supported parallel reads, pending branches and register/memory/status phases through E10; normal software loops. | Explicit opt-in, proved drained entry and incoming E1 hazards; unsupported timing and ownership contracts are refused. |
+| [Loop replay](software-loop-conformance.md) | Buffer issue order, masks, loop counters and supported drain/restart behavior. | Does not execute instruction p-code, retire writes or enter interrupt handlers. |
+| Read-only caller traces | Pending effects carried through explicit immutable caller/callee windows. | Bounded plans and entry proofs; not automatically installed as ordinary function schedules. |
+
+Native delay recovery remains conservative for nested transfers, predicated full
+windows, BDEC/BPOS and existing delayed-call overrides. Ghidra's stock instruction-step
+emulator can fail on mixed-width delay windows; direct listing p-code execution and
+native decompilation have separate checks.
+
+Read-only trace contracts are documented for
+[closed direct calls](closed-call-traces.md),
+[caller continuations](caller-continuation-traces.md) and
+[strict caller/store tails](caller-tail-traces.md). A function boundary or ABI prototype
+does not establish an empty incoming pipeline.
+
+## Memory and addressing
+
+**Aligned LDW requires a word-aligned address.** Its p-code clears the low two address
+bits so a propagated misaligned value cannot form an invalid four-byte RAM range in the
+decompiler. Actual hardware behavior outside the documented alignment requirement is not
+established by this model.
+
+**AMR effects are modeled at instruction level.** Eligible A4–A7/B4–B7 bases wrap
+through BK0/BK1, including bytewise wrapping of nonaligned transfers. Stores capture
+their source before a base update. Packet timing involving AMR writes is not generally
+modeled. The exact compiler refuses unsupported control-register effects and buffered
+missed-stall conditions.
+
+**Linked-word operations require an external memory monitor.** LL and SL expose the
+CPU-visible transfer and named link events. CMTL receives success from a userop; the
+stock instruction emulator cannot infer another core's link state.
+
+## Floating point and arithmetic
+
+Selected instructions model rounding modes, special values and status events, but
+status-register coverage is not complete across the ISA. ADDSP/SUBSP and ADDDP/SUBDP use
+FADCR; MPYSP, MPYSPDP and MPYDP use FMCR. Supported DP arithmetic uses a quad-precision
+intermediate to retain DP rounding. See the
+[fixture catalog](regressions.md#integer-and-floating-point-execution) for
+instruction-specific execution checks.
+
+Reciprocal estimates implement documented special cases and FAUCR flags with an
+eight-bit-accurate seed. TI does not publish the seed lookup table, so ordinary results
+are not proven bit-exact against hardware.
+
+The `analysis` language variants simplify single-precision arithmetic and use an opaque
+status userop. They are reading aids; use the default languages for emulation and exact
+rounding/status checks.
+
+The published RPACK2 execution rule and compiler guide specify a saturating left shift.
+For the manual's `0xFEDCBA98` example this yields upper halfword `0xFDB9`, while the
+worked example prints `0xFDBA`. The implementation follows the stated operation.
+
+## Loops, interrupts and exceptions
+
+Software-loop instructions lift to named userops and receive analyzer bookmarks. The
+loop replay helper models buffer control separately from instruction execution. The
+exact compiler supports normal counted/while loops, but nested reload and loop
+interrupt/restart remain unsupported there. Detailed callback, reload and handoff
+contracts are in the [loop-conformance guide](software-loop-conformance.md).
+
+DINT/RINT update modeled TSR/CSR interrupt-enable fields. B IRP restores GIE and B NRP
+sets NMIE; the remaining ITSR/NTSR-to-TSR restore is not modeled. IDLE emits a scheduler
+event; the stock emulator does not suspend until an interrupt on its own.
+
+SWE/SWENR transitions are instruction-level models. `NRP = inst_next` is exact when SWE
+ends its execute packet. Parallel companions and simultaneous exception priority require
+a packet-aware executor.
+
+## Function ID
+
+Only the [database generator](internals.md#function-id) is shipped. A database derived
+from TI's run-time library is not distributed because its licensing must be assessed
+separately.

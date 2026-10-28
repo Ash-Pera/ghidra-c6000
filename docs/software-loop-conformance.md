@@ -1,34 +1,60 @@
 # C674x software-loop conformance
 
-This is the transfer contract for a future emulator. The authoritative behavior is
-[TI SPRUFE8B, chapter 7](https://www.ti.com/lit/ug/sprufe8b/sprufe8b.pdf),
-especially §§7.7–7.13. `C6000LoopBuffer` is a cycle scheduler over Ghidra
-instructions; it does not execute their p-code. Keep the scheduler's control
-state separate from register, memory, branch, and pipeline state when porting it.
+`C6000LoopBuffer` schedules loop-buffer issue cycles over decoded Ghidra instructions.
+It does not execute their p-code. Its contract follows
+[TI SPRUFE8B, chapter 7](https://www.ti.com/lit/ug/sprufe8b/sprufe8b.pdf), particularly
+sections 7.7–7.13.
 
-## Verified behavior
+The [exact packet compiler](pipeline-schedules.md) separately executes supported normal
+loops with instruction writeback phases. Its
+[post-loop dispatch contract](post-loop-dispatch.md) is distinct from the helper's
+abstract fetch window.
 
-| Behavior | Current model | Check |
+## Loop-buffer contract
+
+| Behavior | API or rule |
+|---|---|
+| Source packets and idle cycles | `fromProgram` extracts execute packets, compact parallel bits and decoded NOP durations. |
+| Initiation-interval overlap | `operationsAt` distinguishes source and buffered operations; SPMASK suppresses the selected units. |
+| Counted termination | `replayCountedDetailed` models the initial SPLOOP ILC test/decrement and the SPLOOPD first-three-cycle grace period. |
+| Short final loading stage | Zero/one-count loops retain idle cycles through the last loading-stage boundary. |
+| While termination | `replayWhileDetailed` samples its predicate with a three-cycle delay and leaves ILC/RILC unchanged. |
+| Post-body fetch | `ReplayResult.firstPostBodyCycle` and `Cycle.postBodyFetchEnabled` expose the fetch window and epilog overlap. |
+| Post-body masking | `Cycle.overlayPostBody(packet)` filters buffered operations using the caller-selected program packet. |
+| Counted interrupt drain | An eligible pending, unblocked interrupt preserves ILC, disables post-body fetch and yields `INTERRUPT_DRAINED`. |
+| While interrupt drain | Delayed predicate tests continue during drain; termination can yield `INTERRUPT_AT_POST_BODY`. |
+| Interrupt restart | `InterruptHandoff` records the SPLOOP packet, ILC and SPLX; restart reverses source/buffer masking and uses the SPLOOP initial control for SPLOOPD. |
+| Suppressed restart operations | Masked BNOP/ADDKPC and protected loads retain idle duration without issuing suppressed effects. |
+| Immediate reload | `replayImmediateReload` samples the outer predicate and visible RILC for the supported SPKERNELR case. |
+
+Cycle zero is the cycle **after** the SPLOOP execute packet.
+`firstPostBodyCycle == cycles` means fetching resumes on the next cycle after the
+reported trace. Operations listed in one cycle are simultaneous. An executor must
+advance through an `idleOnly` operation's cycles without executing that instruction's
+p-code.
+
+## Using the replay script
+
+In Script Manager, select a decoded SPLOOP instruction and run `C6000LoopReplay.java`.
+For a headless run, supply that instruction's address as the first argument:
+
+```text
+C6000LoopReplay.java LOOP_ADDRESS COUNT CYCLE_LIMIT
+```
+
+For counted loops, COUNT is initial ILC. For SPLOOPW, it is the number of predicate
+samples that remain true. COUNT defaults to 2 and CYCLE_LIMIT to 512.
+
+| Optional argument | Counted loops | SPLOOPW |
 |---|---|---|
-| Source execute packets, compact parallel bits, `NOP n` idle cycles | `fromProgram` extracts one scheduled iteration | 24/24 stage 1 and 224/224 stage 2 firmware bodies parsed |
-| Initiation interval overlap and source `SPMASK` | `operationsAt` identifies program versus buffered operations and suppresses masked units | Firmware replay of all 248 paired loops |
-| `SPLOOP` initial zero/nonzero `ILC` test and `SPLOOPD` first-three-cycle grace | `replayCountedDetailed` | Zero, one, and two-count runs over every counted firmware loop |
-| Short final loading stage | Idle cycles continue through its stage boundary | Zero and one-count firmware replay assertions |
-| `SPLOOPW` three-cycle delayed predicate and stage-boundary `ILC` decrement | `replayWhileDetailed` | Every detected firmware `SPLOOPW` replayed |
-| Post-`SPKERNEL` fetch delay and epilog overlap | `ReplayResult.firstPostBodyCycle`, `Cycle.postBodyFetchEnabled` | Stage 2 loop at `0xC0003362`: delay 8 cycles, first fetch cycle 18, replay ends at cycle 23 |
-| Post-body `SPMASK` suppression | `Cycle.overlayPostBody(packet)` filters buffered operations using the caller's selected program packet | 1 stage 1 and 53 stage 2 overlay cycles exercised with synthetic packets containing a `SPMASK` instruction drawn from firmware |
-| Counted-loop interrupt eligibility and buffer drain | `replayCountedDetailed` accepts a pending, unblocked interrupt signal, preserves `ILC`, disables post-body fetch, and returns `INTERRUPT_DRAINED` | Every counted firmware loop drained with a persistent pending signal and high `ILC`; short loops completed without accepting it |
-| `SPLOOPW` interrupt drain and delayed-condition exit | `replayWhileDetailed` continues predicate tests while draining and distinguishes `INTERRUPT_DRAINED` from `INTERRUPT_AT_POST_BODY` | All detected firmware `SPLOOPW` loops drained with a true predicate; synthetic predicate changes ended 15 stage 1 and 39 stage 2 drains at the post-body instruction |
-| Interrupt return packet and pipe-up | `InterruptHandoff` exposes the saved `SPLOOP` packet address, `ILC`, and `SPLX`; restart replay reverses source `SPMASK` behavior and makes `SPLOOPD` use `SPLOOP` initial control | All 248 detected firmware loops replayed on restart; 31 stage 1 and 584 stage 2 masked source operations were identified, and 2 stage 2 buffered operations ran through a source mask |
-| Restart idle cycles for `BNOP`, masked `ADDKPC`, and protected loads | Source packet duration includes encoded delay counts and the compact header's `PROT` bit; restart issues an `Operation` with `idleOnly=true` for suppressed effects | Four assembled C674x loops cover displacement `BNOP`, masked register `BNOP`, masked `ADDKPC`, and a masked protected `LDW`. Firmware contains 6 stage 1 and 42 stage 2 protected source loads; all 248 loops replayed with the corrected durations |
-| Immediate `SPKERNELR` reload | `replayImmediateReload` starts each buffered invocation after the final kernel boundary, copies and decrements the visible `RILC`, and overlaps its prolog with the previous epilog | Assembled buffer sequence from TI Example 7-15 replays two or three invocations in 20 or 27 cycles, including simultaneous old `STW` and new `MV` issues |
+| Fourth | First pending, unblocked interrupt cycle. | Initial ILC, traced without controlling termination. |
+| Fifth | `restart`, after the interrupt argument. | First pending, unblocked interrupt cycle. |
+| Sixth | — | `restart`, after the interrupt argument. |
 
-The replay result's cycle numbers begin at zero on the cycle **after** the
-`SPLOOP` execute packet. `firstPostBodyCycle == cycles` means fetching resumes
-on the next cycle after the reported loop trace. Operations in one cycle are
-simultaneous even though the API returns a list for inspection. An emulator
-must advance through an `idleOnly` operation's scheduled cycles without
-executing that instruction's p-code.
+Restart traces model return with saved SPLX=1. `C6000LoopModelTest.java` can check all
+decoded loop bodies in an imported program. These helpers report issue order and
+loop-control state; instruction writeback and handler entry remain the executor's
+responsibility.
 
 ## Remaining emulator state
 
@@ -41,9 +67,9 @@ executing that instruction's p-code.
    simultaneous-read semantics and the instruction-specific write latencies
    from SPRUFE8B chapter 4. Loads, stores, branches, floating-point results,
    and control-register writes mature at different phases. The loop scheduler
-   currently reports when an operation is issued, not when its result becomes
+   reports when an operation is issued, not when its result becomes
    visible.
-3. **Interrupt completion and architectural return.** Counted-loop buffer draining now
+3. **Interrupt completion and architectural return.** Counted-loop buffer draining
    ends with preserved `ILC` and disabled program-memory fetch; `SPLOOPW`
    draining can instead hand the interrupt to the first post-body instruction.
    The emulator must finish pending register writes, write the saved packet
@@ -69,21 +95,27 @@ executing that instruction's p-code.
    resource, register-access, `SPMASKR`/`SPKERNELR`, and reload-overlap
    restrictions. Ghidra's static decoder does not enforce all of them.
 
-For a full conformance run, supplement the firmware with small assembled
-fixtures for zero/one iteration, every legal `ii`, each `SPKERNEL` delay,
-source/post-body masks, `SPLOOPW` early termination, interrupt restart, and
-both reload forms. Compare issue cycles, result-availability cycles, `ILC`,
-`RILC`, `LBC`, `SPLX`, PC, and memory writes against a C674x hardware trace or
-another independently validated reference. Firmware coverage verifies the
-encodings it contains; it cannot establish behavior for interrupt or nested
-reload paths that it does not exercise.
+## Reproducible fixtures
 
-The restart-delay and immediate-reload fixture is `tests/fixtures/loop-delay.s`. Assemble its
-`.text` section as a raw binary with GNU `tic6x-unknown-elf-as -march=c674x`
-and `tic6x-unknown-elf-objcopy -O binary -j .text`, then import it at
-`0x1000` as `C6000:LE:32:default` and run `C6000LoopDelayTest.java` and
-`C6000ImmediateReloadTest.java` headlessly. The scripts check issue effects and
-idle-cycle positions. The protected-load case uses a 32-bit `LDW` in a compact
-fetch packet with `PROT=1`. The same header rule also applies to 16-bit loads.
-The immediate-reload fixture includes a 32-bit `NOP 4`, validating its four-bit
-encoded count. These fixtures do not replace hardware timing validation.
+`tests/fixtures/loop-delay.s` covers restart idle cycles for displacement BNOP, masked
+register BNOP, masked ADDKPC and a protected LDW. It also includes TI Example 7-15's
+immediate reload sequence. Assemble the `.text` section with GNU
+`tic6x-unknown-elf-as -march=c674x` and extract it using
+`tic6x-unknown-elf-objcopy -O binary -j .text`. Import the result at `0x1000` with
+`C6000:LE:32:default`, then run `C6000LoopDelayTest.java` and
+`C6000ImmediateReloadTest.java`.
+
+The scripts check issue effects and idle-cycle positions. The protected-load case uses a
+full32 LDW in a compact packet with PROT=1; the header rule also applies to compact
+loads. The immediate-reload fixture includes NOP 4 and checks two or three invocations
+in 20 or 27 cycles, including simultaneous old STW and new MV issue.
+
+For the exact compiler, `pipeline-loop.py` and `pipeline-postloop.py` exercise
+normal-loop loading, drain, dispatch and supported writeback phases. See
+[verification](verification.md) for the release runner and TI-tool requirements.
+
+Full emulator qualification also needs independent hardware or reference traces for
+zero/one iterations, legal initiation intervals and SPKERNEL delays, masks, early while
+exits, interrupt restart and both reload forms. Compare issue and writeback cycles,
+ILC/RILC/LBC/SPLX, PC and memory effects. Passing the supplied synthetic fixtures does
+not establish these unmodeled behaviors.

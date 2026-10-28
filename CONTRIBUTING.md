@@ -4,7 +4,8 @@ Issues and pull requests are welcome.
 
 ## Reporting a wrong decode or wrong semantics
 
-Use the [wrong decode / semantics](https://github.com/geepot/ghidra-c6000/issues/new?template=wrong-decode.md)
+Use the
+[wrong decode / semantics](https://github.com/geepot/ghidra-c6000/issues/new?template=wrong-decode.md)
 issue template. The most useful report has:
 
 - the Ghidra version, extension version and language id (`C6000:LE:32:default`, ...);
@@ -16,8 +17,8 @@ issue template. The most useful report has:
   (`objdump -D -b binary -m tic6x --endian=little --adjust-vma=<base> packet.bin`;
   the input must be at least 32 bytes).
 
-Only post bytes you are allowed to share. A single fetch packet is usually
-enough; never attach whole firmware images.
+Only post bytes you are allowed to share. A single fetch packet is usually enough; never
+attach whole firmware images.
 
 ## Changing the module
 
@@ -29,21 +30,31 @@ enough; never attach whole firmware images.
   generated `.sinc` files, which say so in their first line.
 - Add a fixture under `tests/fixtures/` and a `ghidra_scripts/C6000*Test.java`
   check for new semantics, covering both endian modes.
-- Run `tools/build.sh` before opening a PR, and say in the PR which checks you
-  ran. [docs/verification.md](docs/verification.md) shows how to run the corpus
-  test and the GNU oracle comparisons.
+- Run `python3 tools/verify.py --jobs 2` before opening a PR, and say in the PR
+  which checks you ran. Use `--with-ti` when changing predicate proofs,
+  caller continuations or post-loop dispatch; it requires TI's assembler.
+  The runner builds and tests both endian modes in a scratch Ghidra copy.
+  [docs/verification.md](docs/verification.md) explains focused reruns, retained
+  evidence, external-image checks and GNU-oracle comparisons. Add new release
+  dependencies to the runner's fixture registry.
 - Add a line to [`CHANGELOG.md`](CHANGELOG.md) under *Unreleased*.
 - Do not commit firmware, TI manuals or text extracted from them.
 
-The source layout is described in [docs/internals.md](docs/internals.md#repository-layout).
+The source layout is described in
+[docs/internals.md](docs/internals.md#repository-layout). Release preparation and
+compatibility metadata are described in [docs/release.md](docs/release.md).
 
-## Ghidra 12.1.3 script pitfall
+## Script compatibility and troubleshooting
 
-If *every* Java script in a script directory suddenly fails with
-`Failed to get OSGi bundle containing script`, look for a **compile error in a
-sibling `.java` file**. Ghidra compiles a script directory as one OSGi bundle,
-and `GhidraSourceBundle.tryBuild` dereferences a `javac` diagnostic whose source
-is null (Ghidra 12.1.3, `GhidraSourceBundle.java:843`), so the whole build dies
-with a `NullPointerException` that is reported as that misleading message, while
-the console `PrintWriter` is never flushed. Keep independently-buildable scripts
-in separate `-scriptPath` directories.
+Keep verification scripts compatible with every CI Ghidra version. In particular, use
+the four-argument `PcodeExecutor(language, arithmetic, state, reason)` constructor; the
+two-argument convenience constructor requires 12.2. Construct a `PcodeProgram` with the
+library's symbols and pass it to `begin`; the `begin(List, symbols)` symbol-map
+parameter changed between 12.1 and 12.2.
+
+Ghidra compiles a script directory as one OSGi bundle. A compile error in one Java file
+can therefore prevent sibling scripts from loading. In Ghidra 12.1.3, this can appear as
+`Failed to get OSGi bundle containing script` when a compiler diagnostic triggers a
+`GhidraSourceBundle.tryBuild` null-source failure. Check sibling compile errors before
+debugging the script loader. Keep independently buildable scripts in separate
+`-scriptPath` directories.

@@ -5,11 +5,13 @@ title: "Wrong decode/semantics: <MNEMONIC> at <address>"
 ---
 
 **Versions**
+
 - Ghidra:
 - Extension (release or commit):
 - Language id (e.g. `C6000:LE:32:default`):
 
 **Location**
+
 - Address:
 - Raw bytes of the whole 32-byte fetch packet, in file byte order (the header
   word of a compact packet changes how the other words decode):

@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Fixed
+* Add strict source-bound caller/store-tail traces with exact callee/caller byte
+  ownership, native E3 store carry, and verified final caller E1 hazards
+  (SPRUFE8B 3.5, 3.10, 4.2.3, 4.2.5, 4.2.6).
 * Resume normal post-loop dispatch at the documented SPKERNEL execution delay,
   without an inferred six-cycle frontend refill; refuse buffered missed X-path
   or AMR stalls, retain PM stalls, and prove dominated constant suffixes across

@@ -42,6 +42,25 @@ public final class C6000PipelineCompiler {
         /** The trace executor must check this before executing any p-code. */
         public void validateEntryB3(long actual){if((actual&0xffffffffL)!=contract.expectedEntryB3())throw new IllegalArgumentException("caller continuation entry B3 mismatch");}
     }
+    /** Strict read-only continuation scope, including reachable callee code and data gaps. */
+    public record CallerEntryEvidence(TraceWindow setup,long finalIssuedPacketPc,int trailingIdleAdvances,String evidence) {
+        public CallerEntryEvidence {Objects.requireNonNull(setup);if(!setup.contains(finalIssuedPacketPc)||trailingIdleAdvances<0||trailingIdleAdvances>15||evidence==null||evidence.isBlank())throw new IllegalArgumentException("explicit caller-entry source evidence required");}
+    }
+    public record CallerTailPlan(String languageId,TraceWindow callee,TraceWindow caller,ReturnContinuation continuation,CallerEntryEvidence entryEvidence) {
+        public CallerTailPlan {
+            Objects.requireNonNull(languageId);Objects.requireNonNull(callee);Objects.requireNonNull(caller);Objects.requireNonNull(continuation);Objects.requireNonNull(entryEvidence);
+            if(entryEvidence.setup().ownerEntry()!=caller.ownerEntry()||entryEvidence.setup().end()!=caller.start()||callee.start()!=callee.ownerEntry()||caller.ownerEntry()!=continuation.callerFunctionEntry()||caller.start()!=continuation.expectedEntryB3()||caller.end()!=continuation.stopPc()||!caller.fetchBytesSha256().equals(continuation.callerBytesSha256())||callee.start()<caller.end()&&caller.start()<callee.end())throw new IllegalArgumentException("caller-tail scope/continuation mismatch");
+        }
+    }
+    public record CallerTailResult(TraceResult trace,CallerTailPlan contract) {}
+    private CallerTailPlan callerTail;
+    public CallerTailResult compileCallerTail(CallerTailPlan plan)throws Exception {
+        if(!states.isEmpty()||!instructions.isEmpty()||!loopPlans.isEmpty()||!slots.isEmpty()||!b.code.isEmpty()||traceContract!=null||closedCall!=null||callerTail!=null)throw fail("compiler instance already used");callerTail=Objects.requireNonNull(plan);
+        if(!program.getLanguageID().getIdAsString().equals(plan.languageId())||function.getEntryPoint().getOffset()!=plan.callee().ownerEntry())throw fail("caller-tail language/callee identity mismatch");
+        validateWindowMetadata(plan.callee());validateWindowMetadata(plan.caller());validateWindowMetadata(plan.entryEvidence().setup());validateCallerEntryEvidence(plan);
+        validateClosedTargetPacket(plan.callee().start());validateClosedTargetPacket(plan.caller().start());
+        return new CallerTailResult(compileTrace(plan.continuation()),plan);
+    }
     private ReturnContinuation traceContract;
     private final List<TraceBoundary> traceBoundaries=new ArrayList<>();
     private Set<String> traceExitWrites;
@@ -110,15 +129,19 @@ public final class C6000PipelineCompiler {
         if(compiler.closedExitWrites==null||compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_ENTER"))||compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_RETURN")))throw compiler.fail("closed-call trace did not close all declared edges");
         return new ClosedCallTraceResult(result,plan,List.copyOf(compiler.closedBoundaries),Set.copyOf(compiler.closedExitWrites));
     }
-    private TraceWindow closedWindow(long pc){if(closedCall==null)return null;if(closedCall.caller().contains(pc))return closedCall.caller();if(closedCall.callee().contains(pc))return closedCall.callee();return null;}
+    private boolean strictScope(){return closedCall!=null||callerTail!=null;}
+    private TraceWindow closedWindow(long pc){if(callerTail!=null){if(callerTail.callee().contains(pc))return callerTail.callee();if(callerTail.caller().contains(pc))return callerTail.caller();return null;}if(closedCall==null)return null;if(closedCall.caller().contains(pc))return closedCall.caller();if(closedCall.callee().contains(pc))return closedCall.callee();return null;}
     private boolean observesStores(){return traceContract!=null||closedCall!=null;}
     private int closedPhysicalLength(Address at){
         try{return C6000ExecutionPackets.instructionLengthAt(program,at);}
         catch(ghidra.program.model.mem.MemoryAccessException invalid){throw fail("closed-call invalid physical instruction start at "+at+": "+invalid.getMessage());}
     }
     private void validateClosedInstruction(Instruction instruction)throws Exception {
-        long start=instruction.getAddress().getOffset(),end=start+instruction.getLength();var window=closedWindow(start);
-        if(window==null||end>window.end())throw fail("closed-call instruction leaves declared window at "+instruction.getAddress());
+        validateWindowInstruction(instruction,closedWindow(instruction.getAddress().getOffset()));
+    }
+    private void validateWindowInstruction(Instruction instruction,TraceWindow window)throws Exception {
+        long start=instruction.getAddress().getOffset(),end=start+instruction.getLength();
+        if(window==null||start<window.start()||end>window.end())throw fail("closed-call instruction leaves declared window at "+instruction.getAddress());
         UnownedSpan gap=null;for(var candidate:window.unownedSpans())if(candidate.start()<end&&start<candidate.end()){
             if(gap!=null||candidate.start()>start||candidate.end()<end)throw fail("closed-call unowned span cuts an instruction at "+instruction.getAddress());gap=candidate;
         }
@@ -128,7 +151,36 @@ public final class C6000PipelineCompiler {
             if(gap!=null?owner!=null:owner==null||owner.getEntryPoint().getOffset()!=window.ownerEntry()||!owner.getBody().contains(at))throw fail("closed-call instruction leaves declared byte ownership at "+at);
         }
     }
-    private void validateWindow(TraceWindow window)throws Exception {
+    private Instruction entryEvidenceInstruction(long pc,TraceWindow window)throws Exception {
+        var at=entry.getNewAddress(pc);int length=closedPhysicalLength(at);var context=new ProcessorContextImpl(program.getLanguage());
+        for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
+        context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
+        var memory=new DumbMemBufferImpl(program.getMemory(),at);var prototype=program.getLanguage().parse(memory,context,false);var instruction=new PseudoInstruction(program,at,prototype,memory,context);
+        if(instruction.getLength()!=length)throw fail("caller-entry width conflicts with physical layout at "+at);validateWindowInstruction(instruction,window);return instruction;
+    }
+    private void validateCallerEntryEvidence(CallerTailPlan plan)throws Exception { // SPRUFE8B 3.8.10, 3.10.2.2, 4.2.6: issued packet plus counted implicit NOP advances.
+        var proof=plan.entryEvidence();long pc=proof.finalIssuedPacketPc();if(!C6000ExecutionPackets.issuePrefix(program,entry.getNewAddress(pc)).isEmpty())throw fail("caller-entry evidence starts inside an execute packet");
+        var packet=new ArrayList<Instruction>();int idle=0;Instruction generator=null;
+        while(true){var instruction=entryEvidenceInstruction(pc,proof.setup());packet.add(instruction);if(packet.size()>8)throw fail("caller-entry oversized execute packet");String name=base(instruction);int inserted=0;
+            if(name.equals("CALLP"))inserted=5;else if(name.equals("NOP"))inserted=Math.max(0,(int)instruction.getScalar(0).getValue()-1);else if(name.equals("BNOP"))inserted=(int)instruction.getScalar(1).getValue();else if(name.equals("ADDKPC"))inserted=(int)instruction.getScalar(2).getValue();else if(C6000ExecutionPackets.protectedLoad(program,instruction))inserted=4;
+            boolean generates=inserted>0||Set.of("CALLP","BNOP","ADDKPC").contains(name);
+            if(generates){if(generator!=null&&!C6000ExecutionPackets.sameMulticycleNop(generator,instruction))throw fail("caller-entry conflicting NOP generators");generator=instruction;}idle=Math.max(idle,inserted);
+            boolean parallel=C6000ExecutionPackets.parallelWithNext(program,instruction);pc=instruction.getMaxAddress().getOffset()+1;
+            if((pc&31)==28&&(program.getMemory().getInt(entry.getNewAddress(pc))>>>28)==14)pc+=4;
+            if(!parallel)break;
+        }
+        if(pc!=proof.setup().end()||idle!=proof.trailingIdleAdvances())throw fail("caller-entry source span/idle evidence mismatch");
+        if(packet.size()==8)for(var instruction:packet)if(C6000PacketContext.physicalDecodeFields(program,instruction.getAddress()).get("c_hdrpkt")==1)throw fail("caller-entry eight-instruction header-based execute packet");
+        Set<String> actual=new TreeSet<>();if(idle==0)for(var instruction:packet){String name=base(instruction);
+            if(instruction.getMnemonicString().contains("["))throw fail("caller-entry conditional E1 inventory requires a path proof");
+            if(!SINGLE.contains(name)&&!Set.of("NOP","B","BNOP","ADDKPC").contains(name))throw fail("caller-entry unsupported E1 inventory instruction "+instruction);
+            for(var operation:instruction.getPcode()){var output=operation.getOutput();if(output==null||!output.isRegister())continue;
+                for(String bank:List.of("A","B"))for(int index=0;index<32;index++){var register=program.getRegister(bank+index);long offset=register.getAddress().getOffset();if(output.getOffset()<offset+4&&offset<output.getOffset()+output.getSize())actual.add(register.getName());}
+            }
+        }
+        if(!actual.equals(new TreeSet<>(plan.continuation().entry().previousE1Writes())))throw fail("caller-entry E1 inventory mismatch: source="+actual+", declared="+plan.continuation().entry().previousE1Writes());
+    }
+    private void validateWindowMetadata(TraceWindow window)throws Exception {
         if(program.getFunctionManager().getFunctionAt(entry.getNewAddress(window.ownerEntry()))==null)throw fail("closed-call owner identity missing");
         long first=window.start()&~31L,last=(window.end()+31)&~31L;byte[] bytes=new byte[(int)(last-first)];
         if(program.getMemory().getBytes(entry.getNewAddress(first),bytes)!=bytes.length)throw fail("closed-call short byte window");
@@ -137,6 +189,19 @@ public final class C6000PipelineCompiler {
             var at=entry.getNewAddress(pc);if(program.getFunctionManager().getFunctionContaining(at)!=null)throw fail("closed-call unowned span overlaps an owner at "+at);
             if(program.getListing().getDefinedDataContaining(at)!=null)throw fail("closed-call unowned span overlaps defined data at "+at);
         }
+        if(callerTail!=null){
+            physicalBoundary(window.start(),false);physicalBoundary(window.end(),true);
+            for(var gap:window.unownedSpans()){physicalBoundary(gap.start(),true);physicalBoundary(gap.end(),true);}
+        }
+    }
+    private void physicalBoundary(long pc,boolean allowHeader)throws Exception {
+        if((pc&31)==0)return;
+        var at=entry.getNewAddress(pc);
+        if(allowHeader&&(pc&31)==28&&(program.getMemory().getInt(at)>>>28)==14)return;
+        closedPhysicalLength(at);
+    }
+    private void validateWindow(TraceWindow window)throws Exception {
+        validateWindowMetadata(window);
         var boundaries=new HashSet<Long>();long pc=window.start();while(pc<window.end()){
             closedPhysicalLength(entry.getNewAddress(pc));if(!C6000ExecutionPackets.issuePrefix(program,entry.getNewAddress(pc)).isEmpty())throw fail("closed-call declared packet start has a parallel prefix at "+entry.getNewAddress(pc));
             if(!closedPackets.add(pc))throw fail("closed-call overlapping execute packets");var packet=packet(pc);if(packet.get(0).instruction().getAddress().getOffset()!=pc)throw fail("closed-call declared packet start skips a fetch header");if(packet.size()==8)for(var instruction:packet)if(C6000PacketContext.physicalDecodeFields(program,instruction.instruction().getAddress()).get("c_hdrpkt")==1)throw fail("closed-call eight-instruction header-based execute packet");for(var instruction:packet){boundaries.add(instruction.instruction().getAddress().getOffset());boundaries.add(instruction.instruction().getMaxAddress().getOffset()+1);}long next=after(packet.get(packet.size()-1));if(next>window.end()||next<=pc)throw fail("closed-call window cuts an execute packet");
@@ -148,6 +213,7 @@ public final class C6000PipelineCompiler {
             }pc=next;
         }if(pc!=window.end())throw fail("closed-call window is not exact");for(var gap:window.unownedSpans())if(!boundaries.contains(gap.start())||!boundaries.contains(gap.end()))throw fail("closed-call unowned span boundary is not an instruction boundary");
     }
+    private void validateCallerTailTarget(long pc){try{validateClosedTargetPacket(pc);}catch(IllegalArgumentException invalid){throw invalid;}catch(Exception invalid){throw fail("caller-tail invalid branch target: "+invalid.getMessage());}}
     private void validateClosedTargetPacket(long pc)throws Exception {
         var target=packet(pc);long fetch=pc&~31L;
         for(var instruction:target)if((instruction.instruction().getMinAddress().getOffset()&~31L)!=fetch||(instruction.instruction().getMaxAddress().getOffset()&~31L)!=fetch)throw fail("closed-call branch-target execute packet spans fetch packets at "+entry.getNewAddress(pc));
@@ -340,27 +406,27 @@ public final class C6000PipelineCompiler {
         Address at=entry.getNewAddress(pc);
         var owner=program.getFunctionManager().getFunctionContaining(at);
         var window=closedWindow(pc);
-        if(closedCall!=null){if(window==null)throw fail("closed-call flow leaves declared ownership at "+at);if(window.unowned(pc)?owner!=null:owner==null||owner.getEntryPoint().getOffset()!=window.ownerEntry()||!owner.getBody().contains(at))throw fail("closed-call flow leaves declared ownership at "+at);}
-        if(callerPc(pc)){
+        if(strictScope()){if(window==null)throw fail("closed-call flow leaves declared ownership at "+at);if(window.unowned(pc)?owner!=null:owner==null||owner.getEntryPoint().getOffset()!=window.ownerEntry()||!owner.getBody().contains(at))throw fail("closed-call flow leaves declared ownership at "+at);}
+        if(callerPc(pc)&&callerTail==null){
             if(owner!=null&&owner.getEntryPoint().getOffset()!=traceContract.callerFunctionEntry())throw fail("caller continuation has conflicting ownership at "+at);
             if(owner==null&&!traceContract.allowUnownedWindow())throw fail("caller continuation has unowned code at "+at);
         }
         if(program.getListing().getDefinedDataContaining(at)!=null)throw fail("scheduled code conflicts with defined data at "+at);
-        if(owner!=null&&!owner.equals(function)&&!callerPc(pc)&&closedCall==null)throw fail("flow enters another function at "+at);
-        if(closedCall==null&&!callerPc(pc)&&(pc>function.getBody().getMaxAddress().getOffset()+254||pc<function.getBody().getMinAddress().getOffset()))throw fail("flow leaves owned code at "+at);
-        int physicalLength=closedCall==null?0:closedPhysicalLength(at);
+        if(owner!=null&&!owner.equals(function)&&!callerPc(pc)&&!strictScope())throw fail("flow enters another function at "+at);
+        if(!strictScope()&&!callerPc(pc)&&(pc>function.getBody().getMaxAddress().getOffset()+254||pc<function.getBody().getMinAddress().getOffset()))throw fail("flow leaves owned code at "+at);
+        int physicalLength=!strictScope()?0:closedPhysicalLength(at);
         var context=new ProcessorContextImpl(program.getLanguage());
         var value=program.getProgramContext().getRegisterValue(program.getLanguage().getContextBaseRegister(),at);
         if(value!=null)context.setRegisterValue(value);
-        if(closedCall!=null)for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
-        if(callerPc(pc))for(String name:List.of("c_is16","c_rs","c_dsz","c_sat","c_br","c_prot","c_isheader","c_pfollow","c_hdrpkt"))context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
+        if(strictScope())for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
+        if(callerPc(pc)&&callerTail==null)for(String name:List.of("c_is16","c_rs","c_dsz","c_sat","c_br","c_prot","c_isheader","c_pfollow","c_hdrpkt"))context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
         var memory=new DumbMemBufferImpl(program.getMemory(),at);
         var prototype=program.getLanguage().parse(memory,context,false);
         var ins=new PseudoInstruction(program,at,prototype,memory,context);
-        if(closedCall!=null){if(ins.getLength()!=physicalLength)throw fail("closed-call decoder width conflicts with physical fetch layout at "+at);validateClosedInstruction(ins);}
+        if(strictScope()){if(ins.getLength()!=physicalLength)throw fail("closed-call decoder width conflicts with physical fetch layout at "+at);validateClosedInstruction(ins);}
         String name=base(ins);
         boolean load=name.startsWith("LD"),store=name.startsWith("ST");
         int latency;
@@ -410,7 +476,7 @@ public final class C6000PipelineCompiler {
                 destinations.put(out.getOffset()+":"+out.getSize()+(load||store?":"+rawIndex:""),destination);
             }
         }
-        if(traceContract!=null){long b3=program.getRegister("B3").getAddress().getOffset();for(var destination:destinations.values())if(destination.offset()<b3+4&&b3<destination.offset()+destination.size())throw fail("caller continuation requires unchanged entry B3");}
+        if(traceContract!=null||callerTail!=null){long b3=program.getRegister("B3").getAddress().getOffset();for(var destination:destinations.values())if(destination.offset()<b3+4&&b3<destination.offset()+destination.size())throw fail("caller continuation requires unchanged entry B3");}
         // SPRUFE8B 4.2.7--4.2.16: semantic read words and independent write phases.
         List<Read> reads=new ArrayList<>();int ready=1;
         if(Set.of("ADDDP","SUBDP","CMPEQDP","CMPLTDP","CMPGTDP","MPYSPDP").contains(name)){
@@ -524,6 +590,7 @@ public final class C6000PipelineCompiler {
     }
 
     private List<Insn> packet(long pc)throws Exception{
+        if(callerTail!=null){closedPhysicalLength(entry.getNewAddress(pc));if(!C6000ExecutionPackets.issuePrefix(program,entry.getNewAddress(pc)).isEmpty())throw fail("caller-tail packet start has a parallel prefix at "+entry.getNewAddress(pc));}
         List<Insn> result=new ArrayList<>();
         Insn i=decode(pc);
         while(i.name().equals("CPKT"))i=decode(after(i));
@@ -534,6 +601,7 @@ public final class C6000PipelineCompiler {
             if(!C6000ExecutionPackets.parallelWithNext(program,i.instruction()))break;
             i=decode(after(i));
         }
+        if(callerTail!=null){if(result.get(0).instruction().getAddress().getOffset()!=pc)throw fail("caller-tail packet start skips a header");if(result.size()==8)for(var instruction:result)if(C6000PacketContext.physicalDecodeFields(program,instruction.instruction().getAddress()).get("c_hdrpkt")==1)throw fail("caller-tail eight-instruction header-based execute packet");}
         return result;
     }
 
@@ -728,7 +796,7 @@ public final class C6000PipelineCompiler {
     }
 
     public Result compile()throws Exception{
-        if(traceContract!=null||closedCall!=null)throw fail("trace compiler is not an ordinary function schedule");
+        if(traceContract!=null||closedCall!=null||callerTail!=null)throw fail("trace compiler is not an ordinary function schedule");
         return compileInternal();
     }
     private Result compileInternal()throws Exception{
@@ -1013,6 +1081,7 @@ public final class C6000PipelineCompiler {
         var instruction=issueBranch.instruction();long at=instruction.getAddress().getOffset();var register=instruction.getRegister(0);boolean returns=register!=null&&register.getName().equals("B3");
         if(register!=null&&!returns)throw fail("unresolved register branch "+instruction);
         long target=returns?0:instruction.getAddress(0).getOffset();
+        if(callerTail!=null&&!returns){if(!callerTail.callee().contains(target))throw fail("caller-tail callee branch leaves declared scope");validateCallerTailTarget(target);}
         if(returns)b.op(PcodeOp.COPY,slot("target",at,1,0,4),captured.get(at).get(register.getAddress().getOffset()));
         List<Branch> yes=new ArrayList<>(branches);yes.add(new Branch(at,1,target,returns));
         if(Set.of("BDEC","BPOS").contains(issueBranch.name())) {

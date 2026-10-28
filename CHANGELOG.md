@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+* 32-bit `SHL`, `SHR` and `SHRU` use only the six LSBs of a register count, as
+  SPRUFE8B requires, so a count of 64 leaves the value unchanged.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

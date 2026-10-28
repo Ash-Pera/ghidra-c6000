@@ -38,7 +38,12 @@ page has the detail. The module is a working decoder with staged semantics.
   expose their CPU-visible load/store plus named link events. `CMTL` returns
   its monitor-provided success value through a userop. Ghidra's instruction
   emulator cannot decide another core's link state by itself.
-* **No delay-slot modelling** in p-code.
+* **Delay modeling is bounded.** Proven unconditional B/BNOP windows and CALLP
+  packet companions use native delay p-code. Nested transfers, predicated full
+  windows, BDEC/BPOS, and existing delayed-call overrides remain conservative.
+  Loads/arithmetic still assign results without architectural write latency.
+  Stock Ghidra instruction stepping can fail on mixed-width delay windows;
+  direct listing p-code execution and decompilation have separate tests.
 * **Constant propagation is bounded to 512-byte windows.** This prevents the
   observed stage 2 heap exhaustion and recovers the three checked stage 1
   register-built call targets, but a value carried only across a longer span

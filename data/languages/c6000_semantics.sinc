@@ -2803,14 +2803,16 @@ macro c6000_sem_sth(s, a) { *[ram]:2 a = s:2; }
 # slots.  The target operand already carries the PCE1-relative address (see
 # the BranchTarget / BnopTgt tables in c6000.sinc and c6000_manual.sinc).
 #
-# C6000 branches have five delay slots, so the return address a CALLP leaves
-# in A3/B3 is the instruction after the five delay slots: inst_start + 4 + 20.
+# CALLP supplies five implied NOP cycles. Its packet companions run before
+# transfer; the link is the next execute packet (SPRUFE8B CALLP execution).
+# The decode constructors build CFlowDelay before assigning inst_next to
+# the side-specific A3/B3 link. This legacy macro is not used by them.
 # ---------------------------------------------------------------------------
 
 # SEM: B
 macro c6000_sem_b(t) { goto t; }
 # SEM: CALLP
-macro c6000_sem_callp(t) { B3 = inst_start + 24; call t; }
+macro c6000_sem_callp(t) { B3 = inst_next; call t; }
 
 # Indirect branches through a register (B .S2 src2, B IRP, B NRP).
 macro c6000_sem_b_ind(t) { goto [t]; }

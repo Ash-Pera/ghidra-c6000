@@ -852,54 +852,15 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 # scale (see the CTgt tables above).
 # ---------------------------------------------------------------------------
 
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=0 { goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=1 { delayslot(1); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=2 { delayslot(2); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=3 { delayslot(3); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=4 { delayslot(4); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=5 { delayslot(5); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=6 { delayslot(6); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=7 { delayslot(7); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=8 { delayslot(8); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=9 { delayslot(9); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=10 { delayslot(10); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=11 { delayslot(11); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=12 { delayslot(12); goto CTgt7; }
-:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & c_pfollow=13 { delayslot(13); goto CTgt7; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=0 { goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=1 { delayslot(1); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=2 { delayslot(2); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=3 { delayslot(3); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=4 { delayslot(4); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=5 { delayslot(5); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=6 { delayslot(6); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=7 { delayslot(7); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=8 { delayslot(8); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=9 { delayslot(9); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=10 { delayslot(10); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=11 { delayslot(11); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=12 { delayslot(12); goto CTgt8; }
-:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & c_pfollow=13 { delayslot(13); goto CTgt8; }
+:BNOP^CUnitS CTgt7, CN3 is c_is16=1 & CUnitS & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt7 & CN3 & CFlowDelay { build CFlowDelay; goto CTgt7; }
+:BNOP^CUnitS CTgt8, 5 is c_is16=1 & CUnitS & j15=1 & j14=1 & j5=0 & j4=0 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt8 & CFlowDelay { build CFlowDelay; goto CTgt8; }
 
 # ---------------------------------------------------------------------------
 # Figure F-19. Scs10 (CALLP) - SPRUFE8B appendix F.4.  The return address
 # goes to A3 or B3 as selected by s (figure note 'NextPC > B3, A3').
 # ---------------------------------------------------------------------------
 
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=0 { CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=1 { delayslot(1); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=2 { delayslot(2); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=3 { delayslot(3); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=4 { delayslot(4); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=5 { delayslot(5); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=6 { delayslot(6); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=7 { delayslot(7); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=8 { delayslot(8); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=9 { delayslot(9); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=10 { delayslot(10); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=11 { delayslot(11); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=12 { delayslot(12); CRet = inst_start + 24; call CTgt10; }
-:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & c_pfollow=13 { delayslot(13); CRet = inst_start + 24; call CTgt10; }
+:CALLP^CUnitS CTgt10, CRet is c_is16=1 & CUnitS & j5=0 & j4=1 & j3=1 & j2=0 & j1=1 & c_br=1 & CTgt10 & CRet & CFlowDelay { build CFlowDelay; CRet = inst_next; call CTgt10; }
 
 # ---------------------------------------------------------------------------
 # Figures F-20/F-21. Sbs7c / Sbu8c - SPRUFE8B appendix F.4.  Predicated
@@ -907,118 +868,14 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 # is inverted when z = 1.
 # ---------------------------------------------------------------------------
 
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=0 { if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=1 { delayslot(1); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=2 { delayslot(2); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=3 { delayslot(3); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=4 { delayslot(4); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=5 { delayslot(5); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=6 { delayslot(6); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=7 { delayslot(7); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=8 { delayslot(8); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=9 { delayslot(9); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=10 { delayslot(10); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=11 { delayslot(11); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=12 { delayslot(12); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=13 { delayslot(13); if (A0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=0 { if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=1 { delayslot(1); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=2 { delayslot(2); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=3 { delayslot(3); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=4 { delayslot(4); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=5 { delayslot(5); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=6 { delayslot(6); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=7 { delayslot(7); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=8 { delayslot(8); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=9 { delayslot(9); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=10 { delayslot(10); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=11 { delayslot(11); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=12 { delayslot(12); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=13 { delayslot(13); if (A0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=0 { if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=1 { delayslot(1); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=2 { delayslot(2); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=3 { delayslot(3); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=4 { delayslot(4); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=5 { delayslot(5); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=6 { delayslot(6); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=7 { delayslot(7); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=8 { delayslot(8); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=9 { delayslot(9); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=10 { delayslot(10); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=11 { delayslot(11); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=12 { delayslot(12); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=13 { delayslot(13); if (B0 != 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=0 { if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=1 { delayslot(1); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=2 { delayslot(2); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=3 { delayslot(3); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=4 { delayslot(4); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=5 { delayslot(5); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=6 { delayslot(6); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=7 { delayslot(7); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=8 { delayslot(8); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=9 { delayslot(9); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=10 { delayslot(10); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=11 { delayslot(11); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=12 { delayslot(12); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=13 { delayslot(13); if (B0 != 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=0 { if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=1 { delayslot(1); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=2 { delayslot(2); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=3 { delayslot(3); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=4 { delayslot(4); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=5 { delayslot(5); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=6 { delayslot(6); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=7 { delayslot(7); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=8 { delayslot(8); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=9 { delayslot(9); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=10 { delayslot(10); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=11 { delayslot(11); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=12 { delayslot(12); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=13 { delayslot(13); if (A0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=0 { if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=1 { delayslot(1); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=2 { delayslot(2); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=3 { delayslot(3); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=4 { delayslot(4); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=5 { delayslot(5); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=6 { delayslot(6); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=7 { delayslot(7); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=8 { delayslot(8); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=9 { delayslot(9); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=10 { delayslot(10); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=11 { delayslot(11); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=12 { delayslot(12); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=13 { delayslot(13); if (A0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=0 { if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=1 { delayslot(1); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=2 { delayslot(2); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=3 { delayslot(3); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=4 { delayslot(4); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=5 { delayslot(5); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=6 { delayslot(6); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=7 { delayslot(7); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=8 { delayslot(8); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=9 { delayslot(9); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=10 { delayslot(10); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=11 { delayslot(11); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=12 { delayslot(12); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & c_pfollow=13 { delayslot(13); if (B0 == 0) goto CTgt7; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=0 { if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=1 { delayslot(1); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=2 { delayslot(2); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=3 { delayslot(3); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=4 { delayslot(4); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=5 { delayslot(5); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=6 { delayslot(6); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=7 { delayslot(7); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=8 { delayslot(8); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=9 { delayslot(9); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=10 { delayslot(10); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=11 { delayslot(11); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=12 { delayslot(12); if (B0 == 0) goto CTgt8; }
-:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & c_pfollow=13 { delayslot(13); if (B0 == 0) goto CTgt8; }
+:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & CFlowDelay { local take:1 = (A0 != 0); build CFlowDelay; if (take != 0) goto CTgt7; }
+:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & CFlowDelay { local take:1 = (A0 != 0); build CFlowDelay; if (take != 0) goto CTgt8; }
+:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & CFlowDelay { local take:1 = (B0 != 0); build CFlowDelay; if (take != 0) goto CTgt7; }
+:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=0 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & CFlowDelay { local take:1 = (B0 != 0); build CFlowDelay; if (take != 0) goto CTgt8; }
+:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & CFlowDelay { local take:1 = (A0 == 0); build CFlowDelay; if (take != 0) goto CTgt7; }
+:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=0 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & CFlowDelay { local take:1 = (A0 == 0); build CFlowDelay; if (take != 0) goto CTgt8; }
+:^CPred20^"BNOP"^CUnitS CTgt7, CN3 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt7 & CN3 & CFlowDelay { local take:1 = (B0 == 0); build CFlowDelay; if (take != 0) goto CTgt7; }
+:^CPred20^"BNOP"^CUnitS CTgt8, 5 is c_is16=1 & CPred20 & CUnitS & c_br=1 & q_s=1 & j4=1 & j15=1 & j14=1 & j5=1 & j3=1 & j2=0 & j1=1 & CTgt8 & CFlowDelay { local take:1 = (B0 == 0); build CFlowDelay; if (take != 0) goto CTgt8; }
 
 # ---------------------------------------------------------------------------
 # Figure F-22. S3 - SPRUFE8B appendix F.4.  BR must be 0 for the
@@ -1114,20 +971,7 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 # to this form, so it is decoded regardless of the header BR bit.
 # ---------------------------------------------------------------------------
 
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=0 { goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=1 { delayslot(1); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=2 { delayslot(2); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=3 { delayslot(3); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=4 { delayslot(4); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=5 { delayslot(5); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=6 { delayslot(6); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=7 { delayslot(7); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=8 { delayslot(8); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=9 { delayslot(9); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=10 { delayslot(10); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=11 { delayslot(11); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=12 { delayslot(12); goto [RB710]; }
-:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & c_pfollow=13 { delayslot(13); goto [RB710]; }
+:BNOP^CUnitS RB710, CN3 is c_is16=1 & CUnitS & j12=0 & j11=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & RB710 & CN3 & CFlowDelay { local target:4 = RB710; build CFlowDelay; goto [target]; }
 
 # ---------------------------------------------------------------------------
 # Figures G-1/G-2. LSDmvto / LSDmvfr - SPRUFE8B appendix G.3.

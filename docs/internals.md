@@ -56,16 +56,29 @@ encoding `creg=7, z=0` (Table 3-9), so no valid 32-bit instruction matches it.
   p-bit comes from bits 13–0 of its fetch-packet header. In either case,
   `p=1` chains the next instruction into the same execute packet, including
   across a fetch-packet boundary.
-* Instructions in an execute packet read pre-packet state and commit together.
-  Ghidra has no notion of an execute packet, so each instruction is lifted on
-  its own with its own reads and writes. This is the usual pragmatic model; it
-  is *correct* for the common case of one writer per register per packet and can
-  mis-order a packet that reads and writes the same register. It is documented
-  rather than hidden.
-* Delay slots are not modelled as p-code. Branches (`B`, `BNOP`, `CALLP`, ...)
-  have five and loads four; Ghidra's flow analysis follows the branch and the
-  fall-through, which is what matters for recovery. `CALLP` writes `inst_start
-  + 24` to `B3`, matching the five delay slots.
+* Ordinary instructions are still lifted individually. Reads of a register
+  overwritten by another instruction in the same packet can see the new value
+  too early; instruction-result latencies are not scheduled by this p-code.
+* `C6000DelaySlots` proves finite unconditional `B`/`BNOP` windows after code
+  discovery, including IRP/NRP forms. It counts execute cycles, BNOP's implied
+  NOPs, NOP/ADDKPC multi-cycle counts, protected loads and crossed compact headers, then records
+  the physical byte count in `c_flow_delay`. `tools/gen_flow_delay.py` generates
+  the constant `delayslot(n)` choices: SLEIGH counts bytes, not instructions.
+  Targets and predicates are sampled before delay work. Native parsing is
+  checked before code units change; recovery is transactional and retains
+  comments, symbols, reference metadata and explicit fallthrough overrides.
+* Nested transfers, defined data and another function's entry/ownership prevent
+  recovery. Predicated full windows, BDEC/BPOS, ordinary result latency and
+  overlapping branch pipelines still need modeling. Existing delayed-call
+  `CALL` overrides keep their established conservative treatment.
+* CALLP supplies its own five implied NOP cycles. Its parallel companions
+  execute before the side-specific A3/B3 link is written; `inst_next` after
+  native packet expansion is the return address. Ghidra's generic Java
+  delay-depth/fallthrough counter parses all followers with the branch's
+  compact context. The late pass uses native delay-byte counts and corrects
+  CALLP fallthrough from the proved window. Mixed-width instruction stepping
+  in the stock emulator remains limited; listing p-code and decompilation
+  use address-specific contexts and are checked separately.
 * Branch targets are **PCE1-relative** — relative to the first instruction of
   the containing fetch packet, not to the branch itself. `B`/`CALLP`/`BNOP`/
   `BDEC`/`BPOS`/`ADDKPC` all use `inst_start & 0xFFFFFFE0`, exactly as the

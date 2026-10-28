@@ -103,6 +103,7 @@ define context contextreg
   c_isheader = (8,8) noflow # eighth word of a compact fetch packet
   c_branch_terminal = (9,9) noflow # selected register branches after code discovery
   c_pfollow = (10,13) noflow # instructions parallel after this compact branch
+  c_flow_delay = (15,22) noflow # proven delay window in bytes, set by the late return pass
   c_hdrpkt = (14,14) noflow # slot lies in a header-based (compact) fetch packet
 ;
 
@@ -444,9 +445,6 @@ AKPCTgt: reloc is akpc_disp
 AKPCNop: akpc_nop is akpc_nop { export *[const]:4 akpc_nop; }
 Nbit: count is nbit [ count = nbit + 1; ] { export *[const]:4 count; }
 
-# Branch displacement: signed 21-bit, scaled by 4 and added to the address of
-# the instruction after the delay slots (SPRUFE8B, B/CALLP instruction
-# descriptions: target = PC + 4 + (cst21 << 2)).
 # Branch target: signed 21-bit displacement scaled by four, added to PCE1 -
 # the address of the first instruction of the fetch packet that contains the
 # branch (SPRUFE8B B/CALLP execution blocks).
@@ -530,6 +528,7 @@ define pcodeop c6000_link_commit;
 @if FP_MODEL == "analysis"
 define pcodeop c6000_fp_status;
 @endif
+@include "c6000_flow_delay.sinc"
 @include "c6000_semantics.sinc"
 # Figure F-8 pointer branches use op=110 (IRP) or 111 (NRP).
 # The op field overlaps the five-bit register field of Figure F-7; match
@@ -539,26 +538,26 @@ define pcodeop c6000_fp_status;
   i27=0 & i26=0 & i25=0 & i24=0 & i23=0 & i22=0 & i21=0 &
   i20=1 & i19=1 & i18=0 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
-  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { c6000_sem_b_irp(); c6000_sem_b_ind(IRP); }
+  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1 & CFlowDelay
+  { local target:4 = IRP; c6000_sem_b_irp(); build CFlowDelay; goto [target]; }
 :^Cond^"B.S2" "IRP" is c_is16=0 & Cond & creg!=0 & creg!=7 &
   i27=0 & i26=0 & i25=0 & i24=0 & i23=0 & i22=0 & i21=0 &
   i20=1 & i19=1 & i18=0 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
-  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { if (Cond == 0) goto inst_next; c6000_sem_b_irp(); c6000_sem_b_ind(IRP); }
+  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1 & CFlowDelay
+  { local take:1 = Cond; local target:4 = IRP; if (take == 0) goto <skip_status>; c6000_sem_b_irp(); <skip_status> build CFlowDelay; if (take == 0) goto inst_next; goto [target]; }
 :"B.S2" "NRP" is c_is16=0 & creg=0 & z=0 &
   i27=0 & i26=0 & i25=0 & i24=0 & i23=0 & i22=0 & i21=0 &
   i20=1 & i19=1 & i18=1 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
-  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { c6000_sem_b_nrp(); c6000_sem_b_ind(NRP); }
+  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1 & CFlowDelay
+  { local target:4 = NRP; c6000_sem_b_nrp(); build CFlowDelay; goto [target]; }
 :^Cond^"B.S2" "NRP" is c_is16=0 & Cond & creg!=0 & creg!=7 &
   i27=0 & i26=0 & i25=0 & i24=0 & i23=0 & i22=0 & i21=0 &
   i20=1 & i19=1 & i18=1 & i17=0 & i16=0 & i15=0 & i14=0 &
   i13=0 & i12=0 & i11=0 & i10=0 & i9=0 & i8=0 &
-  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1
-  { if (Cond == 0) goto inst_next; c6000_sem_b_nrp(); c6000_sem_b_ind(NRP); }
+  i7=1 & i6=1 & i5=1 & i4=0 & i3=0 & i2=0 & i1=1 & CFlowDelay
+  { local take:1 = Cond; local target:4 = NRP; if (take == 0) goto <skip_status>; c6000_sem_b_nrp(); <skip_status> build CFlowDelay; if (take == 0) goto inst_next; goto [target]; }
 
 @include "c6000_decode.sinc"
 define pcodeop c6000_sploop;

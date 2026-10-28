@@ -373,3 +373,30 @@ unexplained disagreements for each sweep. GNU also decoded eight `MVC .S1`
 forms whose `s=0` violates SPRUFE8B Figure F-31's `s=1` constraint; it left
 64 `SPKERNEL` rows undefined in each synthetic image. The first compact sweep
 exposed the `CPKT` slot collision that `C6000CompactHeaderTest.java` now covers.
+
+
+## Proven delay-window regression
+
+`return-delay.py IMAGE CASES.tsv [be]` and `C6000ReturnDelayTest.java CASES.tsv`
+check 14 synthetic return/interrupt windows: parallel stores, scalar delay
+stores, multi-cycle NOPs, BNOP counts, target sampling, RINT, mixed widths and
+crossed fetch headers and PROT-load NOP cycles. Expected byte windows and guard stores are independent
+of recovery. The native listing p-code is executed, tail effects must precede
+transfer, and each recovered function must decompile within 15 seconds.
+Instruction stepping is also checked for the uniform 32-bit cases. The test
+preserves all five comment classes, label IDs and user references, including
+on initially undefined tail bytes, and requires idempotence.
+
+`C6000DelaySafetyTest.java` refuses nested control transfers, defined data and
+another function's entry, and an oversized execute packet, predicated PROT loads and IDLE (six refusal cases).
+`packet-call.py IMAGE CASES.tsv [be]` and
+`C6000PacketCallTest.java CASES.tsv` check six CALLP cases across both link
+registers, including mixed-width companions that read the old link. Run all
+three scripts in both endian modes. Reuse direct-flow, predicated-register,
+delayed-call and switch-ownership fixtures as dependent checks. Raw auto-analysis
+fixtures require `C6000SetEntry.java 1000` as a pre-script.
+
+Regenerate `c6000_flow_delay.sinc` with `python3 tools/gen_flow_delay.py`;
+`gen_decode.py` and `gen_compact.py` own their corresponding branch constructors.
+The generator's 254-byte bound covers the conservative finite-window reader;
+it does not permit raising decompiler timeouts or approximating FP semantics.

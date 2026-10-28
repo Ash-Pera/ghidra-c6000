@@ -42,9 +42,9 @@ import ghidra.util.task.TaskMonitor;
 
 /**
  * Use terminal p-code for unpredicated register branches after ordinary code
- * discovery. C6000 has variable-length delay windows that SLEIGH cannot
- * express. The initial conservative flow keeps adjacent delay instructions
- * discoverable; the late form gives the decompiler the actual branch flow.
+ * discovery. Initial conservative flow keeps delay instructions discoverable;
+ * the late form supplies terminal flow and the packet-aware pass materializes
+ * proven byte windows through SLEIGH native delay slots.
  */
 public class C6000RegisterBranchAnalyzer extends AbstractAnalyzer {
 	public C6000RegisterBranchAnalyzer() {
@@ -129,6 +129,13 @@ public class C6000RegisterBranchAnalyzer extends AbstractAnalyzer {
 			corrected++;
 		}
 		if (corrected > 0) log.appendMsg(getName(), "corrected " + corrected + " branch(es)");
+		try {
+			C6000DelaySlots.recover(program, monitor, log);
+		}
+		catch (CancelledException e) { throw e; }
+		catch (Exception e) {
+			throw new IllegalStateException("C6000 delay-window recovery failed", e);
+		}
 		C6000JumpTableAnalyzer.repairDetachedOverrides(program, monitor, log);
 		return true;
 	}

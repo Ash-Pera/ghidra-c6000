@@ -58,7 +58,9 @@ context, which auto-analysis does before disassembly.
 Main limitations:
 
 - Execute packets are not atomic: each instruction is lifted on its own, and
-  delay slots are not modelled in p-code.
+  ordinary result latency and overlapping branch pipelines are not modelled.
+  Proven unconditional B/BNOP windows and CALLP packet companions use native
+  delay p-code; see the documented mixed-width emulator limitation.
 - Constant propagation is bounded to 512-byte windows to avoid heap
   exhaustion on large images.
 - Floating-point status flags are incomplete for some instructions, and

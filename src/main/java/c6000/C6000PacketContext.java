@@ -183,6 +183,19 @@ public final class C6000PacketContext {
 	}
 
 	private static void primeBranchMode(Program program, Address at) throws Exception {
+		// Native SLEIGH delayslot() counts bytes, not follower instructions.
+		// Do not shorten a longer window already proved by the late pass.
+		Register delay = program.getRegister("c_flow_delay");
+		int bytes = 0;
+		try { bytes = C6000ExecutionPackets.parallelBytes(program, at); }
+		catch (ghidra.program.model.mem.MemoryAccessException ignored) { }
+		BigInteger current = program.getProgramContext().getValue(delay, at, false);
+		// Existing programs need the late pass to clear and re-decode a proven
+		// window before changing context; never invalidate annotations here.
+		if ((current == null || current.intValue() < bytes) &&
+		        program.getListing().getInstructionContaining(at) == null) {
+		    setField(program, "c_flow_delay", at, bytes);
+		}
 		Register field = program.getRegister("c_branch_terminal");
 		if (program.getProgramContext().getValue(field, at, false) == null) {
 			setField(program, "c_branch_terminal", at, 0);

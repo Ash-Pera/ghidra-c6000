@@ -166,13 +166,17 @@ def con(disp, pat, sem):
         if t not in terms:
             terms.append(t)
     if "BNOP" in disp or "CALLP" in disp:
-        # The compact header's p bits tell how many later instructions share
-        # this execute packet. SLEIGH delay slots keep those instructions in
-        # Ghidra's flow and lift their effects before taking the branch.
-        for following in range(14):
-            body = ("delayslot(%d); " % following if following else "") + sem
-            w(":%s is %s & c_pfollow=%d { %s }" %
-              (disp, " & ".join(terms), following, body))
+        # SPRUFE8B 3.5/3.10/4.2.6. Context records exact physical bytes;
+        # SLEIGH 7.11 delayslot() does not count instructions or cycles.
+        terms.append("CFlowDelay")
+        if "RB710" in disp:
+            sem = "local target:4 = RB710; build CFlowDelay; goto [target];"
+        elif sem.startswith("if ("):
+            condition, target = sem[4:].split(") goto ")
+            sem = f"local take:1 = ({condition}); build CFlowDelay; if (take != 0) goto {target}"
+        else:
+            sem = "build CFlowDelay; " + sem
+        w(":%s is %s { %s }" % (disp, " & ".join(terms), sem))
     else:
         w(":%s is %s { %s }" % (disp, " & ".join(terms), sem))
 
@@ -938,7 +942,7 @@ w("# ---------------------------------------------------------------------------
 w("")
 con("CALLP^CUnitS CTgt10, CRet",
     ["j5=0", "j4=1", "j3=1", "j2=0", "j1=1", "c_br=1", "CTgt10", "CRet"],
-    "CRet = inst_start + 24; call CTgt10;")
+    "CRet = inst_next; call CTgt10;")
 w("")
 
 w("# ---------------------------------------------------------------------------")

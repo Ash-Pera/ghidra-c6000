@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Fixed
+* Recover proven unconditional B/BNOP delay windows (including IRP/NRP)
+  in native p-code, accounting for parallel companions, multi-cycle NOPs,
+  ADDKPC counts, PROT loads and compact packet headers. Sample targets and predicates
+  before delay work; keep tail stores and interrupt-enable restoration in
+  the owning function. Refuse nested transfers, defined data and other
+  function entries. Dry-run parsing and transactional recovery preserve
+  annotations, references and explicit fallthrough overrides.
+* CALLP executes its parallel companions before writing the side-specific
+  A3/B3 link, and links to the next execute packet rather than a fixed
+  `instruction + 24`. Correct mixed-width fallthrough using the proved
+  packet boundary. Generic Ghidra instruction stepping still has a
+  mixed-width delay-context limitation; listing p-code is tested directly.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

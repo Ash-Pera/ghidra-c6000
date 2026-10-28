@@ -705,7 +705,7 @@ def main():
                             sem = "goto BranchTarget;"
                         elif mnem == "CALLP" and ops and ops[0] == "BranchTarget":
                             sem = ("A3" if suffix == ".1" else "B3") + \
-                                " = inst_start + 24; call BranchTarget;"
+                                " = inst_next; call BranchTarget;"
                         elif mnem == "MVK" and ops:
                             width = "5" if ops[0] == "Cst5" else "16"
                             sem = "c6000_sem_mvk%s(%s);" % (width, args)
@@ -730,9 +730,9 @@ def main():
                         # as a conditional jump.
                         plain_pat = [term for term in pat
                                      if term not in {"Cond", "creg!=7"}]
-                        plain_pat += ["creg=0", "z=0"]
+                        plain_pat += ["creg=0", "z=0", "CFlowDelay"]
                         plain_disp = "B." + variant_ul + suffix[1:] + " BranchTarget"
-                        w(":%s is %s { goto BranchTarget; }" %
+                        w(":%s is %s { build CFlowDelay; goto BranchTarget; }" %
                           (plain_disp, " & ".join(plain_pat)))
                         n += 1
                         pat.append("creg!=0")
@@ -747,12 +747,22 @@ def main():
                         # the next time this generator runs.
                         terminal_pat = [term for term in pat
                                         if term not in {"Cond", "creg!=7"}]
-                        terminal_pat += ["creg=0", "z=0", "c_branch_terminal=1"]
+                        terminal_pat += ["creg=0", "z=0", "c_branch_terminal=1", "CFlowDelay"]
                         terminal_disp = "B." + variant_ul + suffix[1:] + " " + ops[0]
-                        w(":%s is %s { c6000_sem_b_ind(%s); }" %
+                        w(":%s is %s { local target:4 = %s; build CFlowDelay; goto [target]; }" %
                           (terminal_disp, " & ".join(terminal_pat), ops[0]))
                         n += 1
                         pat.append("c_branch_terminal=0")
+                    # SPRUFE8B 3.5 / 4.2.6 and CALLP execution: sample the
+                    # issue predicate/target before the proven native byte window.
+                    # CALLP supplies its NOP cycles and links to the next packet.
+                    if mnem == "B" and ops and ops[0] == "BranchTarget":
+                        pat.append("CFlowDelay")
+                        sem = "local take:1 = Cond; build CFlowDelay; if (take != 0) goto BranchTarget;"
+                    elif mnem == "CALLP":
+                        pat.append("CFlowDelay")
+                        link = "A3" if suffix == ".1" else "B3"
+                        sem = f"build CFlowDelay; {link} = inst_next; call BranchTarget;"
                     key = tuple(sorted(pat))
                     if key in seen_patterns:
                         # Same encoding can be listed again as a pseudo-op.

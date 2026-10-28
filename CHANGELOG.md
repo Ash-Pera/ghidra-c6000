@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Fixed
+* Repair generated switch overrides left on a former function after body
+  recovery. Code-verified cases are rehomed or retained outside function
+  namespaces without deleting labels; detached duplicates no longer crash
+  the decompiler. Correct override ownership checks also avoid rewriting
+  unchanged tables on repeated analysis.
+
 * Computed branch references no longer retain the intermediate signed `MVK`
   value when an adjacent, unconditional `MVKH` proves the final target.
   Predicated writes, same-execute-packet writes and alternate entries remain
@@ -10,6 +16,11 @@
 * Builds reject an explicitly configured JDK older than Ghidra's declared
   minimum, with a clear error before SLEIGH starts. JDK discovery reads
   `application.java.min` and handles missing JDKs without silently exiting.
+
+### Added
+* `C6000RepairSwitchOverrides.java` repairs legacy switch metadata on a copy.
+  `C6000UseAnalysisLanguage.java` prepares a reading copy with concise float
+  p-code, keeping the default language available for detailed semantic checks.
 
 ## 1.0.3 - 2026-10-27
 

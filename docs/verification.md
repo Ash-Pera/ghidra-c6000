@@ -1,5 +1,13 @@
 # Verification and measured coverage
 
+`C6000SwitchOwnershipTest.java` runs after `C6000JumpTableTest.java` on the
+existing `tests/fixtures/jump-table.py` image. Run both with little- and
+big-endian languages. Six checks cover stable override label IDs on repeat
+analysis, lossless rehoming, retention when a branch has no function owner,
+idempotence, preservation of mismatching manual cases, and detached duplicates
+when the correct owner already has a table. The test checks that repairs do
+not change instructions, flow or function bodies.
+
 `tests/fixtures/constant-branch-target.py IMAGE CASES.tsv [be]` and
 `C6000ConstantBranchTargetTest.java` check adjacent `MVK`/`MVKH` branch-target
 references. Run the script before auto-analysis with `prepare CASES.tsv`,

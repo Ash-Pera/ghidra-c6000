@@ -129,6 +129,7 @@ public class C6000RegisterBranchAnalyzer extends AbstractAnalyzer {
 			corrected++;
 		}
 		if (corrected > 0) log.appendMsg(getName(), "corrected " + corrected + " branch(es)");
+		C6000JumpTableAnalyzer.repairDetachedOverrides(program, monitor, log);
 		return true;
 	}
 

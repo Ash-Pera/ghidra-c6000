@@ -170,6 +170,12 @@ about 4 seconds. The reported `0xc001dd80` merger did not recur.
 
 ### Floating-point decompilation
 
+`C6000UseAnalysisLanguage.java` switches a comparison copy to the matching
+endian `analysis` language without running auto-analysis. Keep the original
+default-language program: the concise language deliberately approximates
+floating-point status and special rounding. Changing the language is a
+reading aid, not a fix to the exact floating-point model.
+
 The default `C6000:LE:32:default` and `C6000:BE:32:default` languages retain
 the detailed floating-point rounding and status-register model. For reading
 float-heavy functions, explicitly select `C6000:LE:32:analysis` or
@@ -180,6 +186,23 @@ the SP comparisons. It represents status-register effects with the opaque
 not suitable for emulation. The same stage 2 function at `0xc0008c44`
 decompiled to 36 lines with the analysis language versus 219 with the exact
 language; the `fVar1 < 1.0` branch was visible in the shorter output.
+
+## Switch override ownership
+
+Ghidra stores switch metadata as
+`function::override::jmp_<branch>::switch` and `case_<n>` labels. A body repair
+can leave those labels under the former function. Passing the detached
+override to the native decompiler can crash it even when the instruction
+listing is valid.
+
+The jump-table and register-branch passes now verify ownership. Repair is
+limited to canonical metadata whose ordered cases match the table recovered
+from the instructions and bytes. A table moves to its current function owner;
+if no owner exists or that owner already has a table, its namespace moves
+under `C6000_detached_switches`. Existing label IDs, names and addresses stay
+intact. Unverified manual case choices stay unchanged. The standalone
+`C6000RepairSwitchOverrides.java` script applies the same repair to a legacy
+comparison copy.
 
 ## Calling convention
 

@@ -42,6 +42,7 @@ import ghidra.program.model.mem.Memory;
 import ghidra.program.model.mem.MemoryAccessException;
 import ghidra.program.model.mem.MemoryBlock;
 import ghidra.program.model.pcode.JumpTable;
+import ghidra.program.model.pcode.HighFunction;
 import ghidra.program.model.scalar.Scalar;
 import ghidra.program.model.symbol.RefType;
 import ghidra.program.model.symbol.Reference;
@@ -104,6 +105,7 @@ public class C6000JumpTableAnalyzer extends AbstractAnalyzer {
 	/** Recover the dispatches in {@code region}; returns how many were found. */
 	static int recover(Program program, AddressSetView region, TaskMonitor monitor,
 			MessageLog log) throws CancelledException {
+		repairDetachedOverrides(program, monitor, log);
 		AddressSetView set = region;
 		Listing listing = program.getListing();
 		List<Address> branches = new ArrayList<>();
@@ -163,7 +165,105 @@ public class C6000JumpTableAnalyzer extends AbstractAnalyzer {
 			monitor.checkCancelled();
 			CreateFunctionCmd.fixupFunctionBody(program, function, monitor);
 		}
+		repairDetachedOverrides(program, monitor, log);
 		return recovered;
+	}
+
+	/**
+	 * A later body repair can leave a generated switch override on its former
+	 * owner. Ghidra passes it to the native decompiler even though its branch
+	 * is not in that function, which can crash the process. Move only canonical
+	 * overrides whose ordered cases still match the recovered TI table. Keep
+	 * every label and ID: rehome to the current function, or retain under a
+	 * detached namespace when no function owns the branch yet.
+	 */
+	public static int repairDetachedOverrides(Program program, TaskMonitor monitor,
+			MessageLog log) throws CancelledException {
+		var symbols = program.getSymbolTable();
+		List<Symbol> switches = new ArrayList<>();
+		var iterator = symbols.getAllSymbols(true);
+		while (iterator.hasNext()) {
+			monitor.checkCancelled();
+			Symbol symbol = iterator.next();
+			if (symbol.getName().equals("switch")) switches.add(symbol);
+		}
+		C6000CallAnalyzer.Walker walker = new C6000CallAnalyzer.Walker(program);
+		int repaired = 0;
+		for (Symbol symbol : switches) {
+			monitor.checkCancelled();
+			Function oldOwner = overrideOwner(symbol);
+			Address at = symbol.getAddress();
+			if (oldOwner == null || oldOwner.getBody().contains(at)) continue;
+			Instruction branch = program.getListing().getInstructionAt(at);
+			if (branch == null || branch.getRegister(0) == null ||
+				"B3".equals(branch.getDefaultOperandRepresentation(0)) ||
+				branch.getFlowOverride() != FlowOverride.NONE ||
+				!branch.getFlowType().isComputed()) continue;
+			String op = C6000CallAnalyzer.baseName(branch);
+			if (!(op.equals("B.S2") || op.equals("BNOP.S2"))) continue;
+			List<Address> expected = targets(program, walker, branch);
+			Namespace table = symbol.getParentNamespace();
+			if (expected.size() < 2 || !matchesRecoveredTable(program, table, at, expected)) continue;
+			Function owner = program.getFunctionManager().getFunctionContaining(at);
+			try {
+				Namespace destination = owner == null ? null : HighFunction.findCreateOverrideSpace(owner);
+				// The right owner may already have its own copy. Preserve that
+				// copy and retain the detached duplicate outside both functions.
+				if (destination == null || symbols.getNamespace(table.getName(), destination) != null) {
+					Namespace root = symbols.getNamespace("C6000_detached_switches", program.getGlobalNamespace());
+					if (root == null) root = symbols.createNameSpace(program.getGlobalNamespace(),
+						"C6000_detached_switches", SourceType.ANALYSIS);
+					String name = "from_" + oldOwner.getEntryPoint() + "_" + table.getSymbol().getID();
+					destination = symbols.getNamespace(name, root);
+					if (destination == null) destination = symbols.createNameSpace(root, name, SourceType.ANALYSIS);
+				}
+				if (destination == null || symbols.getNamespace(table.getName(), destination) != null) {
+					log.appendMsg("C6000 Jump Tables", "retained conflicting detached override at " + at);
+					continue;
+				}
+				table.getSymbol().setNamespace(destination);
+				log.appendMsg("C6000 Jump Tables", "retained switch " + at + " outside former owner " + oldOwner.getEntryPoint() + " under " + destination.getName(true));
+				repaired++;
+			}
+			catch (ghidra.util.exception.DuplicateNameException |
+					ghidra.program.model.listing.CircularDependencyException | InvalidInputException e) {
+				log.appendException(e);
+			}
+		}
+		return repaired;
+	}
+
+	private static boolean matchesRecoveredTable(Program program, Namespace table,
+			Address at, List<Address> expected) {
+		Set<Integer> cases = new HashSet<>();
+		boolean hasSwitch = false;
+		var symbols = program.getSymbolTable().getSymbols(table);
+		while (symbols.hasNext()) {
+			Symbol symbol = symbols.next();
+			if (symbol.getSymbolType() != ghidra.program.model.symbol.SymbolType.LABEL) return false;
+			if (symbol.getName().equals("switch")) {
+				if (hasSwitch || !symbol.getAddress().equals(at)) return false;
+				hasSwitch = true;
+			}
+			else {
+				if (!symbol.getName().matches("case_[0-9]+")) return false;
+				int index;
+				try { index = Integer.parseInt(symbol.getName().substring(5)); }
+				catch (NumberFormatException e) { return false; }
+				if (index >= expected.size() || !cases.add(index) ||
+					!symbol.getAddress().equals(expected.get(index))) return false;
+			}
+		}
+		return hasSwitch && cases.size() == expected.size();
+	}
+
+	private static Function overrideOwner(Symbol symbol) {
+		Namespace table = symbol.getParentNamespace();
+		if (table == null || !table.getName().equals("jmp_" + symbol.getAddress())) return null;
+		Namespace overrides = table.getParentNamespace();
+		if (overrides == null || !overrides.getName().equals("override")) return null;
+		Namespace owner = overrides.getParentNamespace();
+		return owner instanceof Function ? (Function) owner : null;
 	}
 
 	/** The table entries a register branch dispatches to, or an empty list. */
@@ -262,10 +362,9 @@ public class C6000JumpTableAnalyzer extends AbstractAnalyzer {
 	/** True when {@code function} already carries a switch override for the branch at {@code at}. */
 	private static boolean hasOverride(Program program, Function function, Address at) {
 		for (Symbol symbol : program.getSymbolTable().getSymbols(at)) {
-			Namespace parent = symbol.getParentNamespace();
-			if (symbol.getName().equals("switch") && parent != null &&
-				parent.getParentNamespace() != null &&
-				parent.getParentNamespace().getID() == function.getID()) return true;
+			Function owner = overrideOwner(symbol);
+			if (symbol.getName().equals("switch") && owner != null &&
+				owner.getID() == function.getID()) return true;
 		}
 		return false;
 	}

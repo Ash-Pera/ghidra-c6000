@@ -27,9 +27,8 @@ Existing instruction/data overlaps, foreign owners, function entries, stale
 context, unsupported p-code and new control-transfer peers refuse. Neither path
 clears units, changes decode context or expands function bodies. Headers are
 skipped, not created. Uniform fill, unproved alternate entries, delay-window
-obligations and pointer-data reclassification require separate evidence. In
-particular, the seven DSP pointer mistakes previously repaired are not permission
-to erase similar-looking data automatically.
+obligations and pointer-data reclassification require separate evidence.
+Decodable bytes alone do not justify replacing defined data with instructions.
 
 The pipeline compiler, caller-tail contract, register-write/store phases and
 SLEIGH semantics are unchanged. Ordinary callee-only pending-return refusals
@@ -37,7 +36,7 @@ remain. Caller-scoped traces continue to carry stores into the actual caller.
 
 ## Focused checks
 
-Generate the stock-free fixture with:
+Generate the synthetic fixture with:
 
 ```
 python3 tests/fixtures/parallel-peers.py IMAGE CASES.json [be]

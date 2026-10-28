@@ -1,8 +1,7 @@
 # Verification
 
 Use the release suite to check the current source and packaged extension.
-[Release preparation](release.md) records the candidate checks and remaining release
-work. Individual tests are described in the [fixture catalog](regressions.md).
+[Release guidance](release.md) records the supported matrix and publishing checks. Individual tests are described in the [fixture catalog](regressions.md).
 
 ## Reproducing release verification
 

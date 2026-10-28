@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (planned v1.0.5)
+## Unreleased
+
+## 1.1 - 2026-10-28
 
 ### Upgrade notes
 

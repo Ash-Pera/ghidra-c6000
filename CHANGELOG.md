@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+* The one-bit `dst` of compact L2c, Lx3c and Lx1c instructions (`AND`, `OR`,
+  `XOR`, `CMPxx`) is A0/A1 or B0/B1 as SPRUFE8B Figures D-7, D-9 and D-10
+  say; with the header RS bit set it named A16/A17 or B16/B17.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

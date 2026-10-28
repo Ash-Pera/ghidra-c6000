@@ -108,10 +108,8 @@ RA1110: cq_1110_b0 is cq_1110_b0 & q_s=1 & c_rs=0 { export cq_1110_b0; }
 RA1110: cq_1110_a1 is cq_1110_a1 & q_s=0 & c_rs=1 { export cq_1110_a1; }
 RA1110: cq_1110_b1 is cq_1110_b1 & q_s=1 & c_rs=1 { export cq_1110_b1; }
 
-RA4: cq_4_a0 is cq_4_a0 & q_s=0 & c_rs=0 { export cq_4_a0; }
-RA4: cq_4_b0 is cq_4_b0 & q_s=1 & c_rs=0 { export cq_4_b0; }
-RA4: cq_4_a1 is cq_4_a1 & q_s=0 & c_rs=1 { export cq_4_a1; }
-RA4: cq_4_b1 is cq_4_b1 & q_s=1 & c_rs=1 { export cq_4_b1; }
+RA4: cq_4_a0 is cq_4_a0 & q_s=0 { export cq_4_a0; }
+RA4: cq_4_b0 is cq_4_b0 & q_s=1 { export cq_4_b0; }
 
 RX97: cq_97_a0 is cq_97_a0 & q_s=0 & q_t=0 & c_rs=0 { export cq_97_a0; }
 RX97: cq_97_b0 is cq_97_b0 & q_s=0 & q_t=1 & c_rs=0 { export cq_97_b0; }
@@ -260,14 +258,10 @@ RMVFr: "B13" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=5 { export B13; }
 RMVFr: "B14" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=6 { export B14; }
 RMVFr: "B15" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=7 { export B15; }
 
-RCmpDst: "A0" is q_s=0 & c_rs=0 & j11=0 { export A0; }
-RCmpDst: "A1" is q_s=0 & c_rs=0 & j11=1 { export A1; }
-RCmpDst: "A16" is q_s=0 & c_rs=1 & j11=0 { export A16; }
-RCmpDst: "A17" is q_s=0 & c_rs=1 & j11=1 { export A17; }
-RCmpDst: "B0" is q_s=1 & c_rs=0 & j11=0 { export B0; }
-RCmpDst: "B1" is q_s=1 & c_rs=0 & j11=1 { export B1; }
-RCmpDst: "B16" is q_s=1 & c_rs=1 & j11=0 { export B16; }
-RCmpDst: "B17" is q_s=1 & c_rs=1 & j11=1 { export B17; }
+RCmpDst: "A0" is q_s=0 & j11=0 { export A0; }
+RCmpDst: "A1" is q_s=0 & j11=1 { export A1; }
+RCmpDst: "B0" is q_s=1 & j11=0 { export B0; }
+RCmpDst: "B1" is q_s=1 & j11=1 { export B1; }
 
 RT64: cq_64_a0 is cq_64_a0 & q_t=0 & c_rs=0 { export cq_64_a0; }
 RT64: cq_64_b0 is cq_64_b0 & q_t=1 & c_rs=0 { export cq_64_b0; }

@@ -190,6 +190,11 @@ spec declares a synthetic `PC` for Ghidra's emulator; architectural `PCE1`
 remains a separate control register. P-code updates `CSR.SAT` as an instruction
 effect; cycle-accurate placement of that write belongs to a pipeline model.
 
+`tests/fixtures/compact-cmpdst.py <image.bin> <cases.tsv> [be]` and
+`C6000CompactCmpDstTest.java <cases.tsv>` check that the one-bit `dst` of
+L2c, Lx3c and Lx1c (Figures D-7, D-9, D-10) names A0/A1 with the header RS
+bit set, while the sources move to A16. Both endian variants pass.
+
 `tests/fixtures/compact-header-collision.py <image.bin> [be]` and
 `C6000CompactHeaderTest.java` verify that an E-prefixed word outside the header
 position stays undefined, while a compact word containing an E-prefixed upper

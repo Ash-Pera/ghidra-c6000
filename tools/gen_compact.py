@@ -54,7 +54,7 @@ SUFFIXES = {
     "64":   ("a0", "b0", "a1", "b1"),
     "1110": ("a0", "b0", "a1", "b1"),
     "65":   ("a0", "b0", "a1", "b1"),
-    "4":    ("a0", "b0", "a1", "b1"),
+    "4":    ("a0", "b0"),  # 1-bit dst, header RS ignored (Figure D-7 note)
     "87":   ("a0", "b0", "a1", "b1"),
     "710":  ("a", "b"),
     "117":  ("a", "b", "a1", "b1"),
@@ -182,6 +182,7 @@ def reg_table(name, slot, side):
 
     side == 's'  : file selected by q_s (bit 0)
     side == 't'  : file selected by q_t (bit 12)
+    side == 'sn' : file selected by q_s, header RS ignored (D-7)
     side == 'tn' : file selected by q_t, header RS ignored (C-21 / Dpp)
     side == 'br' : fixed B file, header RS applied (F-32)
     """
@@ -193,6 +194,8 @@ def reg_table(name, slot, side):
         elif side == "t":
             ctx = {"a0": "q_t=0 & c_rs=0", "b0": "q_t=1 & c_rs=0",
                    "a1": "q_t=0 & c_rs=1", "b1": "q_t=1 & c_rs=1"}[suf]
+        elif side == "sn":
+            ctx = {"a0": "q_s=0", "b0": "q_s=1"}[suf]
         elif side == "tn":
             ctx = {"a": "q_t=0", "b": "q_t=1"}[suf]
         elif side == "br":
@@ -340,7 +343,7 @@ reg_table("RA97", "97", "s")
 reg_table("RB97", "97", "s")
 reg_table("RA64", "64", "s")
 reg_table("RA1110", "1110", "s")
-reg_table("RA4", "4", "s")
+reg_table("RA4", "4", "sn")
 cross_table("RX97", "97")
 for side, regs in ((0, A), (1, B)):
     for cross in (0, 1):
@@ -358,12 +361,11 @@ for side, regs in ((0, A), (1, B)):
                 w('RMVFr: "%s" is q_s=%d & c_rs=%d & j11=%d & j10=%d & q_r3=%d { export %s; }' %
                   (reg, side, rs, (ms >> 1) & 1, ms & 1, low, reg))
 w("")
+# Figures D-9/D-10: dst is A0/A1 or B0/B1, header RS ignored.
 for side, regs in ((0, A), (1, B)):
-    for rs in (0, 1):
-        for bit in (0, 1):
-            reg = regs[16 * rs + bit]
-            w('RCmpDst: "%s" is q_s=%d & c_rs=%d & j11=%d { export %s; }' %
-              (reg, side, rs, bit, reg))
+    for bit in (0, 1):
+        reg = regs[bit]
+        w('RCmpDst: "%s" is q_s=%d & j11=%d { export %s; }' % (reg, side, bit, reg))
 w("")
 reg_table("RT64", "64", "t")
 for suf in SUFFIXES["65"]:

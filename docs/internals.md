@@ -97,6 +97,13 @@ undiscovered delay slots, apply a CALL override, add a register-built call-targe
 reference, and repair the caller's body. Predicated calls remain conditional; B/BNOP
 through the ABI return register B3 remain returns.
 
+B3 must match the end of its delay window, or the complete window of a proved
+complementary call partner. Full-width windows may skip only a header exactly at
+the boundary; a header elsewhere does not justify return-address slack. Incoming
+jump propagation requires a complete delay window and no alternate entry into
+the preceding slot sequence. Predicate constraints apply only while their register
+is unchanged; uncertain conditional writes invalidate constants.
+
 Target recovery walks preceding straight-line code, follows MV and ADD/OR of zero, and
 skips writes predicated opposite to the branch. Calls are revisited when preceding code
 becomes available. The analyzer also handles complementary if/else call pairs: only the

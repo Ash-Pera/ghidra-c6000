@@ -12,6 +12,11 @@
 
 ### Fixed
 
+* Apply AMR circular addressing to compact memory forms, including per-byte
+  wrapping for nonaligned transfers, and preserve the incoming store source
+  when predecrement updates an overlapping pointer (SPRUFE8B 3.9.2 and
+  Figures C-8..C-15). Add native and exact-schedule regressions in both byte
+  orders, including E1 pointer and E5 load observations.
 * Correct the skip-condition polarity of compact predicated `MVK` for `[A0]`,
   `[!A0]`, `[B0]` and `[!B0]` (SPRUFE8B Figure G-3). Add raw and exact-schedule
   regression checks for enabled, disabled and predicate-aliasing writes in both

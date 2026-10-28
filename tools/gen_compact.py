@@ -412,6 +412,8 @@ for suf in ("a0", "b0"):
     w("RPTR: %s is %s & q_s=%d { export %s; }" %
       (f, f, 0 if suf == "a0" else 1, f))
 w("")
+# C-8..C-15 ptr fields always name A4-A7/B4-B7, independent of RS.
+imm1("CPtrIndex", "4 + (j8 << 1) + j7", "j8 & j7")
 reg_table("RT710", "710", "tn")
 for file, side in (("A", 0), ("B", 1)):
     for even in range(0, 16, 2):
@@ -600,9 +602,6 @@ def emit_one(pat, mem_kind, imm, v, info, na, sz):
     name, size, sign, pair = info
     for ldst in (0, 1):
         mn = ("LD" if ldst else "ST") + (name.rstrip("U") if not ldst else name)
-        terms = list(pat) + ["c_dsz=%d" % v, "q_ldst=%d" % ldst]
-        if na is not None:
-            terms.append("q_na=%d" % na)
         newpat = list(pat) + ["c_dsz=%d" % v, "q_ldst=%d" % ldst]
         if not any(t.startswith("q_sz=") for t in pat):
             newpat.append("q_sz=%d" % sz)
@@ -613,90 +612,44 @@ def emit_one(pat, mem_kind, imm, v, info, na, sz):
         unscaled = name == "NDW" and mem_kind in {"off", "ind"}
         shift = 0 if unscaled else SHIFT[size]
         left, right = ("(", ")") if unscaled else ("[", "]")
+        reg = "RT64" if size <= 4 else "RT65"
+        offset = "RA15" if mem_kind == "ind" else imm
+        tabs = ["RPTR", offset, reg, "CPtrIndex", "q_s"]
         if mem_kind == "off":
             memdisp = '"*"^RPTR^"%s"^%s^"%s"' % (left, imm, right)
-            addr = "(RPTR + (%s << %d))" % (imm, shift)
-            pre = []
-            post = []
-            tabs = ["RPTR", imm]
-            reg = "RT64" if size <= 4 else "RT65"
-            tabs.append(reg)
-            sto = reg
-            if size <= 4:
-                if ldst:
-                    sem = ld_sem(reg, addr, size, sign)
-                else:
-                    sem = st_sem(reg, addr, size)
-            else:
-                sem = ld_sem(reg, addr, size, sign) if ldst else st_sem(reg, addr, size)
-            if ldst:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, memdisp, reg)
-            else:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
         elif mem_kind == "ind":
             memdisp = '"*"^RPTR^"%s"^RA15^"%s"' % (left, right)
-            addr = "(RPTR + (RA15 << %d))" % shift
-            tabs = ["RPTR", "RA15"]
-            reg = "RT64" if size <= 4 else "RT65"
-            tabs.append(reg)
-            if size <= 4:
-                sem = ld_sem(reg, addr, size, sign) if ldst else st_sem(reg, addr, size)
-            else:
-                sem = ld_sem(reg, addr, size, sign) if ldst else st_sem(reg, addr, size)
-            if ldst:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, memdisp, reg)
-            else:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
         elif mem_kind == "inc":
             memdisp = '"*"^RPTR^"++["^%s^"]"' % imm
-            tabs = ["RPTR", imm]
-            reg = "RT64" if size <= 4 else "RT65"
-            tabs.append(reg)
-            if size <= 4:
-                if ldst:
-                    # SPRUFE8B 4.2.5: old address, E1 pointer, E5 data.
-                    sem = "local loadAddress:4 = RPTR; RPTR = RPTR + (%s << %d); %s" % (
-                        imm, shift, ld_sem(reg, "loadAddress", size, sign))
-                else:
-                    sem = "%s RPTR = RPTR + (%s << %d);" % (
-                        st_sem(reg, "RPTR", size), imm, shift)
-            else:
-                if ldst:
-                    # SPRUFE8B 4.2.5: old address, E1 pointer, E5 data.
-                    sem = "local loadAddress:4 = RPTR; RPTR = RPTR + (%s << %d); %s" % (
-                        imm, shift, ld_sem(reg, "loadAddress", size, sign))
-                else:
-                    sem = "%s RPTR = RPTR + (%s << %d);" % (
-                        st_sem(reg, "RPTR", size), imm, shift)
-            if ldst:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, memdisp, reg)
-            else:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
         elif mem_kind == "dec":
             memdisp = '"*--"^RPTR^"["^%s^"]"' % imm
-            tabs = ["RPTR", imm]
-            reg = "RT64" if size <= 4 else "RT65"
-            tabs.append(reg)
-            if size <= 4:
-                if ldst:
-                    sem = "RPTR = RPTR - (%s << %d); %s" % (
-                        imm, shift, ld_sem(reg, "RPTR", size, sign))
-                else:
-                    sem = "RPTR = RPTR - (%s << %d); %s" % (
-                        imm, shift, st_sem(reg, "RPTR", size))
-            else:
-                if ldst:
-                    sem = "RPTR = RPTR - (%s << %d); %s" % (
-                        imm, shift, ld_sem(reg, "RPTR", size, sign))
-                else:
-                    sem = "RPTR = RPTR - (%s << %d); %s" % (
-                        imm, shift, st_sem(reg, "RPTR", size))
-            if ldst:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, memdisp, reg)
-            else:
-                disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
         else:
             raise ValueError(mem_kind)
+        if ldst:
+            disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, memdisp, reg)
+        else:
+            disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
+
+        # SPRUFE8B 3.9.2.1 and STB/STH/STW/STDW E1 reads: snapshot
+        # store data before an aliased pointer is changed. All four formats
+        # use the same AMR calculation as full-width memory instructions.
+        sem = "" if ldst else "local storeValue:%d = %s; " % (max(4, size), reg)
+        sem += "local delta:4 = %s << %d; " % (offset, shift)
+        if mem_kind == "dec":
+            sem += "delta = 0 - delta; "
+        sem += ("local effective:4; c6000_wrap_address(RPTR, delta, "
+                "CPtrIndex, q_s, effective); ")
+        sem += "local transferAddress:4 = %s; " % ("RPTR" if mem_kind == "inc" else "effective")
+        if mem_kind in {"inc", "dec"}:
+            # SPRUFE8B 4.2.5: E1 base update precedes E5 load writeback,
+            # including when the data register overlaps the pointer.
+            sem += "RPTR = effective; "
+        if name in {"NW", "NDW"}:
+            # SPRUFE8B 3.9.2.3: wrap every byte of a nonaligned transfer.
+            args = ("transferAddress, " + reg) if ldst else "storeValue, transferAddress"
+            sem += "c6000_sem_%s(%s, CPtrIndex, q_s);" % (mn.lower(), args)
+        else:
+            sem += ld_sem(reg, "transferAddress", size, sign) if ldst else st_sem("storeValue", "transferAddress", size)
         con(disp, newpat + tabs, sem)
     w("")
 

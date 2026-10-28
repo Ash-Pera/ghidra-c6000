@@ -34,6 +34,22 @@ from observed disassembler output.
 
 ## Memory and arithmetic
 
+`tests/fixtures/compact-memory.py IMAGE CASES.json [be]` and
+`C6000CompactMemoryTest.java CASES.json` execute 960 native instruction checks
+and 960 exact-schedule checks per endian mode. They cover compact offset,
+indirect, post-increment and pre-decrement loads/stores for byte, halfword,
+word, doubleword and nonaligned word/doubleword transfers, including signed
+and unsigned loads. Linear, BK0 and BK1 cases exercise all four eligible
+pointers on both register sides, both data files and both RS selections.
+The 192 overlapping cases include stores whose source is the updated pointer
+and doubleword transfers whose even or odd data register is the pointer.
+Scheduled observers check the E1 pointer before E5 load writeback and the data
+after E5. All GPRs, AMR, CSR, the captured return target and guarded memory
+bytes are checked. Nonaligned accesses wrap each byte independently across
+the buffer edge (SPRUFE8B 2.8.3, 3.9.2, 4.2.5-4.2.6 and Figures C-8..C-15).
+This fixture is part of the core release suite and requires no external image
+or assembler.
+
 `tests/fixtures/circular-addressing.py <image.bin> <cases.tsv> [be]` and
 `C6000CircularAddressTest.java <cases.tsv>` execute 14 cases per endian mode. They check
 BK0/BK1 wraparound, underflow, pre/post updates, noneligible base registers, a

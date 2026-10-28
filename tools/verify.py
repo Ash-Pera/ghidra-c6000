@@ -34,6 +34,7 @@ CORE = [
     case("compact-operands", "CompactOperands", "C6000_COMPACT_OPERANDS_OK"),
     case("compact-predicated-mvk", "CompactPredicatedMvk", "C6000_COMPACT_PREDICATED_MVK_OK", "json"),
     case("compact-move-memory", "CompactMoveMemory", "C6000_COMPACT_MOVE_MEMORY_OK"),
+    case("compact-memory", "CompactMemory", "C6000_COMPACT_MEMORY_OK", "json"),
     case("compact-compare-destination", "CompactCompareDestination", "C6000_COMPACT_COMPARE_DESTINATION_OK"),
     case("full32-encoding-info", "Full32EncodingInfo", "C6000_FULL32_ENCODING_INFO_OK"),
     case("return-delay", "ReturnDelay", "C6000_RETURN_DELAY_OK"),

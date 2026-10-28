@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+* `SUBU` with opfield `0111111` takes the cross path on `src1`, as SPRUFE8B
+  lists; it read `src2` from the other side instead.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

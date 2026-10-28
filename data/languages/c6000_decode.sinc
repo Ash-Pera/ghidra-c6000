@@ -1155,8 +1155,8 @@
 
 :^Cond^"SUBU.L1" Src1, Src2, DstPair is i2=0 & i3=1 & i4=1 & i11=0 & i10=1 & i9=0 & i8=1 & i7=1 & i6=1 & i5=1 & i1=0 & c_is16=0 & Cond & creg!=7 & Src1 & Src2 & DstPair { if (Cond == 0) goto <skip>; c6000_sem_subu(Src1, Src2, DstPair); <skip> }
 :^Cond^"SUBU.L2" Src1, Src2, DstPair is i2=0 & i3=1 & i4=1 & i11=0 & i10=1 & i9=0 & i8=1 & i7=1 & i6=1 & i5=1 & i1=1 & c_is16=0 & Cond & creg!=7 & Src1 & Src2 & DstPair { if (Cond == 0) goto <skip>; c6000_sem_subu(Src1, Src2, DstPair); <skip> }
-:^Cond^"SUBU.L1" Src1, Src2, DstPair is i2=0 & i3=1 & i4=1 & i11=0 & i10=1 & i9=1 & i8=1 & i7=1 & i6=1 & i5=1 & i1=0 & c_is16=0 & Cond & creg!=7 & Src1 & Src2 & DstPair { if (Cond == 0) goto <skip>; c6000_sem_subu(Src1, Src2, DstPair); <skip> }
-:^Cond^"SUBU.L2" Src1, Src2, DstPair is i2=0 & i3=1 & i4=1 & i11=0 & i10=1 & i9=1 & i8=1 & i7=1 & i6=1 & i5=1 & i1=1 & c_is16=0 & Cond & creg!=7 & Src1 & Src2 & DstPair { if (Cond == 0) goto <skip>; c6000_sem_subu(Src1, Src2, DstPair); <skip> }
+:^Cond^"SUBU.L1" Src1X, Src2Local, DstPair is i2=0 & i3=1 & i4=1 & i11=0 & i10=1 & i9=1 & i8=1 & i7=1 & i6=1 & i5=1 & i1=0 & c_is16=0 & Cond & creg!=7 & Src1X & Src2Local & DstPair { if (Cond == 0) goto <skip>; c6000_sem_subu(Src1X, Src2Local, DstPair); <skip> }
+:^Cond^"SUBU.L2" Src1X, Src2Local, DstPair is i2=0 & i3=1 & i4=1 & i11=0 & i10=1 & i9=1 & i8=1 & i7=1 & i6=1 & i5=1 & i1=1 & c_is16=0 & Cond & creg!=7 & Src1X & Src2Local & DstPair { if (Cond == 0) goto <skip>; c6000_sem_subu(Src1X, Src2Local, DstPair); <skip> }
 
 :^Cond^"SUB2.L1" Src1, Src2, Dst is i2=0 & i3=1 & i4=1 & i5=0 & i6=0 & i7=1 & i8=0 & i9=0 & i10=0 & i11=0 & i1=0 & c_is16=0 & Cond & creg!=7 & Src1 & Src2 & Dst { if (Cond == 0) goto <skip>; c6000_sem_sub2(Src1, Src2, Dst); <skip> }
 :^Cond^"SUB2.L2" Src1, Src2, Dst is i2=0 & i3=1 & i4=1 & i5=0 & i6=0 & i7=1 & i8=0 & i9=0 & i10=0 & i11=0 & i1=1 & c_is16=0 & Cond & creg!=7 & Src1 & Src2 & Dst { if (Cond == 0) goto <skip>; c6000_sem_sub2(Src1, Src2, Dst); <skip> }

@@ -197,8 +197,9 @@ halfword still decodes as two 16-bit instructions. Both endian variants pass.
 
 `tests/fixtures/long-arith.py <image.bin> [be]` and
 `C6000LongArithmeticTest.java` check both endian variants of 32-bit `NORM`
-and `SUBU`. The seven cases include the 40-bit register-pair forms, sign
-boundaries, and a negative 40-bit subtraction result.
+and `SUBU`. The nine cases include the 40-bit register-pair forms, both
+`SUBU` cross-path forms, sign boundaries, and a negative 40-bit subtraction
+result.
 
 `tests/fixtures/exact-fp-selection.py <image.bin> <cases.tsv> [be]` and
 `C6000ExactFloatSelectionTest.java <cases.tsv>` execute 14,688 default-language

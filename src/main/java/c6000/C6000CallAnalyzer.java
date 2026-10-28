@@ -217,19 +217,42 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		Call recognize(Instruction branch) {
 			Map<Register, long[]> regs = new HashMap<>();
 			Instruction partner = null;
-			for (Instruction insn : lookBack(branch)) {
-				// Never executes when the branch does.
-				if (complementary(insn, branch)) {
-					if (isFlow(insn) && branch.getMinAddress().subtract(insn.getMinAddress()) <= 24) {
-						partner = insn;
-					}
+			List<Instruction> path = lookBack(branch);
+			List<Instruction> via = viaJump(branch, path);
+			if (via != null) path = via;
+			List<Instruction> slots = window(branch);
+			if (slots == null) return null;
+			List<Instruction> execution = new ArrayList<>(path);
+			int branchIndex = execution.size();
+			execution.add(branch);
+			execution.addAll(slots);
+			List<PredicateFact> facts = new ArrayList<>();
+
+			for (int i = 0; i < path.size(); i++) {
+				Instruction insn = path.get(i);
+				if (isFlow(insn) && predicate(insn) == null) facts.clear();
+				if (via == null && predicate(insn) != null && insn.getFlowType().isJump() &&
+					!insn.getFlowType().isCall() && !insn.getFlowType().isTerminal() &&
+					!inWindow(insn, branch)) {
+					// The straight-line path reaches branch only on this fall-through.
+					addFact(facts, i, insn, false);
+				}
+			}
+			// Taken-edge constraints take precedence over speculative physical look-back.
+			if (via != null) addFact(facts, slotIndex(path, viaInsn), viaInsn, true);
+			addFact(facts, branchIndex, branch, true);
+			java.util.Collections.reverse(facts);
+			for (int i = 0; i < path.size(); i++) {
+				Instruction insn = path.get(i);
+				Boolean runs = executes(execution, i, facts);
+				if (Boolean.FALSE.equals(runs)) {
+					if (via == null && isFlow(insn) && complementary(insn, branch) &&
+						stable(execution, i, branchIndex, predicate(branch), true) &&
+						branch.getMinAddress().subtract(insn.getMinAddress()) <= 24) partner = insn;
 					continue;
 				}
-				if (insn.getFlowType().isJump() || insn.getFlowType().isCall() ||
-					insn.getFlowType().isTerminal()) {
-					regs.remove(program.getRegister("B3"));
-				}
-				track(insn, regs);
+				if (insn != viaInsn && isFlow(insn)) regs.remove(program.getRegister("B3"));
+				trackOnPath(insn, regs, runs);
 			}
 
 			Register source = branch.getRegister(0);
@@ -244,6 +267,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Instruction current = branch;
 			int cycles = 0;
 			int seen = 0;
+			boolean compact = branch.getLength() != 4;
 			boolean branchPacket = true;
 			try {
 				window: while (cycles < DELAY_CYCLES) {
@@ -260,10 +284,13 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 						// A branch in the window must be the other arm of an
 						// if/else call pair: exactly the opposite predicate.
 						if (isFlow(next)) {
-							if (!complementary(branch, next)) return null;
+							if (!complementary(branch, next) ||
+								!stable(execution, branchIndex + 1 + slotIndex(slots, next), branchIndex, predicate(branch), true)) return null;
 							if (partner == null) partner = next;
 						}
-						track(next, regs);
+						if (next.getLength() != 4) compact = true;
+						int index = branchIndex + 1 + slotIndex(slots, next);
+						trackOnPath(next, regs, executes(execution, index, facts));
 						packetCycles = Math.max(packetCycles, 1 + extraCycles(next));
 						current = next;
 					} while (parallelWithNext(current));
@@ -276,12 +303,15 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			}
 			if (partner != null && jumpArm(branch, partner)) return null;
 			long[] ret = regs.get(b3);
-			// B3 may be set before the branch too; the look-back forgets it at
-			// every earlier branch, so a known value here belongs to this call.
+			// B3 may also be set on the look-back path.
 			if (ret == null || ret[1] != FULL) return null;
 			long branchAt = branch.getMinAddress().getOffset();
 			long windowEnd = current.getMaxAddress().getOffset() + 1;
 			if (ret[0] < branchAt + 4 || ret[0] > windowEnd + 8) return null;
+			boolean headerAtEnd = (windowEnd & 31) == 28 && headerAt(branch, windowEnd);
+			long partnerEnd = partner == null ? -1 : windowEnd(partner);
+			if (ret[0] != windowEnd && !(compact && ret[0] <= windowEnd + 8) &&
+				!(headerAtEnd && ret[0] == windowEnd + 4) && ret[0] != partnerEnd) return null;
 			Address callee = target == null ? null :
 				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
 			if (callee != null && !program.getMemory().contains(callee)) callee = null;
@@ -398,6 +428,194 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				if (o instanceof Address address) return address.getOffset();
 			}
 			return null;
+		}
+
+		/** The jump the last {@link #viaJump} path went through. */
+		private Instruction viaInsn;
+
+		/** Look-back via the one B into a branch nothing falls into, plus its taken slots; else null. */
+		List<Instruction> viaJump(Instruction branch, List<Instruction> linear) {
+			viaInsn = null;
+			Instruction last = null;
+			for (Instruction insn : linear) if (isFlow(insn)) last = insn;
+			if (last == null || last.getFallThrough() != null ||
+				program.getSymbolTable().isExternalEntryPoint(branch.getMinAddress()) ||
+				explicitFunctionEntry(branch.getMinAddress())) return null;
+			List<Instruction> trailing = window(last);
+			if (trailing == null || trailing.isEmpty() ||
+				!adjacent(trailing.get(trailing.size() - 1), branch)) return null;
+			for (Instruction slot : trailing) if (alternateEntry(slot)) return null;
+			Instruction jump = null;
+			for (Reference ref : program.getReferenceManager().getReferencesTo(branch.getMinAddress())) {
+				if (ref.getReferenceType().isData()) return null;
+				if (!ref.getReferenceType().isFlow() || ref.getReferenceType().isFallthrough()) continue;
+				if (jump != null || !ref.getReferenceType().isJump()) return null;
+				jump = listing.getInstructionAt(ref.getFromAddress());
+				if (jump == null) return null;
+			}
+			if (jump == null || !baseName(jump).startsWith("B.S")) return null;
+			List<Instruction> taken = window(jump);
+			if (taken == null) return null;
+			for (Instruction slot : taken) if (isFlow(slot)) return null;
+			List<Instruction> path = new ArrayList<>(lookBack(jump));
+			path.add(jump);
+			path.addAll(taken);
+			viaInsn = jump;
+			return path;
+		}
+
+		private boolean explicitFunctionEntry(Address at) {
+			Function function = listing.getFunctionAt(at);
+			if (function == null) return false;
+			SourceType source = function.getSymbol().getSource();
+			return source == SourceType.USER_DEFINED || source == SourceType.IMPORTED;
+		}
+
+		/** An entry into physical delay slots invalidates the dead-linear-predecessor proof. */
+		private boolean alternateEntry(Instruction insn) {
+			for (int offset = 0; offset < insn.getLength(); offset++) {
+				Address at = insn.getMinAddress().add(offset);
+				if (program.getSymbolTable().isExternalEntryPoint(at) || listing.getFunctionAt(at) != null) return true;
+				for (Reference ref : program.getReferenceManager().getReferencesTo(at)) {
+					if (ref.getReferenceType().isData()) return true;
+					if (ref.getReferenceType().isFlow() &&
+						(offset != 0 || !ref.getReferenceType().isFallthrough())) return true;
+				}
+			}
+			return false;
+		}
+
+		private static int slotIndex(List<Instruction> slots, Instruction instruction) {
+			for (int i = 0; i < slots.size(); i++) {
+				if (slots.get(i).getMinAddress().equals(instruction.getMinAddress())) return i;
+			}
+			throw new IllegalArgumentException("instruction outside proved delay window");
+		}
+
+		private record PredicateFact(int index, String predicate, boolean taken) {}
+
+		private static void addFact(List<PredicateFact> facts, int index, Instruction insn, boolean taken) {
+			String p = predicate(insn);
+			if (p != null) facts.add(new PredicateFact(index, p, taken));
+		}
+
+		/** Null means a conditional write cannot supply a constant on the selected path. */
+		private Boolean executes(List<Instruction> path, int index, List<PredicateFact> facts) {
+			String p = predicate(path.get(index));
+			if (p == null) return true;
+			for (PredicateFact fact : facts) {
+				if (p.replace("!", "").equals(fact.predicate().replace("!", "")) &&
+					stable(path, index, fact.index(), fact.predicate(), fact.taken())) {
+					return p.equals(fact.predicate()) == fact.taken();
+				}
+			}
+			return null;
+		}
+
+		/** Follow a captured predicate forward; never infer its pre-write value backwards. */
+		private boolean stable(List<Instruction> path, int query, int anchor, String predicate, boolean taken) {
+			if (predicate == null) return false;
+			Register register = program.getRegister(predicate.replace("!", ""));
+			boolean nonzero = predicate.startsWith("!") != taken;
+			for (int i = Math.min(query, anchor); i < Math.max(query, anchor); i++) {
+				Instruction instruction = path.get(i);
+				// A packet reads predicates before any of its writes commit.
+				if (samePacket(path, i, Math.max(query, anchor))) continue;
+				String p = predicate(instruction);
+				if (query >= anchor && p != null && p.replace("!", "").equals(register.getName()) &&
+					(p.startsWith("!") ? !nonzero : nonzero) == false) continue;
+				// A constant replacement can preserve the predicate's truth value,
+				// even when the instruction's own predicate is not known.
+				String name = baseName(instruction);
+				if (query >= anchor && (name.startsWith("MVK.") || name.startsWith("MVKL.")) &&
+					register.equals(instruction.getRegister(1)) && instruction.getScalar(0) != null &&
+					(instruction.getScalar(0).getValue() != 0) == nonzero) continue;
+				// B's native delay carrier reports its followers' writes too;
+				// the physical followers are present separately in this path.
+				String op = baseName(instruction);
+				if (op.equals("B.S1") || op.equals("B.S2")) continue;
+				for (Object written : instruction.getResultObjects()) {
+					if (written instanceof Register r && r.getAddress().getAddressSpace().equals(register.getAddress().getAddressSpace()) &&
+						r.getOffset() < register.getOffset() + register.getMinimumByteSize() &&
+						register.getOffset() < r.getOffset() + r.getMinimumByteSize()) return false;
+				}
+			}
+			return true;
+		}
+
+		private boolean samePacket(List<Instruction> path, int first, int last) {
+			try {
+				for (int i = first; i < last; i++) {
+					Instruction following = next(path.get(i));
+					if (!parallelWithNext(path.get(i)) || following == null ||
+						!following.getMinAddress().equals(path.get(i + 1).getMinAddress())) return false;
+				}
+				return true;
+			}
+			catch (MemoryAccessException e) { return false; }
+		}
+
+		private void trackOnPath(Instruction insn, Map<Register, long[]> regs, Boolean runs) {
+			if (Boolean.TRUE.equals(runs)) track(insn, regs);
+			else if (runs == null && insn.getDelaySlotDepth() == 0) {
+				for (Object written : insn.getResultObjects()) if (written instanceof Register r) regs.remove(r);
+			}
+		}
+
+		/** True when {@code later} is in {@code jump}'s execute packet or five delay cycles. */
+		private boolean inWindow(Instruction jump, Instruction later) {
+			List<Instruction> slots = window(jump);
+			if (slots == null) return true; // no complete fall-through proof
+			for (Instruction insn : slots) {
+				if (insn.getMinAddress().equals(later.getMinAddress())) return true;
+			}
+			return false;
+		}
+
+		/** The rest of {@code jump}'s execute packet and its five delay cycles; null on an incomplete window. */
+		private List<Instruction> window(Instruction jump) {
+			List<Instruction> slots = new ArrayList<>();
+			Instruction current = jump;
+			int cycles = 0;
+			boolean branchPacket = true;
+			try {
+				while (cycles < DELAY_CYCLES) {
+					int packetCycles = 1;
+					do {
+						if (branchPacket && !parallelWithNext(current)) break;
+						Instruction next = next(current);
+						if (next == null || slots.size() >= MAX_WINDOW) return null;
+						slots.add(next);
+						packetCycles = Math.max(packetCycles, 1 + extraCycles(next));
+						current = next;
+					} while (parallelWithNext(current));
+					if (!branchPacket) cycles += packetCycles;
+					branchPacket = false;
+				}
+			}
+			catch (MemoryAccessException e) {
+				return null;
+			}
+			return slots;
+		}
+
+		/** The address just past {@code jump}'s delay window. */
+		private long windowEnd(Instruction jump) {
+			List<Instruction> slots = window(jump);
+			if (slots == null) return -1;
+			Instruction last = slots.isEmpty() ? jump : slots.get(slots.size() - 1);
+			return last.getMaxAddress().getOffset() + 1;
+		}
+
+		/** True only when {@code at} itself is a physical fetch header. */
+		private boolean headerAt(Instruction near, long at) {
+			try {
+				Address base = near.getMinAddress().getNewAddress(at);
+				return (program.getMemory().getInt(base) >>> 28) == 0xe;
+			}
+			catch (MemoryAccessException | ghidra.program.model.address.AddressOutOfBoundsException e) {
+				return false;
+			}
 		}
 
 		private Instruction next(Instruction current) {

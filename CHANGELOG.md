@@ -12,6 +12,9 @@
 
 ### Fixed
 
+* Refine delayed-call B3 ownership, restrict header adjustments to the actual
+  window boundary, and require stable predicates and unique incoming paths
+  before propagating return-address constants (SPRUFE8B 3.5, 3.12 B).
 * Display compact cross-path functional units with `X`, including A-side
   `ADDAW` from B15 (SPRUFE8B 3.8.3 and Figures C-17/C-18, D-4/D-5/D-7,
   E-5, F-22/F-23/F-29, G-1/G-2).

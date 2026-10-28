@@ -1,5 +1,16 @@
 # Verification and measured coverage
 
+`tests/fixtures/constant-branch-target.py IMAGE CASES.tsv [be]` and
+`C6000ConstantBranchTargetTest.java` check adjacent `MVK`/`MVKH` branch-target
+references. Run the script before auto-analysis with `prepare CASES.tsv`,
+then after analysis with `check CASES.tsv`. Four cases require exactly the
+constructed address; four ensure that predicated high-half writes,
+same-execute-packet writes, alternate entries and non-word-aligned target
+values do not get over-filtered.
+Run with both `C6000:LE:32:default` and `C6000:BE:32:default`. Expected values
+come from SPRUFE8B's MVK/MVKL and MVKH descriptions (pp. 381, 383-385) and
+branch pipeline Table 4-11, not from observed disassembler output.
+
 How the decoder and p-code are checked, and what the measurements do and do
 not show. Firmware images are never committed; every firmware measurement
 below was taken against privately extracted images passed in by path.

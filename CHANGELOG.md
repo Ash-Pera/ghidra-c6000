@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Fixed
+* Computed branch references no longer retain the intermediate signed `MVK`
+  value when an adjacent, unconditional `MVKH` proves the final target.
+  Predicated writes, same-execute-packet writes and alternate entries remain
+  conservative. Synthetic reference tests cover both endian modes.
 * Builds reject an explicitly configured JDK older than Ghidra's declared
   minimum, with a clear error before SLEIGH starts. JDK discovery reads
   `application.java.min` and handles missing JDKs without silently exiting.

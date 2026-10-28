@@ -190,6 +190,13 @@ spec declares a synthetic `PC` for Ghidra's emulator; architectural `PCE1`
 remains a separate control register. P-code updates `CSR.SAT` as an instruction
 effect; cycle-accurate placement of that write belongs to a pipeline model.
 
+`tests/fixtures/compact-cross.py <image.bin> <cases.tsv> [be]` and
+`C6000CompactCrossTest.java <cases.tsv>` check the unit of 13 compact forms,
+ten with the cross path (`.L1X`, `.M2X`, `.S1X`, `.D2X`, `ADDAW.D1X B15`) and
+three same-side controls. Both endian variants pass. Over all 65,536 compact
+halfwords under 13 header settings, every unit with or without `X` matches TI
+`dis6x`.
+
 `tests/fixtures/compact-header-collision.py <image.bin> [be]` and
 `C6000CompactHeaderTest.java` verify that an E-prefixed word outside the header
 position stays undefined, while a compact word containing an E-prefixed upper

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+* Compact instructions that read `src2` through the cross path show the `X`
+  unit (`AND.L1X A0,B0,A0`), as SPRUFE8B section 3.8.3 requires.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

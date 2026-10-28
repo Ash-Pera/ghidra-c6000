@@ -190,6 +190,10 @@ spec declares a synthetic `PC` for Ghidra's emulator; architectural `PCE1`
 remains a separate control register. P-code updates `CSR.SAT` as an instruction
 effect; cycle-accurate placement of that write belongs to a pipeline model.
 
+`tests/fixtures/nop-count.py <image.bin> <cases.tsv> [be]` and
+`C6000NopCountTest.java <cases.tsv>` check that compact `NOP` reports N3 + 1
+(Figure H-9) and that a loop with `NOP 4` has dynamic length 7.
+
 `tests/fixtures/compact-header-collision.py <image.bin> [be]` and
 `C6000CompactHeaderTest.java` verify that an E-prefixed word outside the header
 position stays undefined, while a compact word containing an E-prefixed upper

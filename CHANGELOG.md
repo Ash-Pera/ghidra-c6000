@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+* Compact `NOP` shows its count, N3 + 1 (Figure H-9), and a loop's dynamic
+  length counts `NOP n` as n cycles, not n + 1.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

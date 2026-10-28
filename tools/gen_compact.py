@@ -428,7 +428,8 @@ imm1("Cucst8f24", "(cq_uc65 << 5) | (j10 << 7) | (cq_uc43 << 3) | q_r3",
      "cq_uc65 & j10 & cq_uc43 & q_r3")                      # Figure F-24
 plain1("Cucst3d9", "q_r3")                            # Figure D-9
 plain1("Cucst1f", "q_uc2")                           # Figures D-10/G-3
-plain1("CN3", "q_r3")                                 # F-17/F-20/F-32/H-9
+plain1("CN3", "q_r3")                                 # F-17/F-20/F-32
+imm1("CNopN", "q_r3 + 1", "q_r3")                     # Figure H-9: src is count - 1
 imm1("Cii", "((cq_ii3 << 3) | q_r3b) + 1", "cq_ii3 & q_r3b") # Figures H-5/H-6
 imm1("Cspk", "(cq_spk43 << 3) | q_r3b | (j0 << 5)", "cq_spk43 & q_r3b & j0")
 imm1("Cmask", "(j15 << 5) | (j14 << 4) | (j9 << 3) | (j8 << 2) | (j7 << 1) | j0",
@@ -1217,9 +1218,9 @@ w("# Figure H-9. Unop (NOP) - SPRUFE8B appendix H.4.  A NOP has no")
 w("# architectural effect.")
 w("# ---------------------------------------------------------------------------")
 w("")
-con("NOP CN3",
+con("NOP CNopN",
     ["j12=0", "j11=1", "j10=1", "j9=0", "j8=0", "j7=0", "j6=1", "j5=1",
-     "j4=0", "j3=1", "j2=1", "j1=1", "j0=0", "CN3"], "")
+     "j4=0", "j3=1", "j2=1", "j1=1", "j0=0", "CNopN"], "")
 
 # fix the D-11/C-20/F-31 op constraints: these used j13 etc. above; ok.
 

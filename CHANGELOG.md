@@ -15,6 +15,9 @@
 
 ### Added
 
+* Complete proved full-width and compact execute-packet peers during ordinary
+  analysis, sharing the reviewed recovery proof and preserving code/data, context
+  and function bodies. Stop speculative compact fetch-tail decoding.
 * Add opt-in physical parallel-peer reports and reviewed-hash recovery of undefined
   instructions while retaining existing code/data, context and annotations
   (SPRUFE8B 3.5, 3.10.2, 3.10.4).

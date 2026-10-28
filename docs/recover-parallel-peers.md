@@ -80,7 +80,7 @@ a code anchor and unrelated gaps are outside this script's proof.
 The synthetic fixture `tests/fixtures/parallel-peers.py` invokes TI cl6x for full32
 opcodes and generates documented compact NOP/header fields.
 `C6000ParallelPeersTest.java` qualifies report/apply behavior in isolated LE and BE
-programs with no autoanalysis. Each run covers 20 cases, creates six instruction units,
+programs with no autoanalysis. Each run covers 24 cases, creates six instruction units,
 and verifies zero newly eligible candidates on repeat discovery. Cases include full32
 branch peers, compact peers, cross-fetch/header chains, a nested-transfer delay-window
 refusal with an accepted immediate peer, p=0, existing code/data at the first/suffix
@@ -95,3 +95,13 @@ These tests cover the script's bounded listing changes and refusal behavior. Whe
 applying a report to another program, review its source bytes and candidate extents,
 retain a backup, and check the annotations and properties that matter for that database.
 The fixture's annotation inventory does not cover every third-party property.
+
+## Ordinary analysis uses the same proof
+
+The script now shares `C6000ParallelPeers` with the default packet-tail analyzer.
+The analyzer completes only proved execute-packet peers, in compact or full-width
+code, instead of trying every later compact fetch slot. Partial-owned anchors,
+unrelated compact p=0 tails, new control-transfer peers and conflicts late in a
+chain refuse. Script review/source guards and annotation audits remain. See
+[execute-packet recovery](execute-packet-recovery.md) for the analyzer contract
+and the companion 24-case test in each endian mode.

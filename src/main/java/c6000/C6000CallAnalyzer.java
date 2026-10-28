@@ -299,7 +299,8 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			boolean skew = compact || headerPacket(branch, windowEnd - 1) ||
 				headerPacket(branch, windowEnd);
 			// A call returns exactly at its window end; only compact packets skew the count.
-			if (ret[0] != windowEnd && !skew) return null;
+			// Both arms of an if/else pair return where the later arm's window ends.
+			if (ret[0] != windowEnd && !skew && (partner == null || ret[0] != windowEnd(partner))) return null;
 			Address callee = target == null ? null :
 				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
 			if (callee != null && !program.getMemory().contains(callee)) callee = null;
@@ -495,6 +496,13 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				return slots;
 			}
 			return slots;
+		}
+
+		/** The address just past {@code jump}'s delay window. */
+		private long windowEnd(Instruction jump) {
+			List<Instruction> slots = window(jump);
+			Instruction last = slots.isEmpty() ? jump : slots.get(slots.size() - 1);
+			return last.getMaxAddress().getOffset() + 1;
 		}
 
 		/** True when the fetch packet holding {@code at} has a compact header. */

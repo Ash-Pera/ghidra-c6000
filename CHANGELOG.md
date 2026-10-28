@@ -4,7 +4,8 @@
 
 ### Fixed
 * A jump that sets `B3` for a later call is no longer a call: `B3` must equal
-  the end of its delay window. The look-back keeps `B3` across a predicated
+  the end of its delay window, or for an arm of an if/else call pair the end
+  of the other arm's. The look-back keeps `B3` across a predicated
   jump's fall-through, and through the one jump reaching a call nothing falls
   into.
 

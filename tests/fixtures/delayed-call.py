@@ -129,6 +129,22 @@ A window ending at a compact header returns past it: 1888 is a call (B3 = window
   1888  B.S2    B5      (call)   18a0  B.S2 B3 ; NOP 5
   188c  ADDKPC.S2 0x18a0,B3,1
 
+Both arms of an if/else call pair return at the later arm's window end, 4
+bytes past the earlier arm's (1c00, 1c08 calls):
+
+  1c00  [A1]B.S1  0x1100 (call)  1c10  NOP
+  1c04  NOP                      1c14  ADDKPC.S2 0x1c1c,B3,1
+  1c08  [!A1]B.S1 0x1100 (call)  1c18  NOP
+  1c0c  NOP                      1c1c  B.S2 B3 ; NOP 5
+
+The same with register arms in a same-predicate BNOP's window, B3 by MVK/MVKH (1c4c, 1c58 calls):
+
+  1c40  MVK.S2  0x1100,B4        1c58  [A1]B.S2  B4   (call)
+  1c44  MVKH.S2 0x0,B4           1c5c  MVK.S2  0x1c68,B3
+  1c48  [!A1]BNOP.S1 0x1c80,1    1c60  MVKH.S2 0x0,B3
+  1c4c  [!A1]B.S2 B4  (call)     1c64  NOP     3
+  1c50  NOP ; 1c54  NOP          1c68, 1c80  B.S2 B3 ; NOP 5
+
 C6000DelayedCallTest.java checks every B form becomes a call that falls
 through into its delay slots and that 0x1100 becomes a function.
 """
@@ -230,6 +246,15 @@ CASES = {
     0x1880: mvk(CALLEE, 5), 0x1884: mvkh(0, 5), 0x1888: 0x362 | (5 << 18),
     0x188C: 0x162 | (8 << 16) | (1 << 13) | (3 << 23), 0x1890: nop(1), 0x1894: nop(1), 0x1898: nop(1),
     0x189C: 0xE0000000, 0x18A0: B_B3, 0x18A4: nop(5),  # header: layout and p-bits zero
+
+    0x1C00: A1 | b_s1(0x1C00, CALLEE), 0x1C04: nop(1), 0x1C08: NOT_A1 | b_s1(0x1C08, CALLEE),
+    0x1C0C: nop(1), 0x1C10: nop(1), 0x1C14: 0x162 | (7 << 16) | (1 << 13) | (3 << 23),  # ADDKPC.S2 0x1c1c,B3,1
+    0x1C18: nop(1), 0x1C1C: B_B3, 0x1C20: nop(5),
+
+    0x1C40: mvk(CALLEE, 4), 0x1C44: mvkh(0, 4), 0x1C48: NOT_A1 | bnop_s1(0x1C48, 0x1C80, 1),
+    0x1C4C: NOT_A1 | B_B4, 0x1C50: nop(1), 0x1C54: nop(1), 0x1C58: A1 | B_B4,
+    0x1C5C: mvk(0x1C68, 3), 0x1C60: mvkh(0, 3), 0x1C64: nop(3), 0x1C68: B_B3, 0x1C6C: nop(5),
+    0x1C80: B_B3, 0x1C84: nop(5),
 }
 
 WORDS = {
@@ -318,7 +343,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x900)
+    image = bytearray(0xC90)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

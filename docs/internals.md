@@ -94,7 +94,9 @@ encoding `creg=7, z=0` (Table 3-9), so no valid 32-bit instruction matches it.
   predicate is the exact opposite of the call's, `B3` may be set before the
   branch, and reaching the return address `B3` already holds ends the window
   (compact packets can skew the cycle count, so only there may `B3` lie up
-  to 8 bytes past the window end). The look-back keeps `B3` across a
+  to 8 bytes past the window end). Both arms of a pair return where the
+  later arm's window ends, so the earlier arm's `B3` may equal its partner's
+  window end instead of its own. The look-back keeps `B3` across a
   predicated jump outside whose window the branch lies, skipping that
   jump's slots under its own predicate, and runs through the one jump
   reaching a branch nothing falls into. In such a pair only one arm is

@@ -14,7 +14,7 @@ public class C6000DelayedCallTest extends GhidraScript {
 		// The if/else pair is its own routine; the entry never reaches it.
 		for (long entry : new long[] { 0x1040L, 0x1060L, 0x10a0L, 0x1140L, 0x1200L, 0x1280L,
 			0x1300L, 0x1380L, 0x1400L, 0x1480L, 0x1500L, 0x1580L, 0x1600L, 0x1680L, 0x1700L,
-			0x1780L, 0x1800L, 0x1880L }) {
+			0x1780L, 0x1800L, 0x1880L, 0x1c00L, 0x1c40L }) {
 			disassemble(toAddr(entry));
 			createFunction(toAddr(entry), null);
 		}
@@ -124,6 +124,15 @@ public class C6000DelayedCallTest extends GhidraScript {
 			if (b == null || b.getFlowOverride() == FlowOverride.CALL) {
 				throw new AssertionError("not a call at " + toAddr(site) + ": " + b +
 					(b == null ? "" : " flow=" + b.getFlowType() + " fallthrough=" + b.getFallThrough()));
+			}
+		}
+		// Both arms of an if/else call pair return at the later arm's window end.
+		for (long site : new long[] { 0x1c00L, 0x1c08L, 0x1c4cL, 0x1c58L }) {
+			Instruction arm = getInstructionAt(toAddr(site));
+			if (arm == null || !arm.getFlowType().isCall() || !toAddr(site + 4).equals(arm.getFallThrough()) ||
+				!calls(arm, 0x1100L)) {
+				throw new AssertionError("pair arm at " + toAddr(site) + ": " + arm +
+					(arm == null ? "" : " flow=" + arm.getFlowType() + " fallthrough=" + arm.getFallThrough()));
 			}
 		}
 		if (getFunctionAt(toAddr(0x1100L)) == null) {

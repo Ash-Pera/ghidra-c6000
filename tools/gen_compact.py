@@ -529,7 +529,7 @@ def st_sem(reg, addr, size):
 # ===========================================================================
 # Figures C-8..C-15: offset / indirect / post-increment / pre-decrement
 # ===========================================================================
-def emit_dformat(fig, pat, mem_kind, imm, has_na, dwonly):
+def emit_dformat(fig, pat, mem_kind, imm, has_na, dwonly, ndw_unscaled=False):
     """Emit all DSZ-selected constructors for one D-unit memory format.
 
     mem_kind: 'off'   -> *ptr[imm]      (no pointer update)
@@ -554,7 +554,8 @@ def emit_dformat(fig, pat, mem_kind, imm, has_na, dwonly):
                     info = ldst_info(v, sz, na)
                     if info is None:
                         continue
-                    emit_one(pat, mem_kind, imm, v, info, na, sz)
+                    emit_one(pat, mem_kind, imm, v, info, na, sz,
+                             ndw_unscaled and info[0] == "NDW")
             else:
                 info = ldst_info(v, sz, None)
                 if info is None:
@@ -562,7 +563,7 @@ def emit_dformat(fig, pat, mem_kind, imm, has_na, dwonly):
                 emit_one(pat, mem_kind, imm, v, info, None, sz)
 
 
-def emit_one(pat, mem_kind, imm, v, info, na, sz):
+def emit_one(pat, mem_kind, imm, v, info, na, sz, unscaled=False):
     name, size, sign, pair = info
     for ldst in (0, 1):
         mn = ("LD" if ldst else "ST") + (name.rstrip("U") if not ldst else name)
@@ -575,8 +576,11 @@ def emit_one(pat, mem_kind, imm, v, info, na, sz):
         if na is not None:
             newpat.append("q_na=%d" % na)
         shift = SHIFT[size]
+        open_, close = ("(", ")") if unscaled else ("[", "]")
+        if unscaled:
+            shift = 0
         if mem_kind == "off":
-            memdisp = '"*"^RPTR^"["^%s^"]"' % imm
+            memdisp = '"*"^RPTR^"%s"^%s^"%s"' % (open_, imm, close)
             addr = "(RPTR + (%s << %d))" % (imm, shift)
             pre = []
             post = []
@@ -596,7 +600,7 @@ def emit_one(pat, mem_kind, imm, v, info, na, sz):
             else:
                 disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
         elif mem_kind == "ind":
-            memdisp = '"*"^RPTR^"["^RA15^"]"'
+            memdisp = '"*"^RPTR^"%s"^RA15^"%s"' % (open_, close)
             addr = "(RPTR + (RA15 << %d))" % shift
             tabs = ["RPTR", "RA15"]
             reg = "RT64" if size <= 4 else "RT65"
@@ -666,13 +670,15 @@ emit_dformat("Figure C-8. Doff4 - SPRUFE8B appendix C.4.",
              ["j10=0", "j2=1", "j1=0"], "off", "Cucst4", False, False)
 # Figure C-9 Doff4DW
 emit_dformat("Figure C-9. Doff4DW - SPRUFE8B appendix C.4.",
-             ["j10=0", "j2=1", "j1=0", "q_sz=0"], "off", "Cucst4", True, True)
+             ["j10=0", "j2=1", "j1=0", "q_sz=0"], "off", "Cucst4", True, True,
+             ndw_unscaled=True)  # Figure C-9: NDW offsets are unscaled
 # Figure C-10 Dind
 emit_dformat("Figure C-10. Dind - SPRUFE8B appendix C.4.",
              ["j11=0", "j10=1", "j2=1", "j1=0"], "ind", None, False, False)
 # Figure C-11 DindDW
 emit_dformat("Figure C-11. DindDW - SPRUFE8B appendix C.4.",
-             ["j11=0", "j10=1", "j2=1", "j1=0", "q_sz=0"], "ind", None, True, True)
+             ["j11=0", "j10=1", "j2=1", "j1=0", "q_sz=0"], "ind", None, True, True,
+             ndw_unscaled=True)  # Figure C-11: NDW offsets are unscaled
 # Figure C-12 Dinc
 emit_dformat("Figure C-12. Dinc - SPRUFE8B appendix C.4.",
              ["j15=0", "j14=0", "j11=1", "j10=1", "j2=1", "j1=0"], "inc", "Cucst2", False, False)

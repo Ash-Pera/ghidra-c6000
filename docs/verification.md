@@ -190,6 +190,11 @@ spec declares a synthetic `PC` for Ghidra's emulator; architectural `PCE1`
 remains a separate control register. P-code updates `CSR.SAT` as an instruction
 effect; cycle-accurate placement of that write belongs to a pipeline model.
 
+`tests/fixtures/compact-ndw.py <image.bin> <cases.tsv> [be]` and
+`C6000CompactNdwTest.java <cases.tsv>` check the byte offset of compact
+`LDNDW`/`STNDW` with a `ucst4` or register offset (unscaled, Figures C-9 and
+C-11) against scaled `LDDW`/`STDW` controls. Both endian variants pass.
+
 `tests/fixtures/compact-header-collision.py <image.bin> [be]` and
 `C6000CompactHeaderTest.java` verify that an E-prefixed word outside the header
 position stays undefined, while a compact word containing an E-prefixed upper

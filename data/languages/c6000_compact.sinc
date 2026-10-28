@@ -495,26 +495,26 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 # ---------------------------------------------------------------------------
 # Figure C-10. Dind - SPRUFE8B appendix C.4.
@@ -563,26 +563,26 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 # ---------------------------------------------------------------------------
 # Figure C-12. Dinc - SPRUFE8B appendix C.4.

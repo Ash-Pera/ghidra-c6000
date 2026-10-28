@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+* Compact `LDNDW`/`STNDW` with a `ucst4` or register offset use it unscaled,
+  as SPRUFE8B Figures C-9 and C-11 require; they scaled it by 8.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

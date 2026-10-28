@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Fixed
+* A predicated register `B` (`src2`, `IRP`, `NRP`) or `BNOP`, and `SWE` /
+  `SWENR`, no longer make the decompiler fail the whole function with "Bad
+  relative branch" when it cannot resolve the indirect jump: they skip to
+  `inst_next` instead of a label after `goto [x]`
+  (`predicated-register-branch.py`, `C6000PredicatedBranchTest.java`).
 * Predicated `B IRP` and `B NRP` decode; they decoded as `B` through `B6` / `B7`.
 * `B IRP` restores GIE from PGIE and `B NRP` sets NMIE.
 

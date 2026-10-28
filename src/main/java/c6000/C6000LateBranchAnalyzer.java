@@ -19,7 +19,6 @@ import ghidra.app.services.AbstractAnalyzer;
 import ghidra.app.services.AnalysisPriority;
 import ghidra.app.services.AnalyzerType;
 import ghidra.app.util.importer.MessageLog;
-import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
 import ghidra.program.model.listing.Program;
 import ghidra.util.exception.CancelledException;
@@ -47,7 +46,7 @@ public class C6000LateBranchAnalyzer extends AbstractAnalyzer {
 	@Override
 	public boolean added(Program program, AddressSetView set, TaskMonitor monitor,
 			MessageLog log) throws CancelledException {
-		AddressSet all = new AddressSet(program.getMinAddress(), program.getMaxAddress());
+		AddressSetView all = program.getMemory().getLoadedAndInitializedAddressSet();
 		// Calls need only the new code; the whole-program walk runs once per
 		// analysis cycle and dominated firmware analysis time.
 		new C6000CallAnalyzer().added(program, set, monitor, log);

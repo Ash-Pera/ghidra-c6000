@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+* Builds reject an explicitly configured JDK older than Ghidra's declared
+  minimum, with a clear error before SLEIGH starts. JDK discovery reads
+  `application.java.min` and handles missing JDKs without silently exiting.
+
 ## 1.0.3 - 2026-10-27
 
 ### Added

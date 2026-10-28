@@ -12,7 +12,7 @@
 #
 # Environment:
 #   GHIDRA_INSTALL_DIR  Ghidra install root (default: Homebrew's opt/ghidra)
-#   JAVA_HOME           JDK home (21 for Ghidra 12.1.x, 25 for 12.2)
+#   JAVA_HOME           JDK home (default: the version in Ghidra's application.java.min)
 #   GHIDRA_WORK         scratch directory for user.home / Gradle caches
 #
 set -euo pipefail
@@ -36,21 +36,40 @@ resolve_java_home() {
   if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
     printf '%s\n' "$JAVA_HOME"; return
   fi
-  for c in "/opt/homebrew/opt/openjdk@$JAVA_MAJOR/libexec/openjdk.jdk/Contents/Home" \
-           "/opt/homebrew/opt/openjdk@$JAVA_MAJOR" \
-           "/usr/lib/jvm/temurin-$JAVA_MAJOR-jdk-amd64" \
-           "/Library/Java/JavaVirtualMachines/temurin-$JAVA_MAJOR.jdk/Contents/Home"; do
+  for c in "/opt/homebrew/opt/openjdk@$1/libexec/openjdk.jdk/Contents/Home" \
+           "/opt/homebrew/opt/openjdk@$1" \
+           "/usr/lib/jvm/temurin-$1-jdk-amd64" \
+           "/Library/Java/JavaVirtualMachines/temurin-$1.jdk/Contents/Home"; do
     [ -x "$c/bin/java" ] && { printf '%s\n' "$c"; return; }
   done
+  return 0
+}
+
+# JDK major version (1.8 -> 8), from its release file or else `java -version`; empty if unknown.
+java_major() {
+  local v
+  v="$(sed -n 's/^JAVA_VERSION="\(1\.\)\{0,1\}\([0-9][0-9]*\).*/\2/p' "$1/release" 2>/dev/null || true)"
+  [ -n "$v" ] || v="$("$1/bin/java" -version 2>&1 | sed -n 's/.*version "\(1\.\)\{0,1\}\([0-9][0-9]*\).*/\2/p' | head -1 || true)"
+  printf '%s\n' "$v"
 }
 
 GHIDRA="$(resolve_ghidra)"
 [ -n "$GHIDRA" ] && [ -x "$GHIDRA/support/analyzeHeadless" ] || \
   die "no Ghidra install found; set GHIDRA_INSTALL_DIR"
-JAVA_MAJOR="$(sed -n 's/^application.java.compiler=//p' "$GHIDRA/Ghidra/application.properties" | tr -d '\r')"
-[[ "$JAVA_MAJOR" =~ ^[0-9]+$ ]] || die "cannot read Ghidra's required JDK version"
-JH="$(resolve_java_home)"
-[ -n "$JH" ] || die "no JDK $JAVA_MAJOR found; set JAVA_HOME"
+JMIN="$(tr -d '\r' < "$GHIDRA/Ghidra/application.properties" 2>/dev/null | \
+  sed -n 's/^[[:space:]]*application\.java\.min[[:space:]]*[=:][[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1 || true)"
+if [ -n "$JMIN" ]; then
+  JH="$(resolve_java_home "$JMIN")"
+  [ -n "$JH" ] || die "no JDK $JMIN found; set JAVA_HOME (this Ghidra needs JDK $JMIN)"
+  JV="$(java_major "$JH")"
+  [ -z "$JV" ] || [ "$JV" -ge "$JMIN" ] || \
+    die "JAVA_HOME is JDK $JV; this Ghidra needs JDK $JMIN or newer"
+else
+  # No declared minimum: require JAVA_HOME and use it unchecked.
+  [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ] || \
+    die "cannot read application.java.min from $GHIDRA; set JAVA_HOME"
+  JH="$JAVA_HOME"
+fi
 
 export PATH="$JH/bin:$PATH"
 # Ghidra writes under $HOME during bootstrap; keep that inside the workspace so

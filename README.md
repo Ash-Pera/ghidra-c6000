@@ -18,8 +18,9 @@ See [`NOTICE.md`](NOTICE.md) for provenance.
    [build it](#build).
 2. In Ghidra: *File → Install Extensions*, **+**, pick the zip, restart Ghidra.
 
-The zip is tied to the Ghidra version it was built against (the current
-release targets 12.1.3); rebuild it for any other 12.x release.
+Each zip is tied to the Ghidra version it was built against. Releases include
+builds for 12.1.3, 12.1.4 and 12.2; select the matching zip, or rebuild for
+another 12.x release.
 
 ## Quick start
 
@@ -78,7 +79,8 @@ More detail:
 
 Requirements: **Ghidra 12.x** and the JDK it declares in
 `Ghidra/application.properties` (`application.java.min`): **JDK 21** for 12.0 and
-12.1, **JDK 25** for 12.2.
+12.1, **JDK 25** for 12.2. The build script selects this version when
+`JAVA_HOME` is unset and rejects an explicitly configured JDK that is too old.
 
 ```sh
 tools/build.sh                             # compile SLEIGH, build dist/*_C6000.zip
@@ -95,7 +97,7 @@ four compiled language variants and the loader opinion.
 ## Testing
 
 CI ([`build.yml`](.github/workflows/build.yml)) runs `tools/build.sh`, installs
-the zip into a fresh Ghidra (12.1.3 and 12.1.4) and decodes a 48-byte synthetic
+the zip into a fresh Ghidra (12.1.3, 12.1.4 and 12.2) and decodes a 48-byte synthetic
 image with `C6000CorpusTest.java`, requiring no undecoded slots and no
 zero-width p-code operands.
 

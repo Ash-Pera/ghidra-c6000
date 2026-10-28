@@ -3,6 +3,20 @@
 ## Unreleased
 
 ### Fixed
+* Builds reject an explicitly configured JDK older than Ghidra's declared
+  minimum, with a clear error before SLEIGH starts. JDK discovery reads
+  `application.java.min` and handles missing JDKs without silently exiting.
+
+## 1.0.3 - 2026-10-27
+
+### Added
+* Ghidra 12.2 release and CI builds using JDK 25. The build script selects the
+  JDK version required by the chosen Ghidra installation.
+
+### Fixed
+* Late branch analysis walks loaded, initialized memory instead of a min/max
+  address range, avoiding exceptions when ELF metadata occupies another
+  address space.
 * A predicated register `B` (`src2`, `IRP`, `NRP`) or `BNOP`, and `SWE` /
   `SWENR`, no longer make the decompiler fail the whole function with "Bad
   relative branch" when it cannot resolve the indirect jump: they skip to
@@ -10,9 +24,6 @@
   (`predicated-register-branch.py`, `C6000PredicatedBranchTest.java`).
 * Predicated `B IRP` and `B NRP` decode; they decoded as `B` through `B6` / `B7`.
 * `B IRP` restores GIE from PGIE and `B NRP` sets NMIE.
-* `tools/build.sh` picks the JDK that Ghidra's `application.java.min` names
-  (25 for Ghidra 12.2) and stops if `JAVA_HOME` is older; it always looked for
-  JDK 21, which Ghidra 12.2 rejects.
 
 ## 1.0.2 - 2026-10-13
 

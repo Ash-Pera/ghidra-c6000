@@ -20,7 +20,7 @@ jobs:
       # of the zip: buildExtension packs the rest of the workspace.
       GHIDRA_INSTALL_DIR: ${{ github.workspace }}/scratch/ghidra
       GHIDRA_WORK: ${{ github.workspace }}/scratch/ghidra-work
-      # Ghidra 12 requires JDK 21 and rejects newer JDKs.
+      # Ghidra 12.1 declares application.java.min=21.
       JAVA_HOME: ${{ github.workspace }}/scratch/jdk21
     steps:
       - uses: actions/checkout@v4

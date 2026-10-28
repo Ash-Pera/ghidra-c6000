@@ -76,14 +76,16 @@ More detail:
 
 ## Build
 
-Requirements: **Ghidra 12.x** and **JDK 21** (Ghidra 12 rejects newer JDKs).
+Requirements: **Ghidra 12.x** and the JDK it declares in
+`Ghidra/application.properties` (`application.java.min`): **JDK 21** for 12.0 and
+12.1, **JDK 25** for 12.2.
 
 ```sh
 tools/build.sh                             # compile SLEIGH, build dist/*_C6000.zip
 tools/build.sh --install /path/to/ghidra   # ... and unzip it into <ghidra>/Ghidra/Extensions
 ```
 
-Set `GHIDRA_INSTALL_DIR` and `JAVA_HOME` if Ghidra and JDK 21 are not in
+Set `GHIDRA_INSTALL_DIR` and `JAVA_HOME` if Ghidra and that JDK are not in
 Homebrew's default locations. The script exists because Gradle's
 `buildExtension` does **not** compile SLEIGH: a zip built without the `.sla`
 files installs cleanly and then fails at import with `Unsupported language`.

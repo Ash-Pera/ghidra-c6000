@@ -10,6 +10,9 @@
   (`predicated-register-branch.py`, `C6000PredicatedBranchTest.java`).
 * Predicated `B IRP` and `B NRP` decode; they decoded as `B` through `B6` / `B7`.
 * `B IRP` restores GIE from PGIE and `B NRP` sets NMIE.
+* `tools/build.sh` picks the JDK that Ghidra's `application.java.min` names
+  (25 for Ghidra 12.2) and stops if `JAVA_HOME` is older; it always looked for
+  JDK 21, which Ghidra 12.2 rejects.
 
 ## 1.0.2 - 2026-10-13
 

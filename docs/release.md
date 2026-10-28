@@ -33,8 +33,8 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 python3 tools/verify.py --ghidra /path/to/ghidra --with-ti --jobs 2
 ```
 
-The runner checks 32 core fixture imports and three TI-assembled fixture
-imports per endian: 70 per Ghidra version, or 210 across the matrix. Native
+The runner checks 42 core fixture imports and three TI-assembled fixture
+imports per endian: 90 per Ghidra version, or 270 across the matrix. Native
 decompiler checks retain their 15/30-second limits. CI runs the core suite
 without the proprietary TI assembler.
 

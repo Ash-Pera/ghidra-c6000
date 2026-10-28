@@ -21,6 +21,7 @@ public class C6000PipelinePayload extends InjectPayloadCallother {
         var writes=hazards.isEmpty()?java.util.Set.<String>of():java.util.Set.of(hazards.split(","));
         try{
             var result=new C6000PipelineCompiler(program,f,writes).compile();
+            C6000PipelineContracts.validate(program,f,result,ghidra.util.task.TaskMonitor.DUMMY);
             var ops=Arrays.copyOf(result.code(),result.code().length);
             var ret=program.getRegister("C6000_PIPE_RET");
             var value=new Varnode(ret.getAddress(),4);

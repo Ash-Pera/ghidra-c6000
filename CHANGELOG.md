@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+* Integrate exact same-packet reads and delayed writeback into reviewed function
+  analysis using the existing scheduling backend. Add read-only report/review/apply
+  tooling, a contract-gated analyzer, and source-bound decompiler injection.
+  Refuse stale bytes, context, ownership, entry assumptions and alternate entries
+  instead of silently using sequential effects (SPRUFE8B 3.5, 3.8.3 and 4.2).
+
 ### Fixed
 
 * Display compact cross-path functional units with `X`, including A-side

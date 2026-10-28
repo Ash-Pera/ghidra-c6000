@@ -32,6 +32,7 @@ CORE = [
          ["image", "input.bin", "0x1000", "0", "48"]),
     case("compact-header-collision", "CompactHeader", "C6000_COMPACT_HEADER_OK", None),
     case("compact-operands", "CompactOperands", "C6000_COMPACT_OPERANDS_OK"),
+    case("compact-predicated-mvk", "CompactPredicatedMvk", "C6000_COMPACT_PREDICATED_MVK_OK", "json"),
     case("compact-move-memory", "CompactMoveMemory", "C6000_COMPACT_MOVE_MEMORY_OK"),
     case("compact-compare-destination", "CompactCompareDestination", "C6000_COMPACT_COMPARE_DESTINATION_OK"),
     case("full32-encoding-info", "Full32EncodingInfo", "C6000_FULL32_ENCODING_INFO_OK"),

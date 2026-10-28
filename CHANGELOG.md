@@ -12,6 +12,10 @@
 
 ### Fixed
 
+* Correct the skip-condition polarity of compact predicated `MVK` for `[A0]`,
+  `[!A0]`, `[B0]` and `[!B0]` (SPRUFE8B Figure G-3). Add raw and exact-schedule
+  regression checks for enabled, disabled and predicate-aliasing writes in both
+  byte orders.
 * Refine delayed-call B3 ownership, restrict header adjustments to the actual
   window boundary, and require stable predicates and unique incoming paths
   before propagating return-address constants (SPRUFE8B 3.5, 3.12 B).

@@ -955,12 +955,13 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 # ---------------------------------------------------------------------------
 # Figure G-3. LSDx1c - SPRUFE8B appendix G.3.  Predicated MVK with a
 # 1-bit constant; CC selects [A0], [!A0], [B0] or [!B0].
+# The branch skips the write when the instruction predicate is false.
 # ---------------------------------------------------------------------------
 
-:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=0 & j14=0 & Cucst1f & RA97 { if (A0 != 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
-:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=0 & j14=1 & Cucst1f & RA97 { if (A0 == 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
-:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=0 & Cucst1f & RA97 { if (B0 != 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
-:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=1 & Cucst1f & RA97 { if (B0 == 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
+:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=0 & j14=0 & Cucst1f & RA97 { if (A0 == 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
+:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=0 & j14=1 & Cucst1f & RA97 { if (A0 != 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
+:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=0 & Cucst1f & RA97 { if (B0 == 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
+:^CPredCC^"MVK"^CUnitLSD " " Cucst1f^", "^RA97 is c_is16=1 & CPredCC & CUnitLSD & j12=0 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=1 & Cucst1f & RA97 { if (B0 != 0) goto <cskip>; RA97 = Cucst1f; <cskip> }
 
 # ---------------------------------------------------------------------------
 # Figure G-4. LSDx1 - SPRUFE8B appendix G.3.  op = 010/011/100/110 defer

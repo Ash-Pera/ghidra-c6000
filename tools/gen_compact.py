@@ -1178,14 +1178,15 @@ w("")
 w("# ---------------------------------------------------------------------------")
 w("# Figure G-3. LSDx1c - SPRUFE8B appendix G.3.  Predicated MVK with a")
 w("# 1-bit constant; CC selects [A0], [!A0], [B0] or [!B0].")
+w("# The branch skips the write when the instruction predicate is false.")
 w("# ---------------------------------------------------------------------------")
 w("")
-for cc, pred, cond in ((0, "[A0]", "A0 != 0"), (1, "[!A0]", "A0 == 0"),
-                       (2, "[B0]", "B0 != 0"), (3, "[!B0]", "B0 == 0")):
+for cc, skip_condition in ((0, "A0 == 0"), (1, "A0 != 0"),
+                           (2, "B0 == 0"), (3, "B0 != 0")):
     con('^CPredCC^"MVK"^CUnitLSD^" "^Cucst1f^", "^RA97',
         ["j12=0", "j11=1", "j10=0", "j6=1", "j5=1", "j2=1", "j1=1",
          "j15=%d" % ((cc >> 1) & 1), "j14=%d" % (cc & 1), "Cucst1f", "RA97"],
-        "if (%s) goto <cskip>; RA97 = Cucst1f; <cskip>" % cond)
+        "if (%s) goto <cskip>; RA97 = Cucst1f; <cskip>" % skip_condition)
 w("")
 
 w("# ---------------------------------------------------------------------------")

@@ -37,6 +37,8 @@ def main():
         ('adddp_unit_occupied',[opcode('ADDDP'),mv(6,7),0x10000,0xc0362,0x8000],'still occupied'),
         ('compare_duplicate_unit',[opcode('CMPEQDP','S')|1,mvkh(0x4008,3),0x10000,0xc0362,0x8000],'functional-unit collision'),
         ('loop_reload_not_guessed',[0x80038000,0x34000,0xc0362,0x8000],'requires reload state'),
+        ('recent_ilc_load',[(13<<23)|(4<<18)|0x3a2,0x38000,0,0x34000,0xc0362,0x8000],'ILC load too close'),
+        ('ilc_read_during_loading',[0x3a000,0x30001|(8<<18),(4<<23)|(13<<18)|0x3e2,0x34000,0xc0362,0x8000],'ILC access inside counted loop body'),
         ('loop_interval_invalid',[0x38000|(14<<23),0x34000,0xc0362,0x8000],'invalid loop interval')]:
         case(name,words,{},{});rows[-1]['refused']=reason
     Path(sys.argv[1]).write_bytes(image);Path(sys.argv[2]).write_text(json.dumps(rows,indent=2))

@@ -10,7 +10,8 @@
   iteration padding. Correct MVD E4, SPLOOPW counter preservation and predicate
   sampling, displacement-BNOP restart recognition, and compact NOP counts
   (SPRUFE8B 4.2, MVD pipeline, 7.4, 7.7–7.10, 7.14; Appendix H).
-  Nested reload and loop interrupt/restart remain guarded in the packet compiler.
+  Reject invalid ILC setup/body accesses under SPRUFE8B 7.9.7. Nested reload
+  and loop interrupt/restart remain guarded in the packet compiler.
 * Add explicit per-function exact packet schedules for overlapping B/BNOP
   transfers and E1/E2/E3/E4/E5 register and memory effects. Preserve raw exact
   floating-point p-code, captured predicates/targets, delayed sticky flags,

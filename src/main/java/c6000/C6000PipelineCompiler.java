@@ -484,6 +484,13 @@ public final class C6000PipelineCompiler {
             for(var instruction:fetched)if(instruction.name().equals("SPLOOP")||instruction.name().equals("SPLOOPD")||instruction.name().equals("SPLOOPW")){
                 if(loop!=null||loopStart!=null)throw fail("overlapping loop invocation requires a reload contract");
                 if(instruction.predicate()!=null&&!instruction.name().equals("SPLOOPW"))throw fail("predicated loop start requires reload state");
+                // SPRUFE8B 7.9.7: an ILC load in parallel with, or in the
+                // three cycles before SPLOOP is not a normal counter read.
+                if(instruction.name().equals("SPLOOP")){
+                    long counter=program.getRegister("ILC").getAddress().getOffset();
+                    for(var peer:fetched)if(peer.name().equals("MVC")&&peer.outputs().stream().anyMatch(d->d.offset()==counter))throw fail("ILC load too close to SPLOOP");
+                    for(var flight:s.flights()){var old=decode(flight.pc());if(old.name().equals("MVC")&&old.outputs().stream().anyMatch(d->d.offset()==counter))throw fail("ILC load too close to SPLOOP");}
+                }
                 loopStart=instruction;planLoop(instruction);
             }
             Varnode whileSample=null;
@@ -710,6 +717,9 @@ public final class C6000PipelineCompiler {
             List<Insn> instructions=packet(pc);int mask=0,duration=1;boolean kernel=false;
             for(var instruction:instructions){
                 if(instruction.name().startsWith("SPLOOP"))throw fail("nested loop source without SPKERNEL");
+                // Do not choose one implementation's ILC value during loading
+                // (SPRUFE8B 7.9.7). SPLOOPW does not use the counter interface.
+                if(!start.name().equals("SPLOOPW")&&instruction.name().equals("MVC")&&instruction.regs().contains(program.getRegister("ILC").getAddress().getOffset()))throw fail("ILC access inside counted loop body");
                 if(instruction.name().equals("SPMASK"))mask|=(int)instruction.instruction().getScalar(0).getValue();
                 if(instruction.name().equals("SPKERNEL")){
                     kernel=true;int raw=(int)instruction.instruction().getScalar(0).getValue();int bits=ii==1?0:ii==2?1:ii<=4?2:ii<=8?3:4;int cycle=raw&((1<<bits)-1),stage=0;

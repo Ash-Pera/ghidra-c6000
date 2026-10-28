@@ -66,7 +66,9 @@ The source is fetched once; cached instructions overlap by initiation interval,
 masked setup remains a once-only program operation, and drain disables cached
 operations in source order. Source NOPs retain decoded cycle counts. SPLOOPD
 suppresses the first three body-cycle tests and observes delayed MVC counter
-loads. SPLOOPW samples its predicate before E1 writes and uses its value three
+loads. ILC loads too close to SPLOOP and ILC accesses inside a counted
+loop body are refused under 7.9.7; their implementation-dependent or exception
+behavior is not guessed. SPLOOPW samples its predicate before E1 writes and uses its value three
 advances later; it does not access or modify ILC/RILC. Early while termination
 stops buffered repeats and lets the first program-memory invocation complete.
 Zero/one counted iterations pad to the last loading boundary. A taken branch

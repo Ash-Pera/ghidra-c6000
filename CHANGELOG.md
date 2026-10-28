@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+* Compact `STW`/`LDW` `*B15[ucst5]` address the right stack word (Figure
+  C-16), and `STW` shows `src, *B15[ucst5]` with separate operands.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

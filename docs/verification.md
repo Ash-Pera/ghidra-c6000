@@ -190,6 +190,10 @@ spec declares a synthetic `PC` for Ghidra's emulator; architectural `PCE1`
 remains a separate control register. P-code updates `CSR.SAT` as an instruction
 effect; cycle-accurate placement of that write belongs to a pipeline model.
 
+`tests/fixtures/compact-dstk.py <image.bin> <cases.tsv> [be]` and
+`C6000CompactDstkTest.java <cases.tsv>` execute compact `STW`/`LDW`
+`*B15[ucst5]` (Figure C-16) at four offsets.
+
 `tests/fixtures/compact-header-collision.py <image.bin> [be]` and
 `C6000CompactHeaderTest.java` verify that an E-prefixed word outside the header
 position stays undefined, while a compact word containing an E-prefixed upper

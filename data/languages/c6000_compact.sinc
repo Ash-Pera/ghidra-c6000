@@ -344,7 +344,7 @@ Cucst2: Cucst2v is q_uc2 [ Cucst2v = q_uc2 + 1; ] { export *[const]:4 Cucst2v; }
 
 Cucst2pp: Cucst2ppv is q_uc2 [ Cucst2ppv = q_uc2 + 1; ] { export *[const]:4 Cucst2ppv; }
 
-Cucst5stk: Cucst5stkv is cq_u21 & q_r3b [ Cucst5stkv = (cq_u21 << 3) | q_r3b; ] { export *[const]:4 Cucst5stkv; }
+Cucst5stk: Cucst5stkv is cq_u21 & q_r3b [ Cucst5stkv = (q_r3b << 2) | cq_u21; ] { export *[const]:4 Cucst5stkv; }
 
 Cucst5d: Cucst5dv is cq_uc43 & q_r3 [ Cucst5dv = (cq_uc43 << 3) | q_r3; ] { export *[const]:4 Cucst5dv; }
 
@@ -725,8 +725,8 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 # (so the unit is always .D2); the 5-bit offset is scaled by the word size.
 # ---------------------------------------------------------------------------
 
-:STW^CUnitD^" *B15["^Cucst5stk^"], "^RT64 is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=0 & RT64 & Cucst5stk { *[ram]:4 (B15 + (Cucst5stk << 2)) = RT64; }
-:LDW^CUnitD^" *B15["^Cucst5stk^"], "^RT64 is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=1 & RT64 & Cucst5stk { RT64 = *[ram]:4 (B15 + (Cucst5stk << 2)); }
+:STW^CUnitD " " RT64^", *B15["^Cucst5stk^"]" is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=0 & RT64 & Cucst5stk { *[ram]:4 (B15 + (Cucst5stk << 2)) = RT64; }
+:LDW^CUnitD " " "*B15["^Cucst5stk^"], "^RT64 is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=1 & RT64 & Cucst5stk { RT64 = *[ram]:4 (B15 + (Cucst5stk << 2)); }
 
 # ---------------------------------------------------------------------------
 # Figure C-17. Dx2op - SPRUFE8B appendix C.4.

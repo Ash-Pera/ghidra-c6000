@@ -420,7 +420,7 @@ w("")
 imm1("Cucst4", "(j11 << 3) | q_r3", "j11 & q_r3")            # Figure C-8..C-15
 imm1("Cucst2", "q_uc2 + 1", "q_uc2")                        # Figures C-12..C-15
 imm1("Cucst2pp", "q_uc2 + 1", "q_uc2")                      # Figure C-21
-imm1("Cucst5stk", "(cq_u21 << 3) | q_r3b", "cq_u21 & q_r3b")  # Figure C-16
+imm1("Cucst5stk", "(q_r3b << 2) | cq_u21", "cq_u21 & q_r3b")  # Figure C-16: ucst4-2, ucst1-0
 imm1("Cucst5d", "(cq_uc43 << 3) | q_r3", "cq_uc43 & q_r3")  # Figures C-18/F-25/F-27/F-30
 imm1("Cucst5p", "(cq_uc98 << 3) | q_r3", "cq_uc98 & q_r3")  # Figure C-19
 imm1("Cucst5f23", "(cq_uc43 << 3) | q_r3", "cq_uc43 & q_r3")
@@ -694,8 +694,8 @@ w("# ---------------------------------------------------------------------------
 w("")
 for ldst in (0, 1):
     mn = "LDW" if ldst else "STW"
-    disp = "%s^CUnitD^\" \"^RT64^\", *B15[\"^Cucst5stk^\"]\"" % mn if ldst is False else \
-           "%s^CUnitD^\" *B15[\"^Cucst5stk^\"], \"^RT64" % mn
+    disp = "%s^CUnitD^\" \"^\"*B15[\"^Cucst5stk^\"], \"^RT64" % mn if ldst else \
+           "%s^CUnitD^\" \"^RT64^\", *B15[\"^Cucst5stk^\"]\"" % mn
     sem = ld_sem("RT64", "(B15 + (Cucst5stk << 2))", 4, "u") if ldst else \
           st_sem("RT64", "(B15 + (Cucst5stk << 2))", 4)
     con(disp, ["j15=1", "j11=1", "j10=1", "j2=1", "j1=0", "q_s=1", "q_ldst=%d" % ldst,

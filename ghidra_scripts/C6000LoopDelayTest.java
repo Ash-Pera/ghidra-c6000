@@ -35,7 +35,7 @@ public class C6000LoopDelayTest extends GhidraScript {
 			Instruction nop = getInstructionAt(at);
 			if (nop == null || !nop.getMnemonicString().equals("NOP") ||
 				nop.getScalar(0) == null ||
-				nop.getScalar(0).getUnsignedValue() != count - 1) {
+				nop.getScalar(0).getUnsignedValue() != count) {
 				throw new AssertionError("wrong NOP count at " + at);
 			}
 		}

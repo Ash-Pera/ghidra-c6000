@@ -556,7 +556,8 @@ public final class C6000LoopBuffer {
 						// The fetch delay counts from the start of draining,
 						// but fetching also waits for the last kernel boundary.
 						firstPostBodyCycle = Math.min(drainEnd + 1,
-							Math.max(lastLoadingBoundary + 1, t + 1 + fetchDelay));
+							Math.max(iteration == 0 ? lastLoadingBoundary + 1 : source.size(),
+                                t + 1 + fetchDelay));
 					}
 					else ilc--;
 				}
@@ -571,8 +572,8 @@ public final class C6000LoopBuffer {
 	}
 
 	/**
-	 * Replay a predicate-terminated SPLOOPW. ILC decrements at every stage
-	 * boundary but does not decide termination. The predicate is sampled after the
+	 * Replay a predicate-terminated SPLOOPW. ILC/RILC are left unchanged
+	 * (SPRUFE8B 7.10). The predicate is sampled before the
 	 * cycle's operations, three cycles before the corresponding stage boundary.
 	 * It must return true while the loop is to continue. SPLOOPW stops without
 	 * an epilog when that delayed condition becomes false.
@@ -622,12 +623,13 @@ public final class C6000LoopBuffer {
 		int finalIteration = Integer.MAX_VALUE;
 		int drainEnd = Integer.MAX_VALUE;
 		boolean interrupted = false;
+		boolean abrupt = false;
 		for (int t = 0; t < maxCycles; t++) {
 			List<Operation> ops = operationsAt(t, finalIteration, false, restart);
 			boolean boundary = (t + 1) % ii == 0;
-			boolean terminate = boundary && t >= 3 && !delayed[(t - 3) % 3];
+			boolean terminate = !abrupt && boundary && t >= 3 && !delayed[(t - 3) % 3];
 			boolean interrupt = false;
-			if (boundary && !terminate && !interrupted && t >= 3 &&
+			if (boundary && !terminate && !abrupt && !interrupted && t >= 3 &&
 				t >= lastLoadingBoundary && pendingInterruptAtCycle.test(t)) {
 				interrupt = true;
 				interrupted = true;
@@ -635,16 +637,27 @@ public final class C6000LoopBuffer {
 				drainEnd = Math.max(t, finalIteration * ii + source.size() - 1);
 			}
 			long before = ilc;
-			if (boundary) ilc = (ilc - 1) & 0xffffffffL;
+			// SPRUFE8B 7.10: SPLOOPW never accesses or modifies ILC/RILC.
+			boolean sample = continuePredicate.getAsBoolean();
 			sink.accept(new Cycle(t, ii, before, ilc, terminate, interrupt,
 				interrupted ? -1 : Integer.MAX_VALUE, ops));
-			if (terminate) return new ReplayResult(t + 1, t + 1,
-				interrupted ? Outcome.INTERRUPT_AT_POST_BODY : Outcome.COMPLETE, ilc);
+			if (terminate) {
+                // An early termination disables buffered copies, but the first
+                // program-memory invocation still finishes loading/executing.
+                // Section 7.10.1 guarantees at least that initial iteration.
+                if (t >= source.size() - 1) return new ReplayResult(t + 1, t + 1,
+                    interrupted ? Outcome.INTERRUPT_AT_POST_BODY : Outcome.COMPLETE, ilc);
+                abrupt = true;
+                finalIteration = -1;
+            }
+            if (abrupt && t >= source.size() - 1)
+                return new ReplayResult(t + 1, t + 1,
+                    interrupted ? Outcome.INTERRUPT_AT_POST_BODY : Outcome.COMPLETE, ilc);
 			if (t >= drainEnd) return new ReplayResult(t + 1, -1,
 				Outcome.INTERRUPT_DRAINED, ilc);
 			// The first three cycles cannot terminate, but their predicate
 			// samples may be used at the first eligible boundary.
-			delayed[t % 3] = continuePredicate.getAsBoolean();
+			delayed[t % 3] = sample;
 		}
 		throw new IllegalStateException("loop trace exceeds " + maxCycles + " cycles");
 	}
@@ -660,14 +673,14 @@ public final class C6000LoopBuffer {
 				// The source is fetched once, including its SPMASKed setup code.
 				for (Instruction insn : cell.program) {
 					String name = insn.getMnemonicString();
-					boolean masked = (unitBit(name) & cell.unitMask) != 0;
+					boolean displacementBnop = name.contains("BNOP") &&
+                        (insn.getAddress(0) != null || insn.getScalar(0) != null);
+                    boolean masked = displacementBnop || (unitBit(name) & cell.unitMask) != 0;
 					if (restart) {
 						if (initiallyZero) continue;
 						// Displacement BNOP is treated as masked even though it
 						// uses no unit. Other masked delay instructions also keep
 						// their idle cycles on return.
-						boolean displacementBnop = name.contains("BNOP") &&
-							insn.getScalar(0) != null;
 						if (displacementBnop || (masked &&
 							(name.contains("BNOP") || name.contains("ADDKPC") ||
 							protectedLoads.contains(insn.getMinAddress())))) {
@@ -702,7 +715,7 @@ public final class C6000LoopBuffer {
 		else if (name.contains("ADDKPC")) operand = 2;
 		else return 1;
 		Scalar count = insn.getScalar(operand);
-		if (count != null) return (int) count.getUnsignedValue() + 1;
+		if (count != null) return name.equals("NOP") ? Math.max(1, (int) count.getUnsignedValue()) : (int) count.getUnsignedValue() + 1;
 		// The compact BNOP encoding with a fixed count of five has no Scalar
 		// object; Ghidra renders its literal operand as decimal text.
 		String rendered = insn.getDefaultOperandRepresentation(operand);

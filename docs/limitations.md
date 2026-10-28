@@ -106,8 +106,7 @@ page has the detail. The module is a working decoder with staged semantics.
   adding a false PC branch. It handles initiation interval overlap, source
   `SPMASK` filtering, counted `SPLOOP`/`SPLOOPD` termination, the first-three-
   cycle `SPLOOPD` grace period, and the three-cycle delayed `SPLOOPW`
-  predicate. `SPLOOPW` also decrements `ILC` at every stage boundary without
-  using it to decide termination. The callback exposes each cycle's operations
+  predicate. `SPLOOPW` leaves `ILC` and `RILC` unchanged (SPRUFE8B 7.10). The callback exposes each cycle's operations
   and `ILC` before and after stage boundaries. Zero- and one-iteration loops
   issue idle cycles through the last loading-stage boundary when the body ends
   partway through a stage. The detailed replay result gives the first cycle
@@ -138,15 +137,17 @@ page has the detail. The module is a working decoder with staged semantics.
   loop at that address. `C6000LoopModelTest.java` checks all decoded loop
   bodies in an imported image.
 
-  The scheduler reports operation order and loop-control state; it does not
-  execute each instruction's p-code or model instruction latency, pipeline
-  writeback and handler entry, nested reload, or choose the post-body
-  program-memory packet after branches. Restart of masked `BNOP`/`ADDKPC`
-  idle-cycle operations is rejected until their special timing is modelled.
-  [The loop conformance notes](software-loop-conformance.md) specify
-  the remaining emulator state. Native Ghidra decompilation still displays
-  the loop-control userops, because the hardware buffer does not correspond
-  to an ordinary control-flow edge.
+  The helper reports operation order and loop-control state. It does not
+  execute instruction p-code, retire instruction writes, enter handlers, or
+  choose the post-body packet after branches. Immediate reload is available
+  through its explicit RILC/predicate callback API; delayed reload still needs
+  additional state. Masked BNOP/ADDKPC restart keeps its idle cycles while
+  suppressing issue effects. [The loop conformance notes](software-loop-conformance.md)
+  specify the remaining emulator state. Native Ghidra decompilation displays
+  loop-control userops unless a supported function is explicitly enabled with
+  the [exact packet compiler](pipeline-schedules.md). That compiler executes
+  normal counted/while loops with instruction writeback phases; nested reload
+  and loop interrupt/restart remain unsupported there.
 * **Predication** is decoded, displayed and guards the modelled 32-bit p-code.
   Compact predication and packet-wide parallel effects need further work.
 * The generic corpus is assembled from GNU binutils, whose tic6x assembler

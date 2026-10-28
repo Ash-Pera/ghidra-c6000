@@ -237,7 +237,7 @@ def opcode(mnemonic, unit, side, opfield):
     decode = Path(__file__).resolve().parents[2] / "data/languages/c6000_decode.sinc"
     prefix = f":{mnemonic}.{unit}{side} "
     for line in decode.read_text().splitlines():
-        if not line.startswith(prefix):
+        if not (line.startswith(prefix) or line.startswith(f':^Cond^"{mnemonic}.{unit}{side}" ')):
             continue
         fixed = {int(bit): int(v) for bit, v in re.findall(r"\bi(\d+)=(\d)\b", line)}
         if unit == "M" or "".join(str(fixed[i]) for i in range(11, 4, -1)) == opfield:
@@ -256,7 +256,8 @@ def main():
             ("ADDDP", "L", 1, False, "0011000"),
             ("ADDDP", "S", 2, False, "1110010"),
             ("SUBDP", "L", 1, False, "0011001"),
-            ("SUBDP", "L", 2, True, "0011101"),
+            # Src1PairX is a cross-port form, not reversed subtraction.
+            ("SUBDP", "L", 2, False, "0011101"),
             ("SUBDP", "S", 1, True, "1110111"),
             ("MPYDP", "M", 1, False, ""),
             ("MPYDP", "M", 2, False, ""),

@@ -358,6 +358,8 @@ Cucst3d9: q_r3 is q_r3 { export *[const]:4 q_r3; }
 
 Cucst1f: q_uc2 is q_uc2 { export *[const]:4 q_uc2; }
 
+CNopCount: CNopCountv is q_r3 [ CNopCountv = q_r3 + 1; ] { export *[const]:4 CNopCountv; }
+
 CN3: q_r3 is q_r3 { export *[const]:4 q_r3; }
 
 Cii: Ciiv is cq_ii3 & q_r3b [ Ciiv = ((cq_ii3 << 3) | q_r3b) + 1; ] { export *[const]:4 Ciiv; }
@@ -1032,4 +1034,4 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 # architectural effect.
 # ---------------------------------------------------------------------------
 
-:NOP CN3 is c_is16=1 & j12=0 & j11=1 & j10=1 & j9=0 & j8=0 & j7=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & j0=0 & CN3 {  }
+:NOP CNopCount is c_is16=1 & j12=0 & j11=1 & j10=1 & j9=0 & j8=0 & j7=0 & j6=1 & j5=1 & j4=0 & j3=1 & j2=1 & j1=1 & j0=0 & CNopCount {  }

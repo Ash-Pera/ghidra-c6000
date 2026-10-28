@@ -73,9 +73,8 @@ public class C6000LoopModelTest extends GhidraScript {
 								maskedSourceOps.incrementAndGet();
 							}
 						}
-						long expectedBefore = (5L - cycle.number / ii) & 0xffffffffL;
-						long expectedAfter = (expectedBefore - (cycle.stageBoundary ? 1 : 0)) &
-							0xffffffffL;
+						long expectedBefore = 5L; // SPRUFE8B 7.10: SPLOOPW leaves ILC unchanged.
+						long expectedAfter = 5L;
 						if (cycle.postBodyFetchEnabled ||
 							cycle.lbc != cycle.number % ii ||
 							cycle.ilcBefore != expectedBefore || cycle.ilcAfter != expectedAfter) {

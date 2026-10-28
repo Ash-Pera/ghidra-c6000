@@ -115,7 +115,7 @@ L = []
 TABLES = set("""CUnitS CUnitL CUnitM CUnitD CUnitLSD
 RA15 RB15 RA97 RB97 RA64 RA1110 RA4 RX97 RT64 RT65Pair RPTR RT710 RT710Pair RB710
 CAcc CRet Cucst4 Cucst2 Cucst2pp Cucst5stk Cucst5d Cucst5p Cucst5f23
-Cucst8f24 Cucst3d9 Cucst1f CN3 Cii Cspk Cmask CimmL3i CimmLx5 CimmS3i
+Cucst8f24 Cucst3d9 Cucst1f CN3 CNopCount Cii Cspk Cmask CimmL3i CimmLx5 CimmS3i
 CTgt7 CTgt8 CTgt10 CPred20 CPredCC""".split())
 TABLES.update({"RMVTo", "RMVFr", "RCmpDst"})
 
@@ -432,6 +432,7 @@ imm1("Cucst8f24", "(cq_uc65 << 5) | (j10 << 7) | (cq_uc43 << 3) | q_r3",
      "cq_uc65 & j10 & cq_uc43 & q_r3")                      # Figure F-24
 plain1("Cucst3d9", "q_r3")                            # Figure D-9
 plain1("Cucst1f", "q_uc2")                           # Figures D-10/G-3
+imm1("CNopCount", "q_r3 + 1", "q_r3") # H-9 NOP count; BNOP keeps the raw N3 count.
 plain1("CN3", "q_r3")                                 # F-17/F-20/F-32/H-9
 imm1("Cii", "((cq_ii3 << 3) | q_r3b) + 1", "cq_ii3 & q_r3b") # Figures H-5/H-6
 imm1("Cspk", "(cq_spk43 << 3) | q_r3b | (j0 << 5)", "cq_spk43 & q_r3b & j0")
@@ -1221,9 +1222,9 @@ w("# Figure H-9. Unop (NOP) - SPRUFE8B appendix H.4.  A NOP has no")
 w("# architectural effect.")
 w("# ---------------------------------------------------------------------------")
 w("")
-con("NOP CN3",
+con("NOP CNopCount",
     ["j12=0", "j11=1", "j10=1", "j9=0", "j8=0", "j7=0", "j6=1", "j5=1",
-     "j4=0", "j3=1", "j2=1", "j1=1", "j0=0", "CN3"], "")
+     "j4=0", "j3=1", "j2=1", "j1=1", "j0=0", "CNopCount"], "")
 
 # fix the D-11/C-20/F-31 op constraints: these used j13 etc. above; ok.
 

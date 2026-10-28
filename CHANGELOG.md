@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Fixed
+* Extend opt-in exact packet schedules with independent DP read ports, split
+  writes through E10, captured predicates and delayed status events. Refuse
+  changing repeated-read words. Add normal SPLOOP/D/W load/fetch/drain timing,
+  delayed ILC/RILC availability, SPMASK overlays, branch aborts and zero/one
+  iteration padding. Correct MVD E4, SPLOOPW counter preservation and predicate
+  sampling, displacement-BNOP restart recognition, and compact NOP counts
+  (SPRUFE8B 4.2, MVD pipeline, 7.4, 7.7–7.10, 7.14; Appendix H).
+  Nested reload and loop interrupt/restart remain guarded in the packet compiler.
 * Add explicit per-function exact packet schedules for overlapping B/BNOP
   transfers and E1/E2/E3/E4/E5 register and memory effects. Preserve raw exact
   floating-point p-code, captured predicates/targets, delayed sticky flags,

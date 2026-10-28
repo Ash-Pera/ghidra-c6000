@@ -27,7 +27,7 @@ def main():
     mpy = 0xe00 | (3 << 13) | (4 << 18) | (5 << 23)
     put(0x1000, mvk(1, 3) | 1, mv(3, 4), b3, 0x8000)
     put(0x1100, mpy, mv(5, 6), 0x2000, mv(5, 7), b3, 0x8000)
-    put(0x1200, stw | 1, ldw, 0x8000, b3, 0x8000)
+    put(0x1200, stw | 0x80 | 1, ldw, 0x8000, b3, 0x8000)
     put(0x1300, mvk(1, 3) | 1, stw, 0x8000, b3, 0x8000)
     put(0x1400, 0x10 | (16 << 7), 0, 0x10 | (32 << 7), mvk(1, 3), 0x2000, stw | (7 << 13))
     put(0x1440, mvk(2, 4), mvk(3, 5), stw | (6 << 13))
@@ -44,11 +44,11 @@ def main():
     put(0x1900, mpy, mvk(9, 5), mv(5, 6), 0, mv(5, 7), b3, 0x8000)
     put(0x1a00, b3, mvk(0x1234, 3, True), 0x6000)
     put(0x1b00, (ldw & ~(15 << 9)) | (9 << 9) | (1 << 13), mv(4, 6), 0x6000, mv(5, 7), b3, 0x8000)
-    put(0x1c00, (0x02185764 & ~(31 << 18)) | (8 << 18), mv(8, 6) | 1, mv(4, 7), 0x6000, b3, 0x8000)
+    put(0x1c00, (0x02185764 & ~(31 << 18)) | (8 << 18), mv(8, 6) | 1, (7 << 23) | (4 << 18) | 0x8f0, 0x6000, b3, 0x8000)
     put(0x1d00, ldw, mvk(5, 4, True), (6 << 23) | (4 << 18) | 0x1058, 0x6000, b3, 0x8000)
     put(0x1600, mpy, (20 << 23) | (4 << 18) | 0x3a2, 0x6000, b3, 0x8000)
     # Unsupported phase and ambiguous updating-load contracts must be refused.
-    put(0x1e00, (4 << 23) | (2 << 18) | (0b0011000 << 5) | 0x18, b3, 0x8000)
+    put(0x1e00, 0x1e000, b3, 0x8000)
     put(0x1e40, (ldw & ~((31 << 23) | (15 << 9))) | (4 << 23) | (9 << 9) | (1 << 13), b3, 0x8000)
     # Prefix provides a known incoming E1 hazard; scheduled entry is 0x1f04.
     put(0x1f00, mvk(5, 4), (6 << 23) | (4 << 18) | 0x105a, b3, 0x8000)

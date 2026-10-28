@@ -1,5 +1,14 @@
 # Verification and measured coverage
 
+The v1.0.4 release verification reran 38,008 affected floating-point cases
+across both endian modes, the constant-target and switch-ownership regressions,
+and both full DSP payload sweeps. A fresh combined memory-map analysis recovered
+714 functions: 713 decompiled within a 30-second limit (slowest 24.92 seconds).
+The cross-stage function at `0x11803100` still terminated the native decompiler;
+the same function and body also fail with the published v1.0.3 runtime. The
+previous timeout at `0xc0041940` completed in 2.55 seconds. These measurements
+describe this analysis configuration, not every possible recovered function.
+
 `C6000SwitchOwnershipTest.java` runs after `C6000JumpTableTest.java` on the
 existing `tests/fixtures/jump-table.py` image. Run both with little- and
 big-endian languages. Six checks cover stable override label IDs on repeat

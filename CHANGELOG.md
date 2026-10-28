@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.0.4 - 2026-10-27
+
 ### Fixed
 * Exact single-precision arithmetic and shared DP-to-SP rounding use equivalent
   mask selections instead of internal p-code branch trees. This preserves
@@ -14,7 +16,6 @@
   namespaces without deleting labels; detached duplicates no longer crash
   the decompiler. Correct override ownership checks also avoid rewriting
   unchanged tables on repeated analysis.
-
 * Computed branch references no longer retain the intermediate signed `MVK`
   value when an adjacent, unconditional `MVKH` proves the final target.
   Predicated writes, same-execute-packet writes and alternate entries remain

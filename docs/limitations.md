@@ -19,6 +19,10 @@ page has the detail. The module is a working decoder with staged semantics.
 
 ## Limitations
 
+* **One recovered cross-stage function can still crash the native decompiler.**
+  In a fresh combined DSP analysis, the function at `0x11803100` fails with
+  both v1.0.3 and v1.0.4. The other 713 recovered functions completed within
+  30 seconds in the v1.0.4 verification run; see [verification](verification.md).
 * **Compact instructions decode via the header context**, which the Java
   analyzer primes before disassembly. The context fields are marked `noflow`
   so a compact slot reached by fall-through is not decoded with the previous

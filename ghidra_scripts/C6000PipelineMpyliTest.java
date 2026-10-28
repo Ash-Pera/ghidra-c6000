@@ -29,10 +29,10 @@ public class C6000PipelineMpyliTest extends GhidraScript {
     }
 
     private void execute(PcodeOp[] code, BytesPcodeExecutorState state, String name) {
-        var executor = new PcodeExecutor<byte[]>(state, PcodeExecutorStatePiece.Reason.EXECUTE_READ);
+        var executor = new PcodeExecutor<byte[]>((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), ghidra.pcode.exec.BytesPcodeArithmetic.forLanguage(currentProgram.getLanguage()), state, PcodeExecutorStatePiece.Reason.EXECUTE_READ);
         var library = PcodeUseropLibrary.<byte[]>nil();
-        var frame = executor.begin(Arrays.asList(code), library.getSymbols(
-            (ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage()));
+        var frame = executor.begin(new ghidra.pcode.exec.PcodeProgram((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), Arrays.asList(code), library.getSymbols(
+            (ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage())) {});
         int steps = 0;
         while (!frame.isFinished() && steps++ < 100000) executor.step(frame, library);
         if (!frame.isFinished()) throw new AssertionError("Step bound: " + name);

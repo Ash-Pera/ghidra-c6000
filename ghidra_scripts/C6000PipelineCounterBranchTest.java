@@ -28,10 +28,10 @@ public class C6000PipelineCounterBranchTest extends GhidraScript {
     }
 
     private void execute(PcodeOp[] code, BytesPcodeExecutorState state, String name) {
-        var executor = new PcodeExecutor<byte[]>(state, PcodeExecutorStatePiece.Reason.EXECUTE_READ);
+        var executor = new PcodeExecutor<byte[]>((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), ghidra.pcode.exec.BytesPcodeArithmetic.forLanguage(currentProgram.getLanguage()), state, PcodeExecutorStatePiece.Reason.EXECUTE_READ);
         var library = PcodeUseropLibrary.<byte[]>nil();
-        var frame = executor.begin(Arrays.asList(code), library.getSymbols(
-            (ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage()));
+        var frame = executor.begin(new ghidra.pcode.exec.PcodeProgram((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), Arrays.asList(code), library.getSymbols(
+            (ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage())) {});
         // The fixture has at most four visits to its backward-loop branch;
         // every other case is acyclic. No operation can execute more than four times.
         int bound = code.length * 4, steps = 0;

@@ -55,7 +55,7 @@ public class C6000ReturnDelayTest extends GhidraScript {
    for(String reg:new String[]{"A3","A4","B3","TSR"})state.setVar(currentProgram.getRegister(reg),arithmetic.fromConst(reg.equals("A3")?0x11223344:reg.equals("A4")?0x8000:reg.equals("B3")?0x9000:2,4));
    for(String reg:new String[]{"IRP","NRP"})state.setVar(currentProgram.getRegister(reg),arithmetic.fromConst(0x9000,4));
    state.setVar(toAddr(0x8000),32,false,new byte[32]);
-   var executor=new ghidra.pcode.exec.PcodeExecutor<byte[]>(state,ghidra.pcode.exec.PcodeExecutorStatePiece.Reason.EXECUTE_READ);
+   var executor=new ghidra.pcode.exec.PcodeExecutor<byte[]>((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), ghidra.pcode.exec.BytesPcodeArithmetic.forLanguage(currentProgram.getLanguage()), state, ghidra.pcode.exec.PcodeExecutorStatePiece.Reason.EXECUTE_READ);
    executor.execute(ghidra.pcode.exec.PcodeProgram.fromInstruction(branch,true),ghidra.pcode.exec.PcodeUseropLibrary.nil());
    for(int k=0;k<8;k++){int want=(mask&(1L<<k))!=0?0x11223344:0;long actual=arithmetic.toLong(state.getVar(toAddr(0x8000+4*k),4,false,reason),ghidra.pcode.exec.PcodeArithmetic.Purpose.INSPECT);if(actual!=Integer.toUnsignedLong(want))throw new AssertionError(f[1]+": listing pcode store["+k+"]="+Long.toHexString(actual));}
    long pc=arithmetic.toLong(state.getVar(currentProgram.getRegister("PC"),reason),ghidra.pcode.exec.PcodeArithmetic.Purpose.INSPECT);if(pc!=0x9000)throw new AssertionError(f[1]+": listing pcode target="+Long.toHexString(pc));

@@ -22,7 +22,7 @@ public class C6000PacketCallTest extends GhidraScript {
    state.setVar(currentProgram.getRegister("A4"),arithmetic.fromConst(0x8000,4));
    for(String reg:new String[]{"A3","B3"})state.setVar(currentProgram.getRegister(reg),arithmetic.fromConst(0x76543210,4));
    state.setVar(toAddr(0x8000),32,false,new byte[32]);
-   var executor=new ghidra.pcode.exec.PcodeExecutor<byte[]>(state,ghidra.pcode.exec.PcodeExecutorStatePiece.Reason.EXECUTE_READ);
+   var executor=new ghidra.pcode.exec.PcodeExecutor<byte[]>((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), ghidra.pcode.exec.BytesPcodeArithmetic.forLanguage(currentProgram.getLanguage()), state, ghidra.pcode.exec.PcodeExecutorStatePiece.Reason.EXECUTE_READ);
    executor.execute(ghidra.pcode.exec.PcodeProgram.fromInstruction(ins,true),ghidra.pcode.exec.PcodeUseropLibrary.nil());
    for(String reg:new String[]{"PC",f[4]}){long actual=arithmetic.toLong(state.getVar(currentProgram.getRegister(reg),reason),ghidra.pcode.exec.PcodeArithmetic.Purpose.INSPECT);long expected=reg.equals("PC")?target:link;if(actual!=expected)throw new AssertionError(f[1]+": "+reg+"="+Long.toHexString(actual)+" expected="+Long.toHexString(expected));}
    for(int n:new int[]{0,7}){long actual=arithmetic.toLong(state.getVar(toAddr(0x8000+4*n),4,false,reason),ghidra.pcode.exec.PcodeArithmetic.Purpose.INSPECT);long expected=n==0&&f[5].equals("1")?0x76543210:0;if(actual!=expected)throw new AssertionError(f[1]+": packet/guard store "+n+"="+Long.toHexString(actual));}

@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -25,7 +26,6 @@ jobs:
       # Everything CI unpacks goes under scratch/, which build.gradle keeps out
       # of the zip: buildExtension packs the rest of the workspace.
       GHIDRA_INSTALL_DIR: ${{ github.workspace }}/scratch/ghidra
-      GHIDRA_WORK: ${{ github.workspace }}/scratch/ghidra-work
       JAVA_HOME: ${{ github.workspace }}/scratch/jdk
     steps:
       - uses: actions/checkout@v4
@@ -42,10 +42,9 @@ jobs:
       - name: Download Ghidra ${{ matrix.ghidra }}
         run: |
           set -euo pipefail
-          URL="https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_${GHIDRA_VERSION}_build/ghidra_${GHIDRA_VERSION}_PUBLIC_$(date +%Y%m%d).zip"
-          # The release asset date is not guessable; resolve it from the API.
-          URL=$(curl -fsSL "https://api.github.com/repos/NationalSecurityAgency/ghidra/releases" \
-                | grep -o 'https://[^"]*ghidra_'"${GHIDRA_VERSION}"'_PUBLIC_[0-9]*\.zip' | head -1)
+          # Resolve the exact tag; older supported releases may not be on page 1.
+          curl -fsSL "https://api.github.com/repos/NationalSecurityAgency/ghidra/releases/tags/Ghidra_${GHIDRA_VERSION}_build" > /tmp/ghidra-release.json
+          URL=$(python3 -c 'import json, os; r=json.load(open("/tmp/ghidra-release.json")); prefix="ghidra_"+os.environ["GHIDRA_VERSION"]+"_PUBLIC_"; print(next(a["browser_download_url"] for a in r["assets"] if a["name"].startswith(prefix) and a["name"].endswith(".zip")))')
           [ -n "$URL" ] || { echo "no Ghidra ${GHIDRA_VERSION} release asset found"; exit 1; }
           echo "downloading $URL"
           curl -fsSL -o /tmp/ghidra.zip "$URL"
@@ -54,49 +53,22 @@ jobs:
           mv /tmp/ghidra-extract/ghidra_* "$GHIDRA_INSTALL_DIR"
           ls "$GHIDRA_INSTALL_DIR/support/sleigh"
 
-      - name: Compile SLEIGH and build the extension
-        run: |
-          set -euo pipefail
-          # build.sh verifies that the zip contains the .sla files.  Without
-          # them the zip installs cleanly and then fails at import with
-          # "Unsupported language".
-          tools/build.sh
+      - name: Check release-tool failure detection
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
 
-      - name: Verify the zip contains both compiled languages
-        run: |
-          set -euo pipefail
-          ZIP=$(ls -t dist/*_C6000.zip | head -1)
-          unzip -l "$ZIP" | grep -E 'data/languages/c6000_(le|be)\.sla'
-          unzip -l "$ZIP" | grep -E 'data/languages/c6000\.opinion'
-          unzip -l "$ZIP" | grep -E 'C6000/lib/C6000\.jar'
+      - name: Verify the release candidate in both endian modes
+        run: python3 tools/verify.py --jobs 2
 
-      - name: Install into the scratch Ghidra
-        run: |
-          set -euo pipefail
-          ZIP=$(ls -t dist/*_C6000.zip | head -1)
-          mkdir -p "$GHIDRA_INSTALL_DIR/Ghidra/Extensions"
-          rm -rf "$GHIDRA_INSTALL_DIR/Ghidra/Extensions/C6000"
-          unzip -q -o "$ZIP" -d "$GHIDRA_INSTALL_DIR/Ghidra/Extensions/"
-
-      - name: Smoke test - import and disassemble a synthetic image
-        run: |
-          set -euo pipefail
-          mkdir -p "$GHIDRA_WORK/home" "$GHIDRA_WORK/proj"
-          # A hand-assembled packet: MVK/MVKH, AND, MVK/MVKH, ZERO, MVC, B, ADDKPC.
-          printf '\x2a\x7e\xad\x07\x6a\xc0\x88\x07\xf2\x09\xbf\x07\x2a\x80\x34\x07' > "$GHIDRA_WORK/smoke.bin"
-          printf '\x6a\xc0\x08\x07\x5a\xa3\x00\x02\xa2\x03\x10\x09\xa2\x03\x10\x0a' >> "$GHIDRA_WORK/smoke.bin"
-          printf '\x2a\x40\x21\x02\x6a\xc0\x08\x02\x62\x03\x10\x00\x2a\x2d\x80\x28' >> "$GHIDRA_WORK/smoke.bin"
-          "$GHIDRA_INSTALL_DIR/support/analyzeHeadless" \
-            "$GHIDRA_WORK/proj" c6000-smoke \
-            -import "$GHIDRA_WORK/smoke.bin" \
-            -loader BinaryLoader -loader-baseAddr 0x11801da0 \
-            -processor C6000:LE:32:default -cspec default -noanalysis \
-            -scriptPath ghidra_scripts -postScript C6000CorpusTest.java image \
-            "$GHIDRA_WORK/smoke.bin" 0x11801da0 0 48 -overwrite \
-            2>&1 | tee "$GHIDRA_WORK/smoke.log"
-          grep -q "C6000_COVERAGE" "$GHIDRA_WORK/smoke.log"
-          grep -q "C6000_PCODE_OK" "$GHIDRA_WORK/smoke.log"
-          grep -q "undecoded=0" "$GHIDRA_WORK/smoke.log"
+      - name: Preserve verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghidra-c6000-verification-${{ matrix.ghidra }}
+          path: |
+            scratch/verify-*/summary.json
+            scratch/verify-*/build.log
+            scratch/verify-*/*/*/*.log
+          if-no-files-found: warn
 
       - uses: actions/upload-artifact@v4
         with:

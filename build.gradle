@@ -28,4 +28,12 @@ tasks.named("buildExtension") {
 	exclude "scratch/**"
 	exclude ".tmp/**"
 	exclude "tools/research/**"
+	exclude "**/__pycache__/**"
+	exclude "**/*.pyc"
+	exclude "**/.DS_Store"
+	doLast {
+		// Record this task's actual output; never select an older zip by mtime.
+		new File(layout.buildDirectory.get().asFile, "release-archive-path.txt").text =
+			archiveFile.get().asFile.canonicalPath + "\n"
+	}
 }

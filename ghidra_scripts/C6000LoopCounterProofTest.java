@@ -46,10 +46,10 @@ public class C6000LoopCounterProofTest extends GhidraScript {
             state.setVar(currentProgram.getRegister("B3"),arithmetic.fromConst(0x9000,4));
             for(var input:row.getAsJsonObject("input").entrySet())
                 state.setVar(currentProgram.getRegister(input.getKey()),arithmetic.fromConst(input.getValue().getAsLong(),4));
-            var executor=new PcodeExecutor<byte[]>(state,PcodeExecutorStatePiece.Reason.EXECUTE_READ);
+            var executor=new PcodeExecutor<byte[]>((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), ghidra.pcode.exec.BytesPcodeArithmetic.forLanguage(currentProgram.getLanguage()), state, PcodeExecutorStatePiece.Reason.EXECUTE_READ);
             var library=PcodeUseropLibrary.<byte[]>nil();
-            var frame=executor.begin(Arrays.asList(result.code()),library.getSymbols(
-                (ghidra.app.plugin.processors.sleigh.SleighLanguage)currentProgram.getLanguage()));
+            var frame=executor.begin(new ghidra.pcode.exec.PcodeProgram((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), Arrays.asList(result.code()),library.getSymbols(
+                (ghidra.app.plugin.processors.sleigh.SleighLanguage)currentProgram.getLanguage())) {});
             int steps=0,cycles=0,stalls=0;
             while(!frame.isFinished()&&steps++<100000) {
                 int index=frame.index();if(result.cycleStarts().containsKey(index))cycles++;

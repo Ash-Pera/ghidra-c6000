@@ -14,6 +14,8 @@
 #   GHIDRA_INSTALL_DIR  Ghidra install root (default: Homebrew's opt/ghidra)
 #   JAVA_HOME           JDK home (default: the version in Ghidra's application.java.min)
 #   GHIDRA_WORK         scratch directory for user.home / Gradle caches
+#                       archive-path.txt records the verified output zip
+#   GRADLE_USER_HOME    optional shared Gradle cache (default: GHIDRA_WORK/gradle)
 #
 set -euo pipefail
 
@@ -22,6 +24,12 @@ WORK="${GHIDRA_WORK:-$ROOT/scratch/build}"
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 note() { printf '\n== %s\n' "$*"; }
+
+case "${1:-}" in
+  "") [ "$#" -eq 0 ] || die "usage: tools/build.sh [--install GHIDRA_DIR]" ;;
+  --install) [ "$#" -le 2 ] || die "usage: tools/build.sh [--install GHIDRA_DIR]" ;;
+  *) die "usage: tools/build.sh [--install GHIDRA_DIR]" ;;
+esac
 
 resolve_ghidra() {
   if [ -n "${GHIDRA_INSTALL_DIR:-}" ]; then printf '%s\n' "$GHIDRA_INSTALL_DIR"
@@ -75,8 +83,10 @@ export PATH="$JH/bin:$PATH"
 # Ghidra writes under $HOME during bootstrap; keep that inside the workspace so
 # the build works in CI and inside a sandbox.
 mkdir -p "$WORK/home" "$WORK/gradle" "$WORK/project"
+WORK="$(cd "$WORK" && pwd)"
+rm -f "$WORK/archive-path.txt"
 export _JAVA_OPTIONS="-Duser.home=$WORK/home"
-export GRADLE_USER_HOME="$WORK/gradle"
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$WORK/gradle}"
 
 note "environment"
 printf '  Ghidra    : %s\n  JDK       : %s\n  user.home : %s\n' \
@@ -94,16 +104,13 @@ done
 note "building extension"
 ( cd "$ROOT" && "$GHIDRA/support/gradle/gradlew" --no-watch-fs -q \
     -PGHIDRA_INSTALL_DIR="$GHIDRA" buildExtension )
-DIST="$(ls -t "$ROOT"/dist/*_C6000.zip 2>/dev/null | head -1)"
-[ -n "$DIST" ] || die "buildExtension produced no zip"
+GVERSION="$(sed -n 's/^application.version=//p' "$GHIDRA/Ghidra/application.properties" | tr -d '\r')"
+DIST="$(cat "$ROOT/build/release-archive-path.txt")"
+[ -f "$DIST" ] || die "buildExtension produced no zip"
 
 note "verifying zip contents"
-for sla in c6000_le c6000_be c6000_le_analysis c6000_be_analysis; do
-  unzip -t "$DIST" "C6000/data/languages/$sla.sla" >/dev/null || \
-    die "built zip is missing data/languages/$sla.sla"
-done
-unzip -t "$DIST" 'C6000/data/languages/c6000.opinion' >/dev/null || \
-  die "built zip is missing the loader opinion"
+python3 "$ROOT/tools/check_archive.py" "$DIST" --ghidra-version "$GVERSION"
+printf '%s\n' "$DIST" > "$WORK/archive-path.txt"
 printf '  %s\n' "$DIST"
 
 if [ "${1:-}" = "--install" ]; then

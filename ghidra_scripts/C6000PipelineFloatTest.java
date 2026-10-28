@@ -31,9 +31,9 @@ public class C6000PipelineFloatTest extends GhidraScript {
             state.setVar(currentProgram.getRegister(fields[2]), arithmetic.fromConst(hex(fields[7]),4));
             state.setVar(currentProgram.getRegister("FMCR"), arithmetic.fromConst(hex(fields[9]),4));
             var library = PcodeUseropLibrary.<byte[]>nil();
-            var executor = new PcodeExecutor<byte[]>(state, PcodeExecutorStatePiece.Reason.EXECUTE_READ);
-            var frame = executor.begin(Arrays.asList(result.code()), library.getSymbols(
-                (ghidra.app.plugin.processors.sleigh.SleighLanguage)currentProgram.getLanguage()));
+            var executor = new PcodeExecutor<byte[]>((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), ghidra.pcode.exec.BytesPcodeArithmetic.forLanguage(currentProgram.getLanguage()), state, PcodeExecutorStatePiece.Reason.EXECUTE_READ);
+            var frame = executor.begin(new ghidra.pcode.exec.PcodeProgram((ghidra.app.plugin.processors.sleigh.SleighLanguage) currentProgram.getLanguage(), Arrays.asList(result.code()), library.getSymbols(
+                (ghidra.app.plugin.processors.sleigh.SleighLanguage)currentProgram.getLanguage())) {});
             int steps = 0;
             while (!frame.isFinished() && steps++ < 100000) executor.step(frame, library);
             if (!frame.isFinished()) throw new AssertionError("Step bound " + fields[0]);

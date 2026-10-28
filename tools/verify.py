@@ -47,6 +47,7 @@ CORE = [
          args=["check", "cases.tsv"], analysis=True),
     case("predicated-register-branch", "PredicatedBranch", "C6000_PREDICATED_BRANCH_OK", analysis=True),
     case("pipeline-schedule", "PipelineSemantics", "C6000_PIPELINE_SEMANTICS_OK", None, ["decompiler.xml"]),
+    case("pipeline-contracts", "PipelineContract", "C6000_PIPELINE_CONTRACT_OK", "json"),
     case("pipeline-float", "PipelineFloat", "C6000_PIPELINE_FLOAT_OK"),
     case("pipeline-dp", "PipelineDp", "C6000_PIPELINE_DP_OK", "json", ["cases.json", "decompile"]),
     case("pipeline-dp-arithmetic", "PipelineDp", "C6000_PIPELINE_DP_OK", "json"),

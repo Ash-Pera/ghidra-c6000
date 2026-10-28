@@ -27,7 +27,7 @@ entry before code discovery can begin.
 | Model | Supported behavior | Boundary |
 |---|---|---|
 | Default instruction p-code | Instruction effects and proved native B/BNOP/CALLP delay windows. | Parallel instructions are lifted individually; ordinary writeback latency is not scheduled. |
-| [Exact packet schedules](pipeline-schedules.md) | Supported parallel reads, pending branches and register/memory/status phases through E10; normal software loops. | Explicit opt-in, proved drained entry and incoming E1 hazards; unsupported timing and ownership contracts are refused. |
+| [Exact packet schedules](pipeline-schedules.md) | Supported parallel reads, pending branches and register/memory/status phases through E10; normal software loops. | Reviewed drained entry and incoming E1 hazards; only unchanged recorded contracts activate automatically. Unsupported or stale contracts are refused. |
 | [Loop replay](software-loop-conformance.md) | Buffer issue order, masks, loop counters and supported drain/restart behavior. | Does not execute instruction p-code, retire writes or enter interrupt handlers. |
 | Read-only caller traces | Pending effects carried through explicit immutable caller/callee windows. | Bounded plans and entry proofs; not automatically installed as ordinary function schedules. |
 

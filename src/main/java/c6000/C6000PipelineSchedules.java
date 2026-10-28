@@ -40,8 +40,32 @@ public final class C6000PipelineSchedules {
         var context = program.getProgramContext();
         var enabled = context.getValue(program.getRegister("c_schedule_entry"), at, false);
         if (BigInteger.ONE.equals(enabled)) {
+            if (C6000PipelineContracts.isPending(program, function)) {
+                int transaction = program.startTransaction("Refresh reviewed exact schedule");
+                boolean commit = false;
+                try {
+                    C6000PipelineContracts.validatePending(program, function,
+                        drainedEntryContract, previousE1Writes, result, monitor);
+                    var body = new AddressSet(function.getBody());body.add(result.covered());
+                    function.setBody(body);
+                    program.getOptions(OPTIONS).setString(contractKey(function), drainedEntryContract);
+                    program.getOptions(OPTIONS).setString(hazardsKey(function), String.join(",", new TreeSet<>(previousE1Writes)));
+                    C6000PipelineContracts.bind(program, function, drainedEntryContract, previousE1Writes, result, monitor);
+                    monitor.checkCancelled();commit = true;return result;
+                }
+                finally { program.endTransaction(transaction, commit); }
+            }
             if (!String.join(",",new TreeSet<>(previousE1Writes)).equals(program.getOptions(OPTIONS).getString(hazardsKey(function), "")) || !drainedEntryContract.equals(program.getOptions(OPTIONS)                     .getString(contractKey(function), null))) {
                 throw new IllegalArgumentException("Entry already enabled with a different contract");
+            }
+            if (C6000PipelineContracts.isRecorded(program, function)) {
+                C6000PipelineContracts.validate(program, function, result, monitor);
+            }
+            else {
+                // An explicit repeat of the legacy API attests its entry assumptions
+                // again. Merely opening an old program never creates a binding.
+                C6000PipelineContracts.bind(program, function, drainedEntryContract,
+                    previousE1Writes, result, monitor);
             }
             return result;
         }
@@ -63,6 +87,10 @@ public final class C6000PipelineSchedules {
         int transaction = program.startTransaction("Enable exact C6000 pipeline schedule");
         boolean commit = false;
         try {
+            if (C6000PipelineContracts.isPending(program, function)) {
+                C6000PipelineContracts.validatePending(program, function,
+                    drainedEntryContract, previousE1Writes, result, monitor);
+            }
             listing.clearCodeUnits(at, at.add(length - 1), false);
             context.setValue(program.getRegister("c_schedule_entry"), at, at, BigInteger.ONE);
             var command = new DisassembleCommand(at, new AddressSet(at, at.add(length - 1)), false);
@@ -82,6 +110,8 @@ public final class C6000PipelineSchedules {
             function.setBody(body);
             program.getOptions(OPTIONS).setString(contractKey(function), drainedEntryContract);
             program.getOptions(OPTIONS).setString(hazardsKey(function), String.join(",", new TreeSet<>(previousE1Writes)));
+            C6000PipelineContracts.bind(program, function, drainedEntryContract,
+                previousE1Writes, result, monitor);
             monitor.checkCancelled();
             commit = true;
             return result;

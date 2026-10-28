@@ -96,8 +96,10 @@ post-body fetch window; it is not a complete frontend or instruction writeback e
 
 ## Entry and exit contracts
 
-This representation is enabled per function, never automatically. A function boundary
-does not imply an empty pipeline. Before enabling it, establish that no incoming writes
+This representation requires an explicit per-function entry review. The default-enabled
+`C6000 Reviewed Pipeline Schedules` analyzer activates only recorded, unchanged contracts;
+discovering a function never supplies a contract. A function boundary does not imply an
+empty pipeline. Before enabling it, establish that no incoming writes
 or transfers remain pending, and supply the GPRs actually written by the preceding E1
 packet. The latter determine an incoming X-path stall. Record the supporting caller/tail
 evidence in the program:
@@ -119,6 +121,65 @@ physical code, and records the contract in program options. Repeating the same e
 operation is idempotent. Only the entry instruction's opt-in context changes; ordinary
 raw instruction semantics stay available at every physical address.
 
+### Review, record and apply
+
+`C6000ReviewPipelineSchedules.java MANIFEST REPORT` produces a read-only plan.
+Each function supplies `drained_entry_evidence`, an explicit `previous_e1_writes`
+array, and SHA-256-pinned full-fetch `entry_sources` windows supporting the entry
+review. These are reviewer assertions about the selected caller/entry paths, not
+an automatically inferred empty pipeline. Account for earlier late writes, pending
+transfers, alternate entry paths and the actual preceding E1 register writers.
+
+The manifest uses schema 1 and the program's exact `language_id`. For example:
+
+```json
+{
+  "schema": 1,
+  "language_id": "C6000:LE:32:default",
+  "functions": [{
+    "entry": 4096,
+    "drained_entry_evidence": "Describe the reviewed caller-path drainage proof here",
+    "previous_e1_writes": [],
+    "entry_sources": [{"start": 8192, "length": 32, "sha256": "REPLACE_WITH_SOURCE_SHA256"}]
+  }]
+}
+```
+
+Source windows must start and end on 32-byte fetch boundaries. The report records
+supported schedules and precise refusal reasons. Successful compilation alone does
+not prove entry drainage. Reviewed activation also requires complete function
+ownership of the covered code; repair/review incomplete bodies separately.
+
+After reviewing the report, pass its SHA-256 with an explicit action:
+
+```
+C6000ReviewPipelineSchedules.java MANIFEST REPORT record REVIEW_SHA256
+C6000ReviewPipelineSchedules.java MANIFEST REPORT apply REVIEW_SHA256
+```
+
+`record` stores approved pending contracts without changing instruction context.
+The analyzer activates them on subsequent function analysis. `apply` records and
+activates the approved batch directly, transactionally, with ordinary auto-analysis
+suppressed during the worker. Both preserve the reviewed report beside the output.
+A changed manifest, review hash or generated plan refuses before application.
+
+Bindings include full fetch bytes, decode context, instruction flow overrides,
+function/data ownership, references into and out of the scope, entry evidence and
+the generated schedule's p-code. Added interior entry points, changed caller bytes,
+or a different compiled schedule invalidate the binding. Injection revalidates it
+even when an analysis pass has not run. A stale schedule produces a specific error;
+it never silently resumes sequential writeback. Re-review and apply a new report
+after intentional changes. Repeated unchanged analysis is read-only.
+
+The existing `C6000PipelineSchedules.enable` API still accepts an explicit drained
+entry attestation and now creates the same source binding. Older enabled programs
+without bindings require an explicit repeat of that API after reviewing their
+entry assumptions; reopening a program does not silently adopt an old contract.
+This compatibility API binds the function scope but has no pinned caller windows;
+use the report workflow when the entry proof depends on caller source bytes.
+No new architectural registers, destination shadows or SLEIGH context fields are
+introduced. Instruction-step emulators still use raw instruction semantics.
+
 The entry invokes a dynamic CALLOTHER fixup registered through the processor
 specification's injection library. The native decompiler receives the scheduled p-code
 CFG and a captured return target. Stock instruction-step emulators do not expand this
@@ -136,6 +197,12 @@ whole-ISA pipeline-completeness claim is made. Raw instruction decode remains av
 for unsupported functions. Other function ownership and defined data are never absorbed
 into a schedule. Schedules beyond 4096 states or one million p-code operations are
 refused; increasing the decompiler timeout is not a workaround.
+
+`pipeline-contracts.py` / `C6000PipelineContractTest.java` reproduce the issue #16
+parallel-input, MPYSP-result and updating-load hazards in each endian mode, then
+verify corrected values through reviewed analyzer activation and native
+decompilation. They also check read-only reporting, review hashes, unsupported
+phases, stale source/context/flow, retained annotations and idempotence.
 
 `tests/fixtures/pipeline-schedule.py` and `C6000PipelineSemanticsTest.java` check 18
 executions and five refusals: old parallel reads, E4/E5 writeback, updating-load

@@ -2,7 +2,16 @@
 
 ## Unreleased
 
+## 1.0.3 - 2026-10-27
+
+### Added
+* Ghidra 12.2 release and CI builds using JDK 25. The build script selects the
+  JDK version required by the chosen Ghidra installation.
+
 ### Fixed
+* Late branch analysis walks loaded, initialized memory instead of a min/max
+  address range, avoiding exceptions when ELF metadata occupies another
+  address space.
 * A predicated register `B` (`src2`, `IRP`, `NRP`) or `BNOP`, and `SWE` /
   `SWENR`, no longer make the decompiler fail the whole function with "Bad
   relative branch" when it cannot resolve the indirect jump: they skip to

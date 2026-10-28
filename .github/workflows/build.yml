@@ -12,24 +12,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Update the Ghidra version here when a new 12.x release lands.
-        ghidra: [ "12.1.3", "12.1.4" ]
+        include:
+          - ghidra: "12.1.3"
+            java: "21"
+          - ghidra: "12.1.4"
+            java: "21"
+          - ghidra: "12.2"
+            java: "25"
     env:
       GHIDRA_VERSION: ${{ matrix.ghidra }}
+      JAVA_VERSION: ${{ matrix.java }}
       # Everything CI unpacks goes under scratch/, which build.gradle keeps out
       # of the zip: buildExtension packs the rest of the workspace.
       GHIDRA_INSTALL_DIR: ${{ github.workspace }}/scratch/ghidra
       GHIDRA_WORK: ${{ github.workspace }}/scratch/ghidra-work
-      # Ghidra 12 requires JDK 21 and rejects newer JDKs.
-      JAVA_HOME: ${{ github.workspace }}/scratch/jdk21
+      JAVA_HOME: ${{ github.workspace }}/scratch/jdk
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install JDK 21
+      - name: Install JDK ${{ matrix.java }}
         run: |
           set -euo pipefail
           curl -fsSL -o /tmp/jdk.tar.gz \
-            "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse"
+            "https://api.adoptium.net/v3/binary/latest/${JAVA_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse"
           mkdir -p "$JAVA_HOME"
           tar -xzf /tmp/jdk.tar.gz -C "$JAVA_HOME" --strip-components=1
           "$JAVA_HOME/bin/java" -version

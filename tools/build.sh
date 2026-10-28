@@ -12,7 +12,7 @@
 #
 # Environment:
 #   GHIDRA_INSTALL_DIR  Ghidra install root (default: Homebrew's opt/ghidra)
-#   JAVA_HOME           JDK 21 home (Ghidra 12 rejects newer JDKs)
+#   JAVA_HOME           JDK home (21 for Ghidra 12.1.x, 25 for 12.2)
 #   GHIDRA_WORK         scratch directory for user.home / Gradle caches
 #
 set -euo pipefail
@@ -36,19 +36,21 @@ resolve_java_home() {
   if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
     printf '%s\n' "$JAVA_HOME"; return
   fi
-  for c in /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
-           /opt/homebrew/opt/openjdk@21 \
-           /usr/lib/jvm/temurin-21-jdk-amd64 \
-           /Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home; do
+  for c in "/opt/homebrew/opt/openjdk@$JAVA_MAJOR/libexec/openjdk.jdk/Contents/Home" \
+           "/opt/homebrew/opt/openjdk@$JAVA_MAJOR" \
+           "/usr/lib/jvm/temurin-$JAVA_MAJOR-jdk-amd64" \
+           "/Library/Java/JavaVirtualMachines/temurin-$JAVA_MAJOR.jdk/Contents/Home"; do
     [ -x "$c/bin/java" ] && { printf '%s\n' "$c"; return; }
   done
 }
 
 GHIDRA="$(resolve_ghidra)"
-JH="$(resolve_java_home)"
 [ -n "$GHIDRA" ] && [ -x "$GHIDRA/support/analyzeHeadless" ] || \
   die "no Ghidra install found; set GHIDRA_INSTALL_DIR"
-[ -n "$JH" ] || die "no JDK 21 found; set JAVA_HOME (Ghidra 12 rejects newer JDKs)"
+JAVA_MAJOR="$(sed -n 's/^application.java.compiler=//p' "$GHIDRA/Ghidra/application.properties" | tr -d '\r')"
+[[ "$JAVA_MAJOR" =~ ^[0-9]+$ ]] || die "cannot read Ghidra's required JDK version"
+JH="$(resolve_java_home)"
+[ -n "$JH" ] || die "no JDK $JAVA_MAJOR found; set JAVA_HOME"
 
 export PATH="$JH/bin:$PATH"
 # Ghidra writes under $HOME during bootstrap; keep that inside the workspace so

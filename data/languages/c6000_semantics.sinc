@@ -2871,6 +2871,14 @@ macro c6000_sem_callp(t) { B3 = inst_start + 24; call t; }
 
 # Indirect branches through a register (B .S2 src2, B IRP, B NRP).
 macro c6000_sem_b_ind(t) { goto [t]; }
+# B IRP: GIE (CSR and TSR, one bit) = PGIE, at issue (SPRUFE8B B IRP, 2.8.2, Table 2-9).
+macro c6000_sem_b_irp() {
+  local pgie:4 = (CSR >> 1) & 1;
+  CSR = (CSR & 0xfffffffe) | pgie;
+  TSR = (TSR & 0xfffffffe) | pgie;
+}
+# B NRP: NMIE = 1, at issue (SPRUFE8B B NRP, 2.8.2).
+macro c6000_sem_b_nrp() { IER = IER | 2; }
 
 # ---------------------------------------------------------------------------
 # Miscellaneous - SPRUFE8B section 3.12.

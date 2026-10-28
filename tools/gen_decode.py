@@ -736,6 +736,9 @@ def main():
                           (plain_disp, " & ".join(plain_pat)))
                         n += 1
                         pat.append("creg!=0")
+                    elif mnem == "B" and ops and ops[0] != "BranchTarget" and \
+                            any(term.startswith("i18=") for term in pat):
+                        continue  # B IRP / B NRP (Figure F-8): hand-written in c6000.sinc
                     elif mnem == "B" and ops and ops[0] != "BranchTarget":
                         # Keep indirect B conservative during code discovery,
                         # then switch unpredicated branches to terminal p-code

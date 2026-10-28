@@ -13,7 +13,8 @@ alone would not establish architecture-wide fidelity.
 instruction emulator does not itself suspend until an interrupt. The
 `interrupt-control.py` fixture and `C6000InterruptControlTest.java` verify the
 `DINT`/`RINT` register transitions, nested sequence, and `IDLE` event in both
-endian modes.
+endian modes. `irp-nrp.py` and `C6000IrpNrpTest.java` check `B IRP` and `B NRP`,
+plain and predicated, in both endian modes.
 
 ## Importing the CDJ-2000NXS DSP payloads
 

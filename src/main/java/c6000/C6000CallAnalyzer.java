@@ -217,18 +217,31 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		Call recognize(Instruction branch) {
 			Map<Register, long[]> regs = new HashMap<>();
 			Instruction partner = null;
-			for (Instruction insn : lookBack(branch)) {
+			List<Instruction> fellThrough = new ArrayList<>();
+			List<Instruction> path = lookBack(branch);
+			List<Instruction> via = viaJump(branch, path);
+			if (via != null) path = via;
+			for (Instruction insn : path) {
 				// Never executes when the branch does.
 				if (complementary(insn, branch)) {
-					if (isFlow(insn) && branch.getMinAddress().subtract(insn.getMinAddress()) <= 24) {
+					if (via == null && isFlow(insn) &&
+						branch.getMinAddress().subtract(insn.getMinAddress()) <= 24) {
 						partner = insn;
 					}
 					continue;
 				}
-				if (insn.getFlowType().isJump() || insn.getFlowType().isCall() ||
-					insn.getFlowType().isTerminal()) {
+				// Runs only when a jump the path falls through is taken.
+				if (takenOnly(insn, fellThrough)) continue;
+				// Flow ends B3, except the jump reaching the branch and a predicated jump outside whose window it lies.
+				boolean fallsThrough = insn == viaInsn ||
+					predicate(insn) != null && insn.getFlowType().isJump() &&
+					!insn.getFlowType().isCall() && !insn.getFlowType().isTerminal() &&
+					!inWindow(insn, branch);
+				if (!fallsThrough && (insn.getFlowType().isJump() || insn.getFlowType().isCall() ||
+					insn.getFlowType().isTerminal())) {
 					regs.remove(program.getRegister("B3"));
 				}
+				if (fallsThrough && insn != viaInsn) fellThrough.add(insn);
 				track(insn, regs);
 			}
 
@@ -244,6 +257,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Instruction current = branch;
 			int cycles = 0;
 			int seen = 0;
+			boolean compact = branch.getLength() != 4;
 			boolean branchPacket = true;
 			try {
 				window: while (cycles < DELAY_CYCLES) {
@@ -263,6 +277,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 							if (!complementary(branch, next)) return null;
 							if (partner == null) partner = next;
 						}
+						if (next.getLength() != 4) compact = true;
 						track(next, regs);
 						packetCycles = Math.max(packetCycles, 1 + extraCycles(next));
 						current = next;
@@ -276,12 +291,15 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			}
 			if (partner != null && jumpArm(branch, partner)) return null;
 			long[] ret = regs.get(b3);
-			// B3 may be set before the branch too; the look-back forgets it at
-			// every earlier branch, so a known value here belongs to this call.
+			// B3 may also be set on the look-back path.
 			if (ret == null || ret[1] != FULL) return null;
 			long branchAt = branch.getMinAddress().getOffset();
 			long windowEnd = current.getMaxAddress().getOffset() + 1;
 			if (ret[0] < branchAt + 4 || ret[0] > windowEnd + 8) return null;
+			boolean skew = compact || headerPacket(branch, windowEnd - 1) ||
+				headerPacket(branch, windowEnd);
+			// A call returns exactly at its window end; only compact packets skew the count.
+			if (ret[0] != windowEnd && !skew) return null;
 			Address callee = target == null ? null :
 				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
 			if (callee != null && !program.getMemory().contains(callee)) callee = null;
@@ -401,6 +419,93 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				if (o instanceof Address address) return address.getOffset();
 			}
 			return null;
+		}
+
+		/** The jump the last {@link #viaJump} path went through. */
+		private Instruction viaInsn;
+
+		/** Look-back via the one B into a branch nothing falls into, plus its taken slots; else null. */
+		List<Instruction> viaJump(Instruction branch, List<Instruction> linear) {
+			viaInsn = null;
+			Instruction last = null;
+			for (Instruction insn : linear) {
+				if (isFlow(insn)) last = insn;
+			}
+			if (last == null || last.getFallThrough() != null) return null;
+			List<Instruction> slots = window(last);
+			if (slots.isEmpty() || !adjacent(slots.get(slots.size() - 1), branch)) return null;
+			Instruction jump = null;
+			for (Reference ref : program.getReferenceManager().getReferencesTo(branch.getMinAddress())) {
+				if (!ref.getReferenceType().isFlow() || ref.getReferenceType().isFallthrough()) continue;
+				if (jump != null || !ref.getReferenceType().isJump()) return null; // one jump in, no call
+				jump = listing.getInstructionAt(ref.getFromAddress());
+				if (jump == null) return null;
+			}
+			// The window walk models B, not BNOP or CALLP.
+			if (jump == null || !baseName(jump).startsWith("B.S")) return null;
+			List<Instruction> path = new ArrayList<>(lookBack(jump));
+			path.add(jump);
+			for (Instruction slot : window(jump)) {
+				if (!complementary(slot, jump)) path.add(slot); // skipped when the jump is taken
+			}
+			viaInsn = jump;
+			return path;
+		}
+
+		/** True when {@code insn} is in the window of a jump in {@code jumps} under the same predicate. */
+		private boolean takenOnly(Instruction insn, List<Instruction> jumps) {
+			String p = predicate(insn);
+			if (p == null) return false;
+			for (Instruction jump : jumps) {
+				if (p.equals(predicate(jump)) && inWindow(jump, insn)) return true;
+			}
+			return false;
+		}
+
+		/** True when {@code later} is in {@code jump}'s execute packet or five delay cycles. */
+		private boolean inWindow(Instruction jump, Instruction later) {
+			for (Instruction insn : window(jump)) {
+				if (insn.getMinAddress().equals(later.getMinAddress())) return true;
+			}
+			return false;
+		}
+
+		/** The rest of {@code jump}'s execute packet and its five delay cycles; partial on a decode miss. */
+		private List<Instruction> window(Instruction jump) {
+			List<Instruction> slots = new ArrayList<>();
+			Instruction current = jump;
+			int cycles = 0;
+			boolean branchPacket = true;
+			try {
+				while (cycles < DELAY_CYCLES) {
+					int packetCycles = 1;
+					do {
+						if (branchPacket && !parallelWithNext(current)) break;
+						Instruction next = next(current);
+						if (next == null) return slots;
+						slots.add(next);
+						packetCycles = Math.max(packetCycles, 1 + extraCycles(next));
+						current = next;
+					} while (parallelWithNext(current));
+					if (!branchPacket) cycles += packetCycles;
+					branchPacket = false;
+				}
+			}
+			catch (MemoryAccessException e) {
+				return slots;
+			}
+			return slots;
+		}
+
+		/** True when the fetch packet holding {@code at} has a compact header. */
+		private boolean headerPacket(Instruction near, long at) {
+			try {
+				Address base = near.getMinAddress().getNewAddress((at & ~31L) + 28);
+				return (program.getMemory().getInt(base) >>> 28) == 0xe;
+			}
+			catch (MemoryAccessException | ghidra.program.model.address.AddressOutOfBoundsException e) {
+				return false;
+			}
 		}
 
 		private Instruction next(Instruction current) {

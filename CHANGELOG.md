@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+* A jump that sets `B3` for a later call is no longer a call: `B3` must equal
+  the end of its delay window. The look-back keeps `B3` across a predicated
+  jump's fall-through, and through the one jump reaching a call nothing falls
+  into.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

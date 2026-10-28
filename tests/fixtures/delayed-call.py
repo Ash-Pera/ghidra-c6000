@@ -2,7 +2,7 @@
 """Build a B-with-B3 call image. Usage: IMAGE [be].
 
 Load at 0x1000 with entry 0x1000 and auto-analysis. Words are encoded from
-SPRUFE8B's MVK/MVKH, B, ADDKPC and NOP opcode diagrams:
+SPRUFE8B's MVK/MVKH, B, BNOP, ADDKPC and NOP opcode diagrams:
 
   1000  MVK.S2  0x1100,B5        1018  B.S1    0x1100        (call)
   1004  MVKH.S2 0x0,B5           101c  ADDKPC.S2 0x1020,B3,4
@@ -23,6 +23,111 @@ Only the far arm is a call:
   1060  MVK.S2  0x1074,B3        106c  [A1]B.S1  0x1100      (call)
   1064  MVKH.S2 0x0,B3           1070  NOP     4
   1068  [!A1]B.S1 0x1080 (jump)  1074  B.S2 B3 ; ...  1080  B.S2 B3
+
+B3 set in a jump's delay slots is the next call's (10b8); 10a0 stays a jump:
+
+  10a0  [A1]B.S1  0x10e0 (jump)  10b0  MVKH.S2 0x0,B5
+  10a4  MVK.S2  0x10c0,B3        10b4  NOP
+  10a8  MVK.S2  0x1100,B5        10b8  B.S2    B5      (call)
+  10ac  MVKH.S2 0x0,B3           10bc  NOP     5       10c0, 10e0  B.S2 B3
+
+B3 set before a conditional jump survives its fall-through to the call at 1150:
+
+  1140  MVK.S2  0x1158,B3        1150  B.S1    0x11c0  (call)
+  1144  MVKH.S2 0x0,B3           1154  NOP     5
+  1148  [A1]B.S1  0x1180 (jump)  1158, 1180, 11c0  B.S2 B3
+  114c  NOP     5
+
+A predicated B inside another's delay slots (120c) stays a jump:
+
+  1200  MVK.S2  0x1214,B3        120c  [!A1]B.S1 0x1240 (jump)
+  1204  MVKH.S2 0x0,B3           1210  NOP     4
+  1208  [B0]B.S1  0x1260         1214, 1240, 1260  B.S2 B3
+
+A B whose window ends 4 bytes short of B3 (1290) stays a jump:
+
+  1280  MVK.S2  0x12a0,B3        1294  NOP     4
+  1284  MVKH.S2 0x0,B3           1298  NOP           (window ends 129c)
+  1288  [A1]B.S1  0x12c0 (jump)  129c  NOP
+  128c  NOP     5                12a0, 12c0, 12e0  B.S2 B3
+  1290  B.S1    0x12e0 (jump)
+
+A call nothing falls into (1308) takes B3 from the one jump reaching it:
+
+  1300  B.S1    0x1340 (jump)    1340  MVK.S2  0x1310,B3
+  1304  NOP     5                1344  MVKH.S2 0x0,B3
+  1308  B.S1    0x1100  (call)   1348  [A1]B.S1  0x1308 (jump)
+  130c  NOP     5                134c  NOP     5
+  1310  B.S2 B3 ; NOP 5          1350  B.S2 B3 ; NOP 5
+
+The same through an unconditional jump:
+
+  1380  B.S1    0x13c0 (jump)    13c0  MVK.S2  0x1390,B3
+  1388  B.S1    0x1100  (call)   13c4  MVKH.S2 0x0,B3
+  1390  B.S2 B3                  13c8  B.S1    0x1388 (jump)
+
+B3 set in the reaching jump's delay slots:
+
+  1400  B.S1    0x1440 (jump)    1440  B.S1    0x1408 (jump)
+  1408  B.S1    0x1100  (call)   1444  MVK.S2  0x1410,B3
+  1410  B.S2 B3                  1448  MVKH.S2 0x0,B3 ; 144c  NOP 3
+
+A predicated reaching jump; the write under the opposite predicate does not count:
+
+  1480  B.S1    0x14c0 (jump)    14c0  [A1]B.S1  0x1488 (jump)
+  1488  B.S1    0x1100  (call)   14c4  [A1]MVK.S2  0x1490,B3
+  1490  B.S2 B3                  14c8  [!A1]MVK.S2 0x1500,B3
+                                 14cc  NOP 3 ; 14d0  B.S2 B3
+
+Not calls: 1508 is also fallen into:
+
+  1500  [A2]B.S1  0x1540 (jump)  1540  MVK.S2  0x1510,B3
+  1508  B.S1    0x1100           1544  MVKH.S2 0x0,B3
+  1510  B.S2 B3                  1548  [A1]B.S1  0x1508 (jump)
+
+158c is fallen into from 1588:
+
+  1580  B.S1    0x15c0 (jump)    15c0  [A2]B.S1  0x1588 (jump)
+  1588  MVK.S2  0x5,B4           15c8  MVK.S2  0x1594,B3
+  158c  B.S1    0x1100           15cc  MVKH.S2 0x0,B3
+  1594  B.S2 B3                  15d0  [A1]B.S1  0x158c (jump)
+
+Two jumps reach 1608:
+
+  1600  B.S1    0x1640 (jump)    1644  [A1]B.S1  0x1608 (jump)
+  1608  B.S1    0x1100           164c  MVK.S2  0x1610,B3
+  1610  B.S2 B3                  1650  MVKH.S2 0x0,B3
+  1640  MVK.S2  0x1700,B3        1654  [A2]B.S1  0x1608 (jump)
+
+1698 is the return point of the call at 1690:
+
+  1680  [A2]B.S1  0x16c0 (jump)  1698  B.S1    0x1100
+  1688  MVK.S2  0x1698,B3        16a0  B.S2 B3
+  168c  MVKH.S2 0x0,B3           16c0  MVK.S2  0x16a0,B3 ; MVKH.S2 0x0,B3
+  1690  B.S1    0x1100  (call)   16c8  [A1]B.S1  0x1698 (jump)
+
+A BNOP reaches 1708:
+
+  1700  B.S1    0x1740 (jump)    1740  BNOP.S1 0x1708,5 (jump)
+  1708  B.S1    0x1100           1744  MVK.S2  0x1710,B3
+  1710  B.S2 B3                  1748  MVKH.S2 0x0,B3 ; 174c  NOP 3
+
+A slot under a fallen-through jump's own predicate does not run: 1798 is a call;
+with that write unpredicated, 1818 is not:
+
+  1780  [!A1]B.S1 0x17c0 (jump)  1798  B.S2 B4  (call)
+  1784  MVK.S2  0x1100,B4        179c  NOP 5
+  1788  MVK.S2  0x17a0,B3        17a0  B.S2 B3 ; NOP 5
+  178c  MVKH.S2 0x0,B4           17c0  B.S2 B3 ; NOP 5
+  1790  MVKH.S2 0x0,B3
+  1794  [!A1]MV.S2 B13,B3
+
+A window ending at a compact header returns past it: 1888 is a call (B3 = window end + 4):
+
+  1880  MVK.S2  0x1100,B5        1890  NOP ; 1894  NOP ; 1898  NOP
+  1884  MVKH.S2 0x0,B5           189c  header, all words 32-bit
+  1888  B.S2    B5      (call)   18a0  B.S2 B3 ; NOP 5
+  188c  ADDKPC.S2 0x18a0,B3,1
 
 C6000DelayedCallTest.java checks every B form becomes a call that falls
 through into its delay slots and that 0x1100 becomes a function.
@@ -46,6 +151,86 @@ def nop(count):
 
 
 B_B3 = 0x362 | (3 << 18)
+A1, NOT_A1, A2 = 0x80000000, 0x90000000, 0xA0000000
+
+
+def b_s1(at, target):
+    """B.S1 to target, relative to the fetch packet holding at."""
+    return 0x10 | ((((target - (at & ~31)) >> 2) & 0x1FFFFF) << 7)
+
+
+def bnop_s1(at, target, count):
+    return 0x120 | (count << 13) | ((((target - (at & ~31)) >> 2) & 0xFFF) << 16)
+
+
+CALLEE = 0x1100
+B_B4 = 0x362 | (4 << 18)
+MV_B13_B3 = 0x01B401A2  # MV.S2 B13,B3
+
+
+def taken_only(base, predicate):
+    """[!A1] jump setting B4 and B3 in its slots, then MV B13,B3 under predicate."""
+    return {
+        base: NOT_A1 | b_s1(base, base + 0x40), base + 0x4: mvk(CALLEE, 4),
+        base + 0x8: mvk(base + 0x20, 3), base + 0xC: mvkh(0, 4), base + 0x10: mvkh(0, 3),
+        base + 0x14: predicate | MV_B13_B3, base + 0x18: B_B4, base + 0x1C: nop(5),
+        base + 0x20: B_B3, base + 0x24: nop(5), base + 0x40: B_B3, base + 0x44: nop(5),
+    }
+
+
+CASES = {
+    0x1300: b_s1(0x1300, 0x1340), 0x1304: nop(5),
+    0x1308: b_s1(0x1308, CALLEE), 0x130C: nop(5), 0x1310: B_B3, 0x1314: nop(5),
+    0x1340: mvk(0x1310, 3), 0x1344: mvkh(0, 3),
+    0x1348: A1 | b_s1(0x1348, 0x1308), 0x134C: nop(5), 0x1350: B_B3, 0x1354: nop(5),
+
+    0x1380: b_s1(0x1380, 0x13C0), 0x1384: nop(5),
+    0x1388: b_s1(0x1388, CALLEE), 0x138C: nop(5), 0x1390: B_B3, 0x1394: nop(5),
+    0x13C0: mvk(0x1390, 3), 0x13C4: mvkh(0, 3),
+    0x13C8: b_s1(0x13C8, 0x1388), 0x13CC: nop(5),
+
+    0x1400: b_s1(0x1400, 0x1440), 0x1404: nop(5),
+    0x1408: b_s1(0x1408, CALLEE), 0x140C: nop(5), 0x1410: B_B3, 0x1414: nop(5),
+    0x1440: b_s1(0x1440, 0x1408), 0x1444: mvk(0x1410, 3), 0x1448: mvkh(0, 3), 0x144C: nop(3),
+
+    0x1480: b_s1(0x1480, 0x14C0), 0x1484: nop(5),
+    0x1488: b_s1(0x1488, CALLEE), 0x148C: nop(5), 0x1490: B_B3, 0x1494: nop(5),
+    0x14C0: A1 | b_s1(0x14C0, 0x1488), 0x14C4: A1 | mvk(0x1490, 3),
+    0x14C8: NOT_A1 | mvk(0x1500, 3), 0x14CC: nop(3), 0x14D0: B_B3, 0x14D4: nop(5),
+
+    0x1500: A2 | b_s1(0x1500, 0x1540), 0x1504: nop(5),
+    0x1508: b_s1(0x1508, CALLEE), 0x150C: nop(5), 0x1510: B_B3, 0x1514: nop(5),
+    0x1540: mvk(0x1510, 3), 0x1544: mvkh(0, 3),
+    0x1548: A1 | b_s1(0x1548, 0x1508), 0x154C: nop(5), 0x1550: B_B3, 0x1554: nop(5),
+
+    0x1580: b_s1(0x1580, 0x15C0), 0x1584: nop(5), 0x1588: mvk(5, 4),
+    0x158C: b_s1(0x158C, CALLEE), 0x1590: nop(5), 0x1594: B_B3, 0x1598: nop(5),
+    0x15C0: A2 | b_s1(0x15C0, 0x1588), 0x15C4: nop(5),
+    0x15C8: mvk(0x1594, 3), 0x15CC: mvkh(0, 3),
+    0x15D0: A1 | b_s1(0x15D0, 0x158C), 0x15D4: nop(5), 0x15D8: B_B3, 0x15DC: nop(5),
+
+    0x1600: b_s1(0x1600, 0x1640), 0x1604: nop(5),
+    0x1608: b_s1(0x1608, CALLEE), 0x160C: nop(5), 0x1610: B_B3, 0x1614: nop(5),
+    0x1640: mvk(0x1700, 3), 0x1644: A1 | b_s1(0x1644, 0x1608), 0x1648: nop(5),
+    0x164C: mvk(0x1610, 3), 0x1650: mvkh(0, 3),
+    0x1654: A2 | b_s1(0x1654, 0x1608), 0x1658: nop(5), 0x165C: B_B3, 0x1660: nop(5),
+
+    0x1680: A2 | b_s1(0x1680, 0x16C0), 0x1684: nop(5),
+    0x1688: mvk(0x1698, 3), 0x168C: mvkh(0, 3),
+    0x1690: b_s1(0x1690, CALLEE), 0x1694: nop(5),
+    0x1698: b_s1(0x1698, CALLEE), 0x169C: nop(5), 0x16A0: B_B3, 0x16A4: nop(5),
+    0x16C0: mvk(0x16A0, 3), 0x16C4: mvkh(0, 3),
+    0x16C8: A1 | b_s1(0x16C8, 0x1698), 0x16CC: nop(5), 0x16D0: B_B3, 0x16D4: nop(5),
+
+    0x1700: b_s1(0x1700, 0x1740), 0x1704: nop(5),
+    0x1708: b_s1(0x1708, CALLEE), 0x170C: nop(5), 0x1710: B_B3, 0x1714: nop(5),
+    0x1740: bnop_s1(0x1740, 0x1708, 5), 0x1744: mvk(0x1710, 3), 0x1748: mvkh(0, 3), 0x174C: nop(3),
+    **taken_only(0x1780, NOT_A1), **taken_only(0x1800, 0),
+
+    0x1880: mvk(CALLEE, 5), 0x1884: mvkh(0, 5), 0x1888: 0x362 | (5 << 18),
+    0x188C: 0x162 | (8 << 16) | (1 << 13) | (3 << 23), 0x1890: nop(1), 0x1894: nop(1), 0x1898: nop(1),
+    0x189C: 0xE0000000, 0x18A0: B_B3, 0x18A4: nop(5),  # header: layout and p-bits zero
+}
 
 WORDS = {
     0x1000: mvk(0x1100, 5),
@@ -74,8 +259,58 @@ WORDS = {
     0x1078: nop(5),
     0x1080: B_B3,
     0x1084: nop(5),
+    0x10A0: 0x80000010 | (0x10 << 7),       # [A1] B.S1 packet+0x40 (jump)
+    0x10A4: mvk(0x10C0, 3),
+    0x10A8: mvk(0x1100, 5),
+    0x10AC: mvkh(0, 3),
+    0x10B0: mvkh(0, 5),
+    0x10B4: nop(1),
+    0x10B8: 0x362 | (5 << 18),              # B.S2 B5 (call)
+    0x10BC: nop(5),
+    0x10C0: B_B3,
+    0x10C4: nop(5),
+    0x10E0: B_B3,
+    0x10E4: nop(5),
     0x1100: B_B3,
     0x1104: nop(5),
+    0x1140: mvk(0x1158, 3),
+    0x1144: mvkh(0, 3),
+    0x1148: 0x80000010 | (0x10 << 7),       # [A1] B.S1 packet+0x40 (jump)
+    0x114C: nop(5),
+    0x1150: 0x10 | (0x20 << 7),             # B.S1 packet+0x80 (call)
+    0x1154: nop(5),
+    0x1158: B_B3,
+    0x115C: nop(5),
+    0x1180: B_B3,
+    0x1184: nop(5),
+    0x11C0: B_B3,
+    0x11C4: nop(5),
+    0x1200: mvk(0x1214, 3),
+    0x1204: mvkh(0, 3),
+    0x1208: 0x20000010 | (0x18 << 7),       # [B0] B.S1 packet+0x60
+    0x120C: 0x90000010 | (0x10 << 7),       # [!A1] B.S1 packet+0x40 (jump)
+    0x1210: nop(4),
+    0x1214: B_B3,
+    0x1218: nop(5),
+    0x1240: B_B3,
+    0x1244: nop(5),
+    0x1260: B_B3,
+    0x1264: nop(5),
+    0x1280: mvk(0x12A0, 3),
+    0x1284: mvkh(0, 3),
+    0x1288: 0x80000010 | (0x10 << 7),       # [A1] B.S1 packet+0x40 (jump)
+    0x128C: nop(5),
+    0x1290: 0x10 | (0x18 << 7),             # B.S1 packet+0x60 (jump)
+    0x1294: nop(4),
+    0x1298: nop(1),
+    0x129C: nop(1),
+    0x12A0: B_B3,
+    0x12A4: nop(5),
+    0x12C0: B_B3,
+    0x12C4: nop(5),
+    0x12E0: B_B3,
+    0x12E4: nop(5),
+    **CASES,
 }
 
 
@@ -83,7 +318,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x120)
+    image = bytearray(0x900)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

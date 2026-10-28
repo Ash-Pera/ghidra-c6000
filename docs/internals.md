@@ -93,7 +93,11 @@ encoding `creg=7, z=0` (Table 3-9), so no valid 32-bit instruction matches it.
   call pairs are recognised: a branch inside the window is allowed when its
   predicate is the exact opposite of the call's, `B3` may be set before the
   branch, and reaching the return address `B3` already holds ends the window
-  (compact packets can skew the cycle count). In such a pair only one arm is
+  (compact packets can skew the cycle count, so only there may `B3` lie up
+  to 8 bytes past the window end). The look-back keeps `B3` across a
+  predicated jump outside whose window the branch lies, skipping that
+  jump's slots under its own predicate, and runs through the one jump
+  reaching a branch nothing falls into. In such a pair only one arm is
   a call ("call Y if p, else jump to X"): a register arm is the call, and
   between two immediate arms the one with the nearer target (the local
   else-block) stays a conditional jump; arms to the same target both stay

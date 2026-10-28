@@ -3,6 +3,8 @@
 // Check B-with-B3 calls in an auto-analysed tests/fixtures/delayed-call.py image.
 
 import ghidra.app.script.GhidraScript;
+import ghidra.program.model.listing.FlowOverride;
+import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.symbol.Reference;
 
@@ -10,7 +12,9 @@ public class C6000DelayedCallTest extends GhidraScript {
 	@Override
 	protected void run() throws Exception {
 		// The if/else pair is its own routine; the entry never reaches it.
-		for (long entry : new long[] { 0x1040L, 0x1060L }) {
+		for (long entry : new long[] { 0x1040L, 0x1060L, 0x10a0L, 0x1140L, 0x1200L, 0x1280L,
+			0x1300L, 0x1380L, 0x1400L, 0x1480L, 0x1500L, 0x1580L, 0x1600L, 0x1680L, 0x1700L,
+			0x1780L, 0x1800L, 0x1880L }) {
 			disassemble(toAddr(entry));
 			createFunction(toAddr(entry), null);
 		}
@@ -23,12 +27,47 @@ public class C6000DelayedCallTest extends GhidraScript {
 				(jump == null ? "" : " flow=" + jump.getFlowType()) +
 				" function at 0x1080=" + getFunctionAt(toAddr(0x1080L)));
 		}
+		// A B3 set in a jump's delay slots for the call after it belongs to that call.
+		for (long[] jt : new long[][] { { 0x10a0L, 0x10e0L }, { 0x1148L, 0x1180L }, { 0x120cL, 0x1240L },
+			{ 0x1288L, 0x12c0L } }) {
+			Instruction owner = getInstructionAt(toAddr(jt[0]));
+			if (owner == null || owner.getFlowType().isCall() || !owner.getFlowType().isConditional() ||
+				getFunctionAt(toAddr(jt[1])) != null) {
+				throw new AssertionError("jump at " + toAddr(jt[0]) + ": " + owner +
+					(owner == null ? "" : " flow=" + owner.getFlowType()) +
+					" function at " + toAddr(jt[1]) + "=" + getFunctionAt(toAddr(jt[1])));
+			}
+		}
+		// B3 past a B's window end is not its return address.
+		Instruction slack = getInstructionAt(toAddr(0x1290L));
+		if (slack == null || slack.getFlowType().isCall() || getFunctionAt(toAddr(0x12e0L)) != null) {
+			throw new AssertionError("jump at 0x1290: " + slack +
+				(slack == null ? "" : " flow=" + slack.getFlowType()) +
+				" function at 0x12e0=" + getFunctionAt(toAddr(0x12e0L)));
+		}
+		// A window ending at a compact header returns to the next fetch packet.
+		Instruction header = getInstructionAt(toAddr(0x1888L));
+		if (header == null || !header.getFlowType().isCall() || !toAddr(0x188cL).equals(header.getFallThrough()) ||
+			!calls(header, 0x1100L)) {
+			throw new AssertionError("call at 0x1888: " + header +
+				(header == null ? "" : " flow=" + header.getFlowType() + " fallthrough=" + header.getFallThrough()));
+		}
+		// B3 set before a conditional jump survives its fall-through to the call after it.
+		Instruction after = getInstructionAt(toAddr(0x1150L));
+		Function owner2 = getFunctionContaining(toAddr(0x1158L));
+		if (after == null || !after.getFlowType().isCall() || !toAddr(0x1154L).equals(after.getFallThrough()) ||
+			getFunctionAt(toAddr(0x11c0L)) == null || owner2 == null ||
+			!owner2.getEntryPoint().equals(toAddr(0x1140L))) {
+			throw new AssertionError("call at 0x1150: " + after +
+				(after == null ? "" : " flow=" + after.getFlowType() + " fallthrough=" + after.getFallThrough()) +
+				" callee 0x11c0=" + getFunctionAt(toAddr(0x11c0L)) + " 0x1158 in " + owner2);
+		}
 		// The generic SLEIGH predicate guard also gives unpredicated register
 		// branches a conditional flow type. Require it for predicated calls only.
-		for (long site : new long[] { 0x1008L, 0x1018L, 0x1048L, 0x104cL, 0x106cL }) {
+		for (long site : new long[] { 0x1008L, 0x1018L, 0x1048L, 0x104cL, 0x106cL, 0x10b8L }) {
 			Instruction call = getInstructionAt(toAddr(site));
 			if (call == null || !call.getFlowType().isCall() ||
-				(site >= 0x1048L && !call.getFlowType().isConditional()) ||
+				(site >= 0x1048L && site <= 0x106cL && !call.getFlowType().isConditional()) ||
 				!toAddr(site + 4).equals(call.getFallThrough())) {
 				throw new AssertionError("call at " + toAddr(site) + ": " + call +
 					(call == null ? "" : " flow=" + call.getFlowType() +
@@ -46,9 +85,57 @@ public class C6000DelayedCallTest extends GhidraScript {
 				throw new AssertionError(toAddr(slot) + " is not in the caller");
 			}
 		}
+		// A call nothing falls into gets its B3 through the one jump reaching it.
+		for (long[] c : new long[][] { { 0x1308L, 0x1300L, 0x1348L }, { 0x1388L, 0x1380L, 0x13c8L },
+			{ 0x1408L, 0x1400L, 0x1440L }, { 0x1488L, 0x1480L, 0x14c0L } }) {
+			Instruction call = getInstructionAt(toAddr(c[0]));
+			if (call == null || !call.getFlowType().isCall() || call.getFlowType().isTerminal() ||
+				!toAddr(c[0] + 4).equals(call.getFallThrough()) || !calls(call, 0x1100L)) {
+				throw new AssertionError("call at " + toAddr(c[0]) + ": " + call +
+					(call == null ? "" : " flow=" + call.getFlowType() + " fallthrough=" + call.getFallThrough()));
+			}
+			for (int i = 1; i < c.length; i++) {
+				Instruction j = getInstructionAt(toAddr(c[i]));
+				if (j == null || j.getFlowOverride() == FlowOverride.CALL) {
+					throw new AssertionError("jump at " + toAddr(c[i]) + ": " + j +
+						(j == null ? "" : " flow=" + j.getFlowType()));
+				}
+			}
+		}
+		// A slot under a fallen-through jump's own predicate does not run.
+		Instruction viaFall = getInstructionAt(toAddr(0x1798L));
+		if (viaFall == null || !viaFall.getFlowType().isCall() || viaFall.getFlowType().isTerminal() ||
+			!calls(viaFall, 0x1100L)) {
+			throw new AssertionError("call at 0x1798: " + viaFall +
+				(viaFall == null ? "" : " flow=" + viaFall.getFlowType()));
+		}
+		Instruction unpredicated = getInstructionAt(toAddr(0x1818L));
+		if (unpredicated == null || unpredicated.getFlowType().isCall()) {
+			throw new AssertionError("not a call at 0x1818: " + unpredicated +
+				(unpredicated == null ? "" : " flow=" + unpredicated.getFlowType()));
+		}
+		// Not when fallen into, reached twice, a return point, or reached by BNOP.
+		Instruction control = getInstructionAt(toAddr(0x1690L));
+		if (control == null || !control.getFlowType().isCall() || !calls(control, 0x1100L)) {
+			throw new AssertionError("call at 0x1690: " + control);
+		}
+		for (long site : new long[] { 0x1508L, 0x158cL, 0x1608L, 0x1698L, 0x1708L }) {
+			Instruction b = getInstructionAt(toAddr(site));
+			if (b == null || b.getFlowOverride() == FlowOverride.CALL) {
+				throw new AssertionError("not a call at " + toAddr(site) + ": " + b +
+					(b == null ? "" : " flow=" + b.getFlowType() + " fallthrough=" + b.getFallThrough()));
+			}
+		}
 		if (getFunctionAt(toAddr(0x1100L)) == null) {
 			throw new AssertionError("callee 0x1100 is not a function");
 		}
 		println("C6000_DELAYED_CALL_OK");
+	}
+
+	private static boolean calls(Instruction insn, long target) {
+		for (Reference r : insn.getReferencesFrom()) {
+			if (r.getReferenceType().isCall() && r.getToAddress().getOffset() == target) return true;
+		}
+		return false;
 	}
 }

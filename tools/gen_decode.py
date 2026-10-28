@@ -120,7 +120,12 @@ def operands_for(syntax, fields, mnem):
                 out.append("Cst16")
             else:
                 field = next((f for f in fields if f["name"] == "cst5"), None)
-                out.append("Cst5Hi" if field and field["lo"] == 18 else "Cst5")
+                # SPRUFE8B MVK .L/.D (pp. 380-381): both variants
+                # sign-extend five bits, including the high-position .L field.
+                if mnem == "MVK":
+                    out.append("SCst5Hi" if field and field["lo"] == 18 else "SCst5")
+                else:
+                    out.append("Cst5Hi" if field and field["lo"] == 18 else "Cst5")
         elif base == "csta":
             out.append("Csta")
         elif base == "cstb":
@@ -152,6 +157,10 @@ def main():
     w("#  Patterns carry the exact")
     w("#  constant bits of the opcode map; `c_is16=0` restricts them to")
     w("#  non-compact instruction slots.")
+    w("")
+    w("# SPRUFE8B 2.4 / 3.12 MV: make the encoded move primitive and cross path explicit.")
+    w('FullMoveCrossSuffix: "" is i12=0 { }')
+    w('FullMoveCrossSuffix: "X" is i12=1 { }')
     w("")
     n = 0
     skipped = []
@@ -568,11 +577,36 @@ def main():
                         # after the transfer so src == baseR reads the old
                         # value.  Post modes use the old base as the address.
                         pat.append("BaseReg")
-                    disp = mnem + (("." + variant_ul + suffix[1:]) if variant_ul else "")
+                    # SPRUFE8B 3.12 MV opcode maps select ADD-zero or OR-zero.
+                    # The MV pseudo mnemonic lets an assembler choose a different
+                    # encoding. Preserve the existing move p-code below, but expose
+                    # its actual primitive and zero operand in the listing. Keep
+                    # the distinct 40-bit pair move unchanged.
+                    display_mnem, display_ops = mnem, ops
+                    move_cross_suffix = False
+                    if mnem == "MV" and ops[-1] != "DstPair":
+                        if ul == "L":
+                            display_mnem = "ADD" if v == "0000010" else "OR"
+                        elif ul == "S":
+                            display_mnem = "ADD"
+                        else:
+                            display_mnem = "OR" if "x" in names else "ADD"
+                        display_ops = (["Src2", "UCst5", "Dst"]
+                                       if ul == "D" and display_mnem == "ADD"
+                                       else ["SCst5", "Src2", "Dst"])
+                        for display_op in display_ops:
+                            if display_op not in pat:
+                                pat.append(display_op)
+                        move_cross_suffix = "x" in names
+                        if move_cross_suffix:
+                            pat.append("FullMoveCrossSuffix")
+                    disp = display_mnem + (("." + variant_ul + suffix[1:]) if variant_ul else "")
                     if not fixed_pred:
                         disp = '^Cond^"' + disp + '"'
-                    if ops:
-                        disp += " " + ", ".join(ops)
+                    if move_cross_suffix:
+                        disp += "^FullMoveCrossSuffix"
+                    if display_ops:
+                        disp += " " + ", ".join(display_ops)
                     if mnem == "CALLP" and suffix == ".1":
                         disp = disp.replace('"B3"', '"A3"')
                     if mnem == "ADDKPC":
@@ -707,7 +741,7 @@ def main():
                             sem = ("A3" if suffix == ".1" else "B3") + \
                                 " = inst_next; call BranchTarget;"
                         elif mnem == "MVK" and ops:
-                            width = "5" if ops[0] == "Cst5" else "16"
+                            width = "5" if ops[0] in {"SCst5", "SCst5Hi"} else "16"
                             sem = "c6000_sem_mvk%s(%s);" % (width, args)
                     else:
                         sem = "c6000_unimpl_%s();" % mnem.lower()
@@ -716,7 +750,15 @@ def main():
                         if mem_mode in (0xA, 0xB, 0xE, 0xF):
                             sem = sem.replace(mem, "BaseReg")
                         if mem_mode >= 0x8:
-                            sem += f" BaseReg = {mem};"
+                            if mnem.startswith("LD"):
+                                # SPRUFE8B 4.2.5: capture the transfer address,
+                                # write the E1 base, then the E5 load result.
+                                # This order also preserves native alias loads.
+                                address = "BaseReg" if mem_mode in (0xA, 0xB, 0xE, 0xF) else mem
+                                sem = sem.replace(address, "loadAddress")
+                                sem = f"local loadAddress:4 = {address}; BaseReg = {mem}; " + sem
+                            else:
+                                sem += f" BaseReg = {mem};"
                     if not fixed_pred and mnem == "B" and ops and ops[0] != "BranchTarget":
                         # A skip label after goto [t] makes the decompiler report
                         # "Bad relative branch"; skip to inst_next (SPRUFE8B 3.12 B: else nop).

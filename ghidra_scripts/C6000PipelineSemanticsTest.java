@@ -25,6 +25,7 @@ public class C6000PipelineSemanticsTest extends GhidraScript {
    new Case("late_overwrites_early",0x1900,regs("A3",0x40000000,"A4",0x40400000),regs("A6",9,"A7",0x40c00000),0x11223344),
    new Case("return_target_capture",0x1a00,regs(),regs("B3",0x1234),0x11223344),
    new Case("load_base_e1",0x1b00,regs("A4",0x8000,"A5",0x55),regs("A6",0x8004,"A7",0x22334455),0x11223344),
+   new Case("updating_load_alias_phases",0x1e40,regs("A4",0x8000),regs("A4",0x22334455,"A6",0x8004,"A7",0x22334455),0x11223344),
    new Case("doubleword_load",0x1c00,regs("A8",0x8000,"A4",0x44),regs("A4",currentProgram.getMemory().isBigEndian()?0x22334455:0x11223344,"A5",currentProgram.getMemory().isBigEndian()?0x11223344:0x22334455,"A6",0x8010,"A7",0x44),0x11223344),
    new Case("cross_path_stall",0x1d00,regs("A4",0x8000),regs("A6",5,"A5",0x11223344),0x11223344),
    new Case("late_float_flags",0x1600,regs("A3",0x7f7fffff,"A4",0x40000000,"B4",0,"FMCR",0xc0),regs("A5",0x7f800000,"FMCR",0xc0),0x11223344));
@@ -42,9 +43,10 @@ public class C6000PipelineSemanticsTest extends GhidraScript {
   var bodyBefore=new AddressSet(f.getBody());c6000.C6000PipelineSchedules.enable(currentProgram,f,"Synthetic function begins with an empty pipeline",Set.of(),monitor);if(!f.getBody().equals(bodyBefore))throw new AssertionError("Enable not idempotent");
   currentProgram.getFunctionManager().createFunction("foreign_owner",toAddr(0x2200),new AddressSet(toAddr(0x2200),toAddr(0x221f)),SourceType.USER_DEFINED);
   createData(toAddr(0x2304),ghidra.program.model.data.DWordDataType.dataType);
-  var rejections=Map.of(0x1e00L,"unimplemented phase contract",0x1e40L,"updating load aliases",0x2100L,"another function",0x2300L,"defined data",0x2400L,"return leaves architectural pipeline effects pending");
+  var rejections=Map.of(0x1e00L,"unimplemented phase contract",0x2000L,"potential simultaneous memory/register writes",0x2100L,"another function",0x2300L,"defined data",0x2400L,"return leaves architectural pipeline effects pending");
   for(var rejection:rejections.entrySet()){
    long address=rejection.getKey();var bad=currentProgram.getFunctionManager().createFunction("refuse_"+address,toAddr(address),new AddressSet(toAddr(address),toAddr(address+0x1f)),SourceType.USER_DEFINED);
+   if(!new ghidra.app.cmd.disassemble.DisassembleCommand(toAddr(address),new AddressSet(toAddr(address),toAddr(address+3)),false).applyTo(currentProgram,monitor))throw new AssertionError("Cannot define refusal entry");
    boolean refused=false;try{c6000.C6000PipelineSchedules.enable(currentProgram,bad,"Synthetic empty entry",Set.of(),monitor);}catch(IllegalArgumentException error){if(!error.getMessage().contains(rejection.getValue()))throw new AssertionError("Unexpected refusal "+error);refused=true;}
    if(!refused)throw new AssertionError("Unsupported schedule accepted");var flag=currentProgram.getProgramContext().getValue(currentProgram.getRegister("c_schedule_entry"),toAddr(address),false);if(java.math.BigInteger.ONE.equals(flag))throw new AssertionError("Refusal mutated entry context");
   }

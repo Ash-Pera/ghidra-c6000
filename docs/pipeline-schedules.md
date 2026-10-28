@@ -33,6 +33,7 @@ The phase contracts currently implemented are:
 | Loads | E1 address and base inputs | Base update E1; memory read E3; result E5 |
 | Stores | E1 address, data and base inputs | Base update E1; memory write E3 |
 | B / BNOP | E1 predicate and target | Landing after five delay advances, at C+6 |
+| BDEC / BPOS | E1 predicate, signed counter and target | BDEC decrement E1 iff taken; transfer after five delay advances, at C+6 |
 
 Same-cycle loads read memory before stores commit. Long-latency results and
 flag events retain their issue predicate. Flag events merge into the *current*
@@ -42,6 +43,15 @@ advance the same state machine. A branch landing can interrupt a multi-cycle
 NOP. Up to six transfers can remain pending. E1 X-path hazards insert a stall
 without advancing any pending pipeline phase (SPRUFE8B 3.5, 3.8.3–3.8.4,
 3.10.2.2 and 4.2).
+
+BDEC and BPOS use the raw instruction's actual transfer decision, including
+its signed counter test, rather than treating an enabled predicate as a taken
+branch. Zero satisfies both instructions' `counter >= 0` condition; BDEC's
+existing raw subtraction is committed once in E1 only when the transfer is
+taken. Same-packet readers and predicate/counter changes sample the pre-write
+values. Both instructions reject ADDKPC companions. BDEC rejects potential
+simultaneous E1 counter writers unless complementary predicates prove the
+writes exclusive (SPRUFE8B pp. 159-160, 170-171; section 3.7).
 
 ## DP source ports and software loops
 
@@ -122,14 +132,14 @@ Unsupported timing contracts fail closed. These include changing repeated DP
 source reads, nested/predicated loop reloads (SPKERNELR/SPMASKR), loop interrupt
 entry/restart in this compiler, calls, unresolved
 register transfers other than a captured B3 return, special control-register
-side effects, and updating loads that alias their own destination. No whole-ISA
+side effects, and unproved dynamic control-flow scopes. No whole-ISA
 pipeline-completeness claim is made. Raw instruction decode remains available
 for unsupported functions. Other function ownership and defined data are never
 absorbed into a schedule. Schedules beyond 4096 states or one million p-code
 operations are refused; increasing the decompiler timeout is not a workaround.
 
 `tests/fixtures/pipeline-schedule.py` and `C6000PipelineSemanticsTest.java`
-check old parallel reads, E4/E5 writeback, memory timing, six overlapping
+check 18 executions and five refusals: old parallel reads, E4/E5 writeback, updating-load aliases, memory timing, six overlapping
 branches, captured predicates and return targets, predicated delayed writes,
 sticky flags, X-path stalls including incoming hazards, both endian modes,
 refusal safety, idempotent enablement and native decompilation. The focused
@@ -148,3 +158,51 @@ checks intervals 1/2/3/6/14, zero/one/many iterations, delayed counter setup,
 while sampling, buffered floating-point memory effects, branch aborts and all
 eight compact NOP counts in both endian modes. Selected DP/loop cases also
 pass through the native decompiler at the unchanged 30-second limit.
+
+`pipeline-counter-branch.py IMAGE CASES.json [be]` and
+`C6000PipelineCounterBranchTest.java CASES.json` check 60 cases per endian:
+56 executions and four refusals. They cover negative/zero/positive counters,
+E1 decrement visibility, captured and inverted predicates, safe parallel
+counter writes for BPOS, backward BDEC loops, overlapping transfers and
+ADDKPC/conflicting-writer refusals. Acyclic cases count raw subtractions to
+reject duplicated BDEC arithmetic; refusal checks require unchanged entry
+bytes and disabled schedule context.
+
+### Proved path feasibility
+
+The straight-line prefix proof starts with unknown registers and uses Ghidra's
+integer p-code arithmetic, packet input snapshots and documented write phases.
+Memory, floating results, unknown predicates and collisions invalidate constants.
+Only an unconditional counted loop with a proved positive loading-stage bound
+can lose an impossible early-stop edge; its counter decrement and all later
+states remain. Unknown proofs retain the existing resource rejection.
+
+A separate finite zero/nonzero domain tracks the six predicate GPRs and old-value
+copy aliases. Facts fork on the pre-E1 snapshot, invalidate at actual commit
+phases, and widen at backward transfers and loop-time wraps. Counter branches
+retain their actual raw taken condition and do not infer predicate truth from a
+failed sign test. This pruning never permits a resource collision or flushes a
+pending effect early.
+
+`loop-counter-proof.py` / `C6000LoopCounterProofTest.java` check known and unknown
+counts, both parallel setup forms, E4 counter visibility and preserved refusals.
+`pipeline-predicate-facts.py` / `C6000PredicateFactsTest.java` check old-value copies,
+parallel predicate changes, delayed writes, unknown arithmetic and conservative
+widening. The latter fixture uses TI's assembler (`TI_C6000_BIN` can select it).
+The pending-return guard remains required: stores and other effects may genuinely
+cross a function boundary, requiring a caller continuation rather than an early
+writeback approximation.
+
+## Updating loads and cross-return traces
+
+Updating loads capture the transfer address before modifying the base. Their
+base and data outputs retain distinct E1 and E5 values even when registers
+alias. The scheduler observes individual raw p-code writes and commits them
+at their phases; it does not duplicate the address or load arithmetic.
+Simultaneous overlapping memory/register writes remain refused under
+SPRUFE8B 3.8.8 and 4.2.5/Table 4-10.
+
+The separate read-only [caller-continuation trace API](caller-continuation-traces.md)
+can carry captured STW E3 tails through an explicit immutable caller window. It
+exports the endpoint and remaining E1 hazard set. It cannot be enabled as a
+callee-only schedule; the ordinary pending-return refusal remains intact.

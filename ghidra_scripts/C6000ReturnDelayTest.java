@@ -21,10 +21,12 @@ public class C6000ReturnDelayTest extends GhidraScript {
   for(String row:Files.readAllLines(Paths.get(args[0]))){var f=row.split("\\t");var at=toAddr(Long.parseUnsignedLong(f[0],16));int bytes=Integer.parseInt(f[2]);int length=Integer.parseInt(f[5]);long mask=Long.parseUnsignedLong(f[3],16);
    currentProgram.getProgramContext().setValue(currentProgram.getRegister("c_branch_terminal"),at,at,BigInteger.ONE);
    // The production recovery must discover the hand-counted window, not a test context write.
-   new DisassembleCommand(at,null,true).applyTo(currentProgram,monitor);
+   int prefix=f.length>6?Integer.parseInt(f[6]):0;
+   var functionAt=at.subtract(prefix);
+   new DisassembleCommand(functionAt,null,true).applyTo(currentProgram,monitor);
    var branch=currentProgram.getListing().getInstructionAt(at);branch.setFlowOverride(FlowOverride.RETURN);
-   ghidra.program.model.address.AddressSetView body=new AddressSet(at,at.add(branch.getLength()-1));
-   var function=currentProgram.getFunctionManager().createFunction(f[1],at,body,ghidra.program.model.symbol.SourceType.USER_DEFINED);
+   ghidra.program.model.address.AddressSetView body=new AddressSet(functionAt,at.add(branch.getLength()-1));
+   var function=currentProgram.getFunctionManager().createFunction(f[1],functionAt,body,ghidra.program.model.symbol.SourceType.USER_DEFINED);
    // Exercise preservation of labels, all comment classes and explicit refs.
    var savedAt=at.add(length);var listing=currentProgram.getListing();
    for(int ct=0;ct<5;ct++)listing.setComment(savedAt,ct,"keep "+f[1]+" "+ct);

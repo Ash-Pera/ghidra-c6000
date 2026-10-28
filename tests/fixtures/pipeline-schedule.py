@@ -47,9 +47,12 @@ def main():
     put(0x1c00, (0x02185764 & ~(31 << 18)) | (8 << 18), mv(8, 6) | 1, (7 << 23) | (4 << 18) | 0x8f0, 0x6000, b3, 0x8000)
     put(0x1d00, ldw, mvk(5, 4, True), (6 << 23) | (4 << 18) | 0x1058, 0x6000, b3, 0x8000)
     put(0x1600, mpy, (20 << 23) | (4 << 18) | 0x3a2, 0x6000, b3, 0x8000)
-    # Unsupported phase and ambiguous updating-load contracts must be refused.
+    # Updating-load aliases retain independent E1 base and E5 data writes.
+    # The adjacent same-cycle base writer remains an undefined-write refusal.
     put(0x1e00, 0x1e000, b3, 0x8000)
-    put(0x1e40, (ldw & ~((31 << 23) | (15 << 9))) | (4 << 23) | (9 << 9) | (1 << 13), b3, 0x8000)
+    alias = (ldw & ~((31 << 23) | (15 << 9))) | (4 << 23) | (9 << 9) | (1 << 13)
+    put(0x1e40, alias, mv(4, 6), 0x4000, mv(4, 7), b3, 0x8000)
+    put(0x2000, alias | 1, mvk(7, 4), b3, 0x8000)
     # Prefix provides a known incoming E1 hazard; scheduled entry is 0x1f04.
     put(0x1f00, mvk(5, 4), (6 << 23) | (4 << 18) | 0x105a, b3, 0x8000)
     put(0x2100, 0x10 | (0x100 // 4 << 7), 0x8000)

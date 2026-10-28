@@ -296,7 +296,8 @@ w("#    secondary LD/ST data size from it.")
 w("#  * A bracketed compact offset is scaled by the access size, as for the")
 w("#    32-bit addressing modes (SPRUFE8B section 3.9.3): <<0 byte, <<1")
 w("#    halfword, <<2 word, <<3 doubleword.")
-w("#  * Figure C-12 Dinc (\"*ptr[ucst2]++\") is a post-increment: the access")
+w("#  * Figures C-12/C-13 Dinc display the post-increment as *ptr++[ucst2],")
+w("#    using section 3.9.3 assembly syntax.  The access")
 w("#    uses ptr and ptr is then advanced by the scaled offset.  Figure C-14")
 w("#    Ddec (\"*--ptr[ucst2]\") is a pre-decrement: ptr is advanced first and")
 w("#    the access uses the new ptr.  Figure C-21 Dpp pairs \"*B15--[ucst2]\"")
@@ -344,30 +345,38 @@ reg_table("RA97", "97", "s")
 reg_table("RB97", "97", "s")
 reg_table("RA64", "64", "s")
 reg_table("RA1110", "1110", "s")
-reg_table("RA4", "4", "s")
+# Figure D-7: the one-bit destination always selects A0/A1 or B0/B1.
+# Header RS selects the source register set, never this predicate destination.
+for side, regs in ((0, A), (1, B)):
+    for bit in (0, 1):
+        reg = regs[bit]
+        w('RA4: "%s" is q_s=%d & j4=%d { export %s; }' %
+          (reg, side, bit, reg))
+w("")
 cross_table("RX97", "97")
+# SPRUFE8B Figures G-1/G-2: the explicit srcms/dstms fields extend
+# only one operand to an absolute five-bit register number. Header RS
+# still selects the opposite three-bit operand, but never rotates this one.
 for side, regs in ((0, A), (1, B)):
     for cross in (0, 1):
         file_regs = regs if cross == 0 else (B if side == 0 else A)
-        for rs in (0, 1):
-            f = fld("117", ("a" if file_regs is A else "b") + ("1" if rs else ""))
-            w("RMVTo: %s is q_s=%d & q_t=%d & c_rs=%d & %s { export %s; }" %
-              (f, side, cross, rs, f, f))
+        f = fld("117", "a" if file_regs is A else "b")
+        w("RMVTo: %s is q_s=%d & q_t=%d & %s { export %s; }" %
+          (f, side, cross, f, f))
 w("")
 for side, regs in ((0, A), (1, B)):
-    for rs in (0, 1):
-        for ms in range(4):
-            for low in range(8):
-                reg = regs[(16 * rs + 8 * ms + low) & 31]
-                w('RMVFr: "%s" is q_s=%d & c_rs=%d & j11=%d & j10=%d & q_r3=%d { export %s; }' %
-                  (reg, side, rs, (ms >> 1) & 1, ms & 1, low, reg))
+    for ms in range(4):
+        for low in range(8):
+            reg = regs[8 * ms + low]
+            w('RMVFr: "%s" is q_s=%d & j11=%d & j10=%d & q_r3=%d { export %s; }' %
+              (reg, side, (ms >> 1) & 1, ms & 1, low, reg))
 w("")
 for side, regs in ((0, A), (1, B)):
-    for rs in (0, 1):
-        for bit in (0, 1):
-            reg = regs[16 * rs + bit]
-            w('RCmpDst: "%s" is q_s=%d & c_rs=%d & j11=%d { export %s; }' %
-              (reg, side, rs, bit, reg))
+    # Figures D-9 and D-10 likewise ignore header RS for their destination.
+    for bit in (0, 1):
+        reg = regs[bit]
+        w('RCmpDst: "%s" is q_s=%d & j11=%d { export %s; }' %
+          (reg, side, bit, reg))
 w("")
 reg_table("RT64", "64", "t")
 for suf in SUFFIXES["65"]:
@@ -424,7 +433,8 @@ w("")
 imm1("Cucst4", "(j11 << 3) | q_r3", "j11 & q_r3")            # Figure C-8..C-15
 imm1("Cucst2", "q_uc2 + 1", "q_uc2")                        # Figures C-12..C-15
 imm1("Cucst2pp", "q_uc2 + 1", "q_uc2")                      # Figure C-21
-imm1("Cucst5stk", "(cq_u21 << 3) | q_r3b", "cq_u21 & q_r3b")  # Figure C-16
+# Figure C-16: bits14:13 are ucst1:0, bits9:7 are ucst4:2.
+imm1("Cucst5stk", "(q_r3b << 2) | cq_u21", "cq_u21 & q_r3b")
 imm1("Cucst5d", "(cq_uc43 << 3) | q_r3", "cq_uc43 & q_r3")  # Figures C-18/F-25/F-27/F-30
 imm1("Cucst5p", "(cq_uc98 << 3) | q_r3", "cq_uc98 & q_r3")  # Figure C-19
 imm1("Cucst5f23", "(cq_uc43 << 3) | q_r3", "cq_uc43 & q_r3")
@@ -528,7 +538,10 @@ def ld_sem(reg, addr, size, sign):
 
 
 def st_sem(reg, addr, size):
-    return "*[ram]:%d %s = %s;" % (size, addr, reg)
+    # SPRUFE8B STB/STH execution: transfer only the low byte/halfword.
+    # SLEIGH's memory size annotation alone does not truncate a register.
+    value = "%s:%d" % (reg, size) if size < 4 else reg
+    return "*[ram]:%d %s = %s;" % (size, addr, value)
 
 
 # ===========================================================================
@@ -579,9 +592,13 @@ def emit_one(pat, mem_kind, imm, v, info, na, sz):
             newpat.append("q_sz=%d" % sz)
         if na is not None:
             newpat.append("q_na=%d" % na)
-        shift = SHIFT[size]
+        # SPRUFE8B C-9/C-11 require unscaled LDNDW/STNDW offsets;
+        # C-13/C-15 require scaled postincrement/predecrement counts.
+        unscaled = name == "NDW" and mem_kind in {"off", "ind"}
+        shift = 0 if unscaled else SHIFT[size]
+        left, right = ("(", ")") if unscaled else ("[", "]")
         if mem_kind == "off":
-            memdisp = '"*"^RPTR^"["^%s^"]"' % imm
+            memdisp = '"*"^RPTR^"%s"^%s^"%s"' % (left, imm, right)
             addr = "(RPTR + (%s << %d))" % (imm, shift)
             pre = []
             post = []
@@ -601,7 +618,7 @@ def emit_one(pat, mem_kind, imm, v, info, na, sz):
             else:
                 disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
         elif mem_kind == "ind":
-            memdisp = '"*"^RPTR^"["^RA15^"]"'
+            memdisp = '"*"^RPTR^"%s"^RA15^"%s"' % (left, right)
             addr = "(RPTR + (RA15 << %d))" % shift
             tabs = ["RPTR", "RA15"]
             reg = "RT64" if size <= 4 else "RT65"
@@ -615,21 +632,23 @@ def emit_one(pat, mem_kind, imm, v, info, na, sz):
             else:
                 disp = "%s^CUnitD^\" \"^%s^\", \"^%s" % (mn, reg, memdisp)
         elif mem_kind == "inc":
-            memdisp = '"*"^RPTR^"["^%s^"]++"' % imm
+            memdisp = '"*"^RPTR^"++["^%s^"]"' % imm
             tabs = ["RPTR", imm]
             reg = "RT64" if size <= 4 else "RT65"
             tabs.append(reg)
             if size <= 4:
                 if ldst:
-                    sem = "%s RPTR = RPTR + (%s << %d);" % (
-                        ld_sem(reg, "RPTR", size, sign), imm, shift)
+                    # SPRUFE8B 4.2.5: old address, E1 pointer, E5 data.
+                    sem = "local loadAddress:4 = RPTR; RPTR = RPTR + (%s << %d); %s" % (
+                        imm, shift, ld_sem(reg, "loadAddress", size, sign))
                 else:
                     sem = "%s RPTR = RPTR + (%s << %d);" % (
                         st_sem(reg, "RPTR", size), imm, shift)
             else:
                 if ldst:
-                    sem = "%s RPTR = RPTR + (%s << %d);" % (
-                        ld_sem(reg, "RPTR", size, sign), imm, shift)
+                    # SPRUFE8B 4.2.5: old address, E1 pointer, E5 data.
+                    sem = "local loadAddress:4 = RPTR; RPTR = RPTR + (%s << %d); %s" % (
+                        imm, shift, ld_sem(reg, "loadAddress", size, sign))
                 else:
                     sem = "%s RPTR = RPTR + (%s << %d);" % (
                         st_sem(reg, "RPTR", size), imm, shift)
@@ -694,13 +713,14 @@ emit_dformat("Figure C-15. DdecDW - SPRUFE8B appendix C.4.",
 # Figure C-16 Dstk
 w("# ---------------------------------------------------------------------------")
 w("# Figure C-16. Dstk - SPRUFE8B appendix C.4.  ptr is B15 and s is fixed to 1")
-w("# (so the unit is always .D2); the 5-bit offset is scaled by the word size.")
+w("# (so the unit is always .D2); ucst1:0 = opcode14:13, ucst4:2 = opcode9:7.")
+w("# The reconstructed 5-bit offset is scaled by the word size.")
 w("# ---------------------------------------------------------------------------")
 w("")
 for ldst in (0, 1):
     mn = "LDW" if ldst else "STW"
-    disp = "%s^CUnitD^\" \"^RT64^\", *B15[\"^Cucst5stk^\"]\"" % mn if ldst is False else \
-           "%s^CUnitD^\" *B15[\"^Cucst5stk^\"], \"^RT64" % mn
+    disp = "%s^CUnitD^\" \"^RT64^\", *B15[\"^Cucst5stk^\"]\"" % mn if ldst == 0 else \
+           "%s^CUnitD^\" \"^\"*B15[\"^Cucst5stk^\"], \"^RT64" % mn
     sem = ld_sem("RT64", "(B15 + (Cucst5stk << 2))", 4, "u") if ldst else \
           st_sem("RT64", "(B15 + (Cucst5stk << 2))", 4)
     con(disp, ["j15=1", "j11=1", "j10=1", "j2=1", "j1=0", "q_s=1", "q_ldst=%d" % ldst,
@@ -1129,7 +1149,8 @@ w("")
 # ===========================================================================
 w("# ---------------------------------------------------------------------------")
 w("# Figures G-1/G-2. LSDmvto / LSDmvfr - SPRUFE8B appendix G.3.")
-w("# Bits 11:10 extend the source of mvto or destination of mvfr to 5 bits.")
+w("# Bits 11:10 extend the source of mvto or destination of mvfr to 5 bits;")
+w("# that absolute operand ignores RS. RS selects only the other 3-bit operand.")
 w("# ---------------------------------------------------------------------------")
 w("")
 con("MV^CUnitLSD RMVTo, RA15",
@@ -1154,7 +1175,8 @@ w("")
 w("# ---------------------------------------------------------------------------")
 w("# Figure G-4. LSDx1 - SPRUFE8B appendix G.3.  op = 010/011/100/110 defer")
 w("# to the per-unit Figures C-20 (.D), D-11 (.L) and F-31 (.S); only the")
-w("# unit-independent operations are constructed here.")
+w("# unit-independent operations are constructed here.  G-4 spells the shared")
+w("# source/destination explicitly in the three-operand ADD and XOR forms.")
 w("# ---------------------------------------------------------------------------")
 w("")
 con('MVK^CUnitLSD^" 0, "^RA97',
@@ -1163,10 +1185,10 @@ con('MVK^CUnitLSD^" 0, "^RA97',
 con('MVK^CUnitLSD^" 1, "^RA97',
     ["j12=1", "j11=1", "j10=0", "j6=1", "j5=1", "j2=1", "j1=1",
      "j15=0", "j14=0", "j13=1", "RA97"], "RA97 = 1;")
-con('ADD^CUnitLSD^" 1, "^RB97',
+con('ADD^CUnitLSD RA97, 1, RB97',
     ["j12=1", "j11=1", "j10=0", "j6=1", "j5=1", "j2=1", "j1=1",
      "j15=1", "j14=0", "j13=1", "RA97", "RB97"], "RB97 = RA97 + 1;")
-con('XOR^CUnitLSD^" 1, "^RB97',
+con('XOR^CUnitLSD RA97, 1, RB97',
     ["j12=1", "j11=1", "j10=0", "j6=1", "j5=1", "j2=1", "j1=1",
      "j15=1", "j14=1", "j13=1", "RA97", "RB97"], "RB97 = RA97 ^ 1;")
 w("")

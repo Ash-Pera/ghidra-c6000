@@ -276,3 +276,46 @@ tools/                   build.sh, generators (gen_*.py, build_encodings.py, par
 (`tools/build_encodings.py`); `c6000_memory.sinc` and `c6000_nonalign.sinc`
 come from `tools/gen_memory.py` and `tools/gen_nonalign.py`. They are committed so the extension builds without the
 manual; edit their generators rather than the generated files.
+
+## Lossless full32 encoding identity
+
+SPRUFE8B section 3.12's scalar `MV` opcode maps cover distinct ADD-zero and
+OR-zero encodings. The full32 decoder displays the actual primitive and an
+explicit zero operand; cross-path variants of these constructors include X
+in the unit suffix. This is a display change: their existing move p-code is
+retained. The separate 40-bit register-pair move keeps its MV spelling, and
+an equal-source SUB is not collapsed into an assembler-chosen ZERO alias.
+
+TI-compatible text alone still cannot select every address form. In particular,
+small B14/B15 offsets may use short5 or long15 forms with identical spelling.
+The public `C6000EncodingInfo.describe(Instruction)` utility returns that form,
+encoded element offset and scale, short-memory addressing mode, base/offset
+registers, predicate and p fields, known scalar-move cross paths,
+and numeric packet layout/expansion/p bits. `C6000ExportEncodingInfo.java
+<output.jsonl> [start end]` exports these alongside ordinary listing text.
+It does not invent a TI suffix or emit raw opcode directives.
+
+The packet description distinguishes unavailable header bytes from a known
+ordinary packet. A full32 BNOP's displacement scale is two bytes in a
+header-based packet and four in an ordinary packet; B, BDEC and BPOS remain
+four-byte scaled. An unknown BNOP context has a null scale. These rules are
+from SPRUFE8B 3.10.2 and the section 3.12 opcode/execution descriptions;
+address-form fields follow 3.9.3 and the ADDAW/scalar load/store opcode maps.
+Compact-specific form details are intentionally left to their compact decoder.
+
+`C6000EncodingInfo.registerCopySource(Instruction)` identifies conservative,
+unconditional MV or integer ADD/OR-zero copies with zero in either operand
+position. Constant-call recovery uses it so `ADD.Dx src,0,dst` retains the
+same known register value as its former MV spelling. Unknown cross-path
+metadata is null; the API does not assume every bit 12 is a cross selector.
+
+### Language prototype migration
+
+The 1.1 language minor version forces Ghidra's native re-disassembly upgrade.
+This is necessary when a corrected compact operand partition distinguishes bits
+that an older shared persisted prototype ignored. Updating the extension alone
+can leave old programs with stale operand text and p-code. Preserve a packed
+backup and annotation inventory before upgrade. Native migration can remove
+historical Bad Instruction error bookmarks; retain/restore those from the
+backup if preserving every annotation is required. Audit actual processor
+context and instruction extents as well as symbols, functions and references.

@@ -36,7 +36,8 @@
 #  * A bracketed compact offset is scaled by the access size, as for the
 #    32-bit addressing modes (SPRUFE8B section 3.9.3): <<0 byte, <<1
 #    halfword, <<2 word, <<3 doubleword.
-#  * Figure C-12 Dinc ("*ptr[ucst2]++") is a post-increment: the access
+#  * Figures C-12/C-13 Dinc display the post-increment as *ptr++[ucst2],
+#    using section 3.9.3 assembly syntax.  The access
 #    uses ptr and ptr is then advanced by the scaled offset.  Figure C-14
 #    Ddec ("*--ptr[ucst2]") is a pre-decrement: ptr is advanced first and
 #    the access uses the new ptr.  Figure C-21 Dpp pairs "*B15--[ucst2]"
@@ -108,10 +109,10 @@ RA1110: cq_1110_b0 is cq_1110_b0 & q_s=1 & c_rs=0 { export cq_1110_b0; }
 RA1110: cq_1110_a1 is cq_1110_a1 & q_s=0 & c_rs=1 { export cq_1110_a1; }
 RA1110: cq_1110_b1 is cq_1110_b1 & q_s=1 & c_rs=1 { export cq_1110_b1; }
 
-RA4: cq_4_a0 is cq_4_a0 & q_s=0 & c_rs=0 { export cq_4_a0; }
-RA4: cq_4_b0 is cq_4_b0 & q_s=1 & c_rs=0 { export cq_4_b0; }
-RA4: cq_4_a1 is cq_4_a1 & q_s=0 & c_rs=1 { export cq_4_a1; }
-RA4: cq_4_b1 is cq_4_b1 & q_s=1 & c_rs=1 { export cq_4_b1; }
+RA4: "A0" is q_s=0 & j4=0 { export A0; }
+RA4: "A1" is q_s=0 & j4=1 { export A1; }
+RA4: "B0" is q_s=1 & j4=0 { export B0; }
+RA4: "B1" is q_s=1 & j4=1 { export B1; }
 
 RX97: cq_97_a0 is cq_97_a0 & q_s=0 & q_t=0 & c_rs=0 { export cq_97_a0; }
 RX97: cq_97_b0 is cq_97_b0 & q_s=0 & q_t=1 & c_rs=0 { export cq_97_b0; }
@@ -122,152 +123,80 @@ RX97: cq_97_b1 is cq_97_b1 & q_s=0 & q_t=1 & c_rs=1 { export cq_97_b1; }
 RX97: cq_97_b1 is cq_97_b1 & q_s=1 & q_t=0 & c_rs=1 { export cq_97_b1; }
 RX97: cq_97_a1 is cq_97_a1 & q_s=1 & q_t=1 & c_rs=1 { export cq_97_a1; }
 
-RMVTo: cq_117_a is q_s=0 & q_t=0 & c_rs=0 & cq_117_a { export cq_117_a; }
-RMVTo: cq_117_a1 is q_s=0 & q_t=0 & c_rs=1 & cq_117_a1 { export cq_117_a1; }
-RMVTo: cq_117_b is q_s=0 & q_t=1 & c_rs=0 & cq_117_b { export cq_117_b; }
-RMVTo: cq_117_b1 is q_s=0 & q_t=1 & c_rs=1 & cq_117_b1 { export cq_117_b1; }
-RMVTo: cq_117_b is q_s=1 & q_t=0 & c_rs=0 & cq_117_b { export cq_117_b; }
-RMVTo: cq_117_b1 is q_s=1 & q_t=0 & c_rs=1 & cq_117_b1 { export cq_117_b1; }
-RMVTo: cq_117_a is q_s=1 & q_t=1 & c_rs=0 & cq_117_a { export cq_117_a; }
-RMVTo: cq_117_a1 is q_s=1 & q_t=1 & c_rs=1 & cq_117_a1 { export cq_117_a1; }
+RMVTo: cq_117_a is q_s=0 & q_t=0 & cq_117_a { export cq_117_a; }
+RMVTo: cq_117_b is q_s=0 & q_t=1 & cq_117_b { export cq_117_b; }
+RMVTo: cq_117_b is q_s=1 & q_t=0 & cq_117_b { export cq_117_b; }
+RMVTo: cq_117_a is q_s=1 & q_t=1 & cq_117_a { export cq_117_a; }
 
-RMVFr: "A0" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=0 { export A0; }
-RMVFr: "A1" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=1 { export A1; }
-RMVFr: "A2" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=2 { export A2; }
-RMVFr: "A3" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=3 { export A3; }
-RMVFr: "A4" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=4 { export A4; }
-RMVFr: "A5" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=5 { export A5; }
-RMVFr: "A6" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=6 { export A6; }
-RMVFr: "A7" is q_s=0 & c_rs=0 & j11=0 & j10=0 & q_r3=7 { export A7; }
-RMVFr: "A8" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=0 { export A8; }
-RMVFr: "A9" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=1 { export A9; }
-RMVFr: "A10" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=2 { export A10; }
-RMVFr: "A11" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=3 { export A11; }
-RMVFr: "A12" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=4 { export A12; }
-RMVFr: "A13" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=5 { export A13; }
-RMVFr: "A14" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=6 { export A14; }
-RMVFr: "A15" is q_s=0 & c_rs=0 & j11=0 & j10=1 & q_r3=7 { export A15; }
-RMVFr: "A16" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=0 { export A16; }
-RMVFr: "A17" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=1 { export A17; }
-RMVFr: "A18" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=2 { export A18; }
-RMVFr: "A19" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=3 { export A19; }
-RMVFr: "A20" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=4 { export A20; }
-RMVFr: "A21" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=5 { export A21; }
-RMVFr: "A22" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=6 { export A22; }
-RMVFr: "A23" is q_s=0 & c_rs=0 & j11=1 & j10=0 & q_r3=7 { export A23; }
-RMVFr: "A24" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=0 { export A24; }
-RMVFr: "A25" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=1 { export A25; }
-RMVFr: "A26" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=2 { export A26; }
-RMVFr: "A27" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=3 { export A27; }
-RMVFr: "A28" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=4 { export A28; }
-RMVFr: "A29" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=5 { export A29; }
-RMVFr: "A30" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=6 { export A30; }
-RMVFr: "A31" is q_s=0 & c_rs=0 & j11=1 & j10=1 & q_r3=7 { export A31; }
-RMVFr: "A16" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=0 { export A16; }
-RMVFr: "A17" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=1 { export A17; }
-RMVFr: "A18" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=2 { export A18; }
-RMVFr: "A19" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=3 { export A19; }
-RMVFr: "A20" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=4 { export A20; }
-RMVFr: "A21" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=5 { export A21; }
-RMVFr: "A22" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=6 { export A22; }
-RMVFr: "A23" is q_s=0 & c_rs=1 & j11=0 & j10=0 & q_r3=7 { export A23; }
-RMVFr: "A24" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=0 { export A24; }
-RMVFr: "A25" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=1 { export A25; }
-RMVFr: "A26" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=2 { export A26; }
-RMVFr: "A27" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=3 { export A27; }
-RMVFr: "A28" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=4 { export A28; }
-RMVFr: "A29" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=5 { export A29; }
-RMVFr: "A30" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=6 { export A30; }
-RMVFr: "A31" is q_s=0 & c_rs=1 & j11=0 & j10=1 & q_r3=7 { export A31; }
-RMVFr: "A0" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=0 { export A0; }
-RMVFr: "A1" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=1 { export A1; }
-RMVFr: "A2" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=2 { export A2; }
-RMVFr: "A3" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=3 { export A3; }
-RMVFr: "A4" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=4 { export A4; }
-RMVFr: "A5" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=5 { export A5; }
-RMVFr: "A6" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=6 { export A6; }
-RMVFr: "A7" is q_s=0 & c_rs=1 & j11=1 & j10=0 & q_r3=7 { export A7; }
-RMVFr: "A8" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=0 { export A8; }
-RMVFr: "A9" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=1 { export A9; }
-RMVFr: "A10" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=2 { export A10; }
-RMVFr: "A11" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=3 { export A11; }
-RMVFr: "A12" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=4 { export A12; }
-RMVFr: "A13" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=5 { export A13; }
-RMVFr: "A14" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=6 { export A14; }
-RMVFr: "A15" is q_s=0 & c_rs=1 & j11=1 & j10=1 & q_r3=7 { export A15; }
-RMVFr: "B0" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=0 { export B0; }
-RMVFr: "B1" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=1 { export B1; }
-RMVFr: "B2" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=2 { export B2; }
-RMVFr: "B3" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=3 { export B3; }
-RMVFr: "B4" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=4 { export B4; }
-RMVFr: "B5" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=5 { export B5; }
-RMVFr: "B6" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=6 { export B6; }
-RMVFr: "B7" is q_s=1 & c_rs=0 & j11=0 & j10=0 & q_r3=7 { export B7; }
-RMVFr: "B8" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=0 { export B8; }
-RMVFr: "B9" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=1 { export B9; }
-RMVFr: "B10" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=2 { export B10; }
-RMVFr: "B11" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=3 { export B11; }
-RMVFr: "B12" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=4 { export B12; }
-RMVFr: "B13" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=5 { export B13; }
-RMVFr: "B14" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=6 { export B14; }
-RMVFr: "B15" is q_s=1 & c_rs=0 & j11=0 & j10=1 & q_r3=7 { export B15; }
-RMVFr: "B16" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=0 { export B16; }
-RMVFr: "B17" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=1 { export B17; }
-RMVFr: "B18" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=2 { export B18; }
-RMVFr: "B19" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=3 { export B19; }
-RMVFr: "B20" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=4 { export B20; }
-RMVFr: "B21" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=5 { export B21; }
-RMVFr: "B22" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=6 { export B22; }
-RMVFr: "B23" is q_s=1 & c_rs=0 & j11=1 & j10=0 & q_r3=7 { export B23; }
-RMVFr: "B24" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=0 { export B24; }
-RMVFr: "B25" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=1 { export B25; }
-RMVFr: "B26" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=2 { export B26; }
-RMVFr: "B27" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=3 { export B27; }
-RMVFr: "B28" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=4 { export B28; }
-RMVFr: "B29" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=5 { export B29; }
-RMVFr: "B30" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=6 { export B30; }
-RMVFr: "B31" is q_s=1 & c_rs=0 & j11=1 & j10=1 & q_r3=7 { export B31; }
-RMVFr: "B16" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=0 { export B16; }
-RMVFr: "B17" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=1 { export B17; }
-RMVFr: "B18" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=2 { export B18; }
-RMVFr: "B19" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=3 { export B19; }
-RMVFr: "B20" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=4 { export B20; }
-RMVFr: "B21" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=5 { export B21; }
-RMVFr: "B22" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=6 { export B22; }
-RMVFr: "B23" is q_s=1 & c_rs=1 & j11=0 & j10=0 & q_r3=7 { export B23; }
-RMVFr: "B24" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=0 { export B24; }
-RMVFr: "B25" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=1 { export B25; }
-RMVFr: "B26" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=2 { export B26; }
-RMVFr: "B27" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=3 { export B27; }
-RMVFr: "B28" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=4 { export B28; }
-RMVFr: "B29" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=5 { export B29; }
-RMVFr: "B30" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=6 { export B30; }
-RMVFr: "B31" is q_s=1 & c_rs=1 & j11=0 & j10=1 & q_r3=7 { export B31; }
-RMVFr: "B0" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=0 { export B0; }
-RMVFr: "B1" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=1 { export B1; }
-RMVFr: "B2" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=2 { export B2; }
-RMVFr: "B3" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=3 { export B3; }
-RMVFr: "B4" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=4 { export B4; }
-RMVFr: "B5" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=5 { export B5; }
-RMVFr: "B6" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=6 { export B6; }
-RMVFr: "B7" is q_s=1 & c_rs=1 & j11=1 & j10=0 & q_r3=7 { export B7; }
-RMVFr: "B8" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=0 { export B8; }
-RMVFr: "B9" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=1 { export B9; }
-RMVFr: "B10" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=2 { export B10; }
-RMVFr: "B11" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=3 { export B11; }
-RMVFr: "B12" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=4 { export B12; }
-RMVFr: "B13" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=5 { export B13; }
-RMVFr: "B14" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=6 { export B14; }
-RMVFr: "B15" is q_s=1 & c_rs=1 & j11=1 & j10=1 & q_r3=7 { export B15; }
+RMVFr: "A0" is q_s=0 & j11=0 & j10=0 & q_r3=0 { export A0; }
+RMVFr: "A1" is q_s=0 & j11=0 & j10=0 & q_r3=1 { export A1; }
+RMVFr: "A2" is q_s=0 & j11=0 & j10=0 & q_r3=2 { export A2; }
+RMVFr: "A3" is q_s=0 & j11=0 & j10=0 & q_r3=3 { export A3; }
+RMVFr: "A4" is q_s=0 & j11=0 & j10=0 & q_r3=4 { export A4; }
+RMVFr: "A5" is q_s=0 & j11=0 & j10=0 & q_r3=5 { export A5; }
+RMVFr: "A6" is q_s=0 & j11=0 & j10=0 & q_r3=6 { export A6; }
+RMVFr: "A7" is q_s=0 & j11=0 & j10=0 & q_r3=7 { export A7; }
+RMVFr: "A8" is q_s=0 & j11=0 & j10=1 & q_r3=0 { export A8; }
+RMVFr: "A9" is q_s=0 & j11=0 & j10=1 & q_r3=1 { export A9; }
+RMVFr: "A10" is q_s=0 & j11=0 & j10=1 & q_r3=2 { export A10; }
+RMVFr: "A11" is q_s=0 & j11=0 & j10=1 & q_r3=3 { export A11; }
+RMVFr: "A12" is q_s=0 & j11=0 & j10=1 & q_r3=4 { export A12; }
+RMVFr: "A13" is q_s=0 & j11=0 & j10=1 & q_r3=5 { export A13; }
+RMVFr: "A14" is q_s=0 & j11=0 & j10=1 & q_r3=6 { export A14; }
+RMVFr: "A15" is q_s=0 & j11=0 & j10=1 & q_r3=7 { export A15; }
+RMVFr: "A16" is q_s=0 & j11=1 & j10=0 & q_r3=0 { export A16; }
+RMVFr: "A17" is q_s=0 & j11=1 & j10=0 & q_r3=1 { export A17; }
+RMVFr: "A18" is q_s=0 & j11=1 & j10=0 & q_r3=2 { export A18; }
+RMVFr: "A19" is q_s=0 & j11=1 & j10=0 & q_r3=3 { export A19; }
+RMVFr: "A20" is q_s=0 & j11=1 & j10=0 & q_r3=4 { export A20; }
+RMVFr: "A21" is q_s=0 & j11=1 & j10=0 & q_r3=5 { export A21; }
+RMVFr: "A22" is q_s=0 & j11=1 & j10=0 & q_r3=6 { export A22; }
+RMVFr: "A23" is q_s=0 & j11=1 & j10=0 & q_r3=7 { export A23; }
+RMVFr: "A24" is q_s=0 & j11=1 & j10=1 & q_r3=0 { export A24; }
+RMVFr: "A25" is q_s=0 & j11=1 & j10=1 & q_r3=1 { export A25; }
+RMVFr: "A26" is q_s=0 & j11=1 & j10=1 & q_r3=2 { export A26; }
+RMVFr: "A27" is q_s=0 & j11=1 & j10=1 & q_r3=3 { export A27; }
+RMVFr: "A28" is q_s=0 & j11=1 & j10=1 & q_r3=4 { export A28; }
+RMVFr: "A29" is q_s=0 & j11=1 & j10=1 & q_r3=5 { export A29; }
+RMVFr: "A30" is q_s=0 & j11=1 & j10=1 & q_r3=6 { export A30; }
+RMVFr: "A31" is q_s=0 & j11=1 & j10=1 & q_r3=7 { export A31; }
+RMVFr: "B0" is q_s=1 & j11=0 & j10=0 & q_r3=0 { export B0; }
+RMVFr: "B1" is q_s=1 & j11=0 & j10=0 & q_r3=1 { export B1; }
+RMVFr: "B2" is q_s=1 & j11=0 & j10=0 & q_r3=2 { export B2; }
+RMVFr: "B3" is q_s=1 & j11=0 & j10=0 & q_r3=3 { export B3; }
+RMVFr: "B4" is q_s=1 & j11=0 & j10=0 & q_r3=4 { export B4; }
+RMVFr: "B5" is q_s=1 & j11=0 & j10=0 & q_r3=5 { export B5; }
+RMVFr: "B6" is q_s=1 & j11=0 & j10=0 & q_r3=6 { export B6; }
+RMVFr: "B7" is q_s=1 & j11=0 & j10=0 & q_r3=7 { export B7; }
+RMVFr: "B8" is q_s=1 & j11=0 & j10=1 & q_r3=0 { export B8; }
+RMVFr: "B9" is q_s=1 & j11=0 & j10=1 & q_r3=1 { export B9; }
+RMVFr: "B10" is q_s=1 & j11=0 & j10=1 & q_r3=2 { export B10; }
+RMVFr: "B11" is q_s=1 & j11=0 & j10=1 & q_r3=3 { export B11; }
+RMVFr: "B12" is q_s=1 & j11=0 & j10=1 & q_r3=4 { export B12; }
+RMVFr: "B13" is q_s=1 & j11=0 & j10=1 & q_r3=5 { export B13; }
+RMVFr: "B14" is q_s=1 & j11=0 & j10=1 & q_r3=6 { export B14; }
+RMVFr: "B15" is q_s=1 & j11=0 & j10=1 & q_r3=7 { export B15; }
+RMVFr: "B16" is q_s=1 & j11=1 & j10=0 & q_r3=0 { export B16; }
+RMVFr: "B17" is q_s=1 & j11=1 & j10=0 & q_r3=1 { export B17; }
+RMVFr: "B18" is q_s=1 & j11=1 & j10=0 & q_r3=2 { export B18; }
+RMVFr: "B19" is q_s=1 & j11=1 & j10=0 & q_r3=3 { export B19; }
+RMVFr: "B20" is q_s=1 & j11=1 & j10=0 & q_r3=4 { export B20; }
+RMVFr: "B21" is q_s=1 & j11=1 & j10=0 & q_r3=5 { export B21; }
+RMVFr: "B22" is q_s=1 & j11=1 & j10=0 & q_r3=6 { export B22; }
+RMVFr: "B23" is q_s=1 & j11=1 & j10=0 & q_r3=7 { export B23; }
+RMVFr: "B24" is q_s=1 & j11=1 & j10=1 & q_r3=0 { export B24; }
+RMVFr: "B25" is q_s=1 & j11=1 & j10=1 & q_r3=1 { export B25; }
+RMVFr: "B26" is q_s=1 & j11=1 & j10=1 & q_r3=2 { export B26; }
+RMVFr: "B27" is q_s=1 & j11=1 & j10=1 & q_r3=3 { export B27; }
+RMVFr: "B28" is q_s=1 & j11=1 & j10=1 & q_r3=4 { export B28; }
+RMVFr: "B29" is q_s=1 & j11=1 & j10=1 & q_r3=5 { export B29; }
+RMVFr: "B30" is q_s=1 & j11=1 & j10=1 & q_r3=6 { export B30; }
+RMVFr: "B31" is q_s=1 & j11=1 & j10=1 & q_r3=7 { export B31; }
 
-RCmpDst: "A0" is q_s=0 & c_rs=0 & j11=0 { export A0; }
-RCmpDst: "A1" is q_s=0 & c_rs=0 & j11=1 { export A1; }
-RCmpDst: "A16" is q_s=0 & c_rs=1 & j11=0 { export A16; }
-RCmpDst: "A17" is q_s=0 & c_rs=1 & j11=1 { export A17; }
-RCmpDst: "B0" is q_s=1 & c_rs=0 & j11=0 { export B0; }
-RCmpDst: "B1" is q_s=1 & c_rs=0 & j11=1 { export B1; }
-RCmpDst: "B16" is q_s=1 & c_rs=1 & j11=0 { export B16; }
-RCmpDst: "B17" is q_s=1 & c_rs=1 & j11=1 { export B17; }
+RCmpDst: "A0" is q_s=0 & j11=0 { export A0; }
+RCmpDst: "A1" is q_s=0 & j11=1 { export A1; }
+RCmpDst: "B0" is q_s=1 & j11=0 { export B0; }
+RCmpDst: "B1" is q_s=1 & j11=1 { export B1; }
 
 RT64: cq_64_a0 is cq_64_a0 & q_t=0 & c_rs=0 { export cq_64_a0; }
 RT64: cq_64_b0 is cq_64_b0 & q_t=1 & c_rs=0 { export cq_64_b0; }
@@ -344,7 +273,7 @@ Cucst2: Cucst2v is q_uc2 [ Cucst2v = q_uc2 + 1; ] { export *[const]:4 Cucst2v; }
 
 Cucst2pp: Cucst2ppv is q_uc2 [ Cucst2ppv = q_uc2 + 1; ] { export *[const]:4 Cucst2ppv; }
 
-Cucst5stk: Cucst5stkv is cq_u21 & q_r3b [ Cucst5stkv = (cq_u21 << 3) | q_r3b; ] { export *[const]:4 Cucst5stkv; }
+Cucst5stk: Cucst5stkv is cq_u21 & q_r3b [ Cucst5stkv = (q_r3b << 2) | cq_u21; ] { export *[const]:4 Cucst5stkv; }
 
 Cucst5d: Cucst5dv is cq_uc43 & q_r3 [ Cucst5dv = (cq_uc43 << 3) | q_r3; ] { export *[const]:4 Cucst5dv; }
 
@@ -457,37 +386,37 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=0 & RPTR & Cucst4 & RT64 { *[ram]:4 (RPTR + (Cucst4 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=0 & RPTR & Cucst4 & RT64 { RT64 = *[ram]:4 (RPTR + (Cucst4 << 2)); }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:1 (RPTR + (Cucst4 << 0)) = RT64; }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:1 (RPTR + (Cucst4 << 0)) = RT64:1; }
 :LDBU^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = zext(*[ram]:1 (RPTR + (Cucst4 << 0))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=0 & RPTR & Cucst4 & RT64 { *[ram]:4 (RPTR + (Cucst4 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=0 & RPTR & Cucst4 & RT64 { RT64 = *[ram]:4 (RPTR + (Cucst4 << 2)); }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:1 (RPTR + (Cucst4 << 0)) = RT64; }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:1 (RPTR + (Cucst4 << 0)) = RT64:1; }
 :LDB^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = sext(*[ram]:1 (RPTR + (Cucst4 << 0))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=0 & RPTR & Cucst4 & RT64 { *[ram]:4 (RPTR + (Cucst4 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=0 & RPTR & Cucst4 & RT64 { RT64 = *[ram]:4 (RPTR + (Cucst4 << 2)); }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:2 (RPTR + (Cucst4 << 1)) = RT64; }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:2 (RPTR + (Cucst4 << 1)) = RT64:2; }
 :LDHU^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = zext(*[ram]:2 (RPTR + (Cucst4 << 1))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=0 & RPTR & Cucst4 & RT64 { *[ram]:4 (RPTR + (Cucst4 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=0 & RPTR & Cucst4 & RT64 { RT64 = *[ram]:4 (RPTR + (Cucst4 << 2)); }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:2 (RPTR + (Cucst4 << 1)) = RT64; }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:2 (RPTR + (Cucst4 << 1)) = RT64:2; }
 :LDH^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = sext(*[ram]:2 (RPTR + (Cucst4 << 1))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=4 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:4 (RPTR + (Cucst4 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=4 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = *[ram]:4 (RPTR + (Cucst4 << 2)); }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:1 (RPTR + (Cucst4 << 0)) = RT64; }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:1 (RPTR + (Cucst4 << 0)) = RT64:1; }
 :LDB^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=5 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = sext(*[ram]:1 (RPTR + (Cucst4 << 0))); }
 
 :STNW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=6 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:4 (RPTR + (Cucst4 << 2)) = RT64; }
 :LDNW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=6 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = *[ram]:4 (RPTR + (Cucst4 << 2)); }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:2 (RPTR + (Cucst4 << 1)) = RT64; }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & Cucst4 & RT64 { *[ram]:2 (RPTR + (Cucst4 << 1)) = RT64:2; }
 :LDH^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT64 is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & c_dsz=7 & q_ldst=1 & q_sz=1 & RPTR & Cucst4 & RT64 { RT64 = sext(*[ram]:2 (RPTR + (Cucst4 << 1))); }
 
 # ---------------------------------------------------------------------------
@@ -497,26 +426,26 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=0 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=0 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst4^"]" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst4^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^Cucst4^")" is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & Cucst4 & RT65Pair { *[ram]:8 (RPTR + (Cucst4 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^Cucst4^")"^", "^RT65Pair is c_is16=1 & CUnitD & j10=0 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & Cucst4 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (Cucst4 << 0)); }
 
 # ---------------------------------------------------------------------------
 # Figure C-10. Dind - SPRUFE8B appendix C.4.
@@ -525,37 +454,37 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=0 & RPTR & RA15 & RT64 { *[ram]:4 (RPTR + (RA15 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=0 & RPTR & RA15 & RT64 { RT64 = *[ram]:4 (RPTR + (RA15 << 2)); }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:1 (RPTR + (RA15 << 0)) = RT64; }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:1 (RPTR + (RA15 << 0)) = RT64:1; }
 :LDBU^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = zext(*[ram]:1 (RPTR + (RA15 << 0))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=0 & RPTR & RA15 & RT64 { *[ram]:4 (RPTR + (RA15 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=0 & RPTR & RA15 & RT64 { RT64 = *[ram]:4 (RPTR + (RA15 << 2)); }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:1 (RPTR + (RA15 << 0)) = RT64; }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:1 (RPTR + (RA15 << 0)) = RT64:1; }
 :LDB^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = sext(*[ram]:1 (RPTR + (RA15 << 0))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=0 & RPTR & RA15 & RT64 { *[ram]:4 (RPTR + (RA15 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=0 & RPTR & RA15 & RT64 { RT64 = *[ram]:4 (RPTR + (RA15 << 2)); }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:2 (RPTR + (RA15 << 1)) = RT64; }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:2 (RPTR + (RA15 << 1)) = RT64:2; }
 :LDHU^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = zext(*[ram]:2 (RPTR + (RA15 << 1))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=0 & RPTR & RA15 & RT64 { *[ram]:4 (RPTR + (RA15 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=0 & RPTR & RA15 & RT64 { RT64 = *[ram]:4 (RPTR + (RA15 << 2)); }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:2 (RPTR + (RA15 << 1)) = RT64; }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:2 (RPTR + (RA15 << 1)) = RT64:2; }
 :LDH^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = sext(*[ram]:2 (RPTR + (RA15 << 1))); }
 
 :STW^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:4 (RPTR + (RA15 << 2)) = RT64; }
 :LDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = *[ram]:4 (RPTR + (RA15 << 2)); }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:1 (RPTR + (RA15 << 0)) = RT64; }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:1 (RPTR + (RA15 << 0)) = RT64:1; }
 :LDB^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = sext(*[ram]:1 (RPTR + (RA15 << 0))); }
 
 :STNW^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:4 (RPTR + (RA15 << 2)) = RT64; }
 :LDNW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = *[ram]:4 (RPTR + (RA15 << 2)); }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:2 (RPTR + (RA15 << 1)) = RT64; }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & RA15 & RT64 { *[ram]:2 (RPTR + (RA15 << 1)) = RT64:2; }
 :LDH^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT64 is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=1 & q_sz=1 & RPTR & RA15 & RT64 { RT64 = sext(*[ram]:2 (RPTR + (RA15 << 1))); }
 
 # ---------------------------------------------------------------------------
@@ -565,94 +494,94 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 :STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=0 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
 :LDDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=0 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^RA15^"]" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 3)) = RT65Pair; }
-:LDNDW^CUnitD " " "*"^RPTR^"["^RA15^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 3)); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"("^RA15^")" is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & RA15 & RT65Pair { *[ram]:8 (RPTR + (RA15 << 0)) = RT65Pair; }
+:LDNDW^CUnitD " " "*"^RPTR^"("^RA15^")"^", "^RT65Pair is c_is16=1 & CUnitD & j11=0 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & RA15 & RT65Pair { RT65Pair = *[ram]:8 (RPTR + (RA15 << 0)); }
 
 # ---------------------------------------------------------------------------
 # Figure C-12. Dinc - SPRUFE8B appendix C.4.
 # ---------------------------------------------------------------------------
 
-:STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
-:LDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RT64 = *[ram]:4 RPTR; RPTR = RPTR + (Cucst2 << 2); }
+:STW^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
+:LDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 2); RT64 = *[ram]:4 loadAddress; }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:1 RPTR = RT64; RPTR = RPTR + (Cucst2 << 0); }
-:LDBU^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = zext(*[ram]:1 RPTR); RPTR = RPTR + (Cucst2 << 0); }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:1 RPTR = RT64:1; RPTR = RPTR + (Cucst2 << 0); }
+:LDBU^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 0); RT64 = zext(*[ram]:1 loadAddress); }
 
-:STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
-:LDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RT64 = *[ram]:4 RPTR; RPTR = RPTR + (Cucst2 << 2); }
+:STW^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
+:LDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 2); RT64 = *[ram]:4 loadAddress; }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:1 RPTR = RT64; RPTR = RPTR + (Cucst2 << 0); }
-:LDB^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = sext(*[ram]:1 RPTR); RPTR = RPTR + (Cucst2 << 0); }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:1 RPTR = RT64:1; RPTR = RPTR + (Cucst2 << 0); }
+:LDB^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 0); RT64 = sext(*[ram]:1 loadAddress); }
 
-:STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
-:LDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RT64 = *[ram]:4 RPTR; RPTR = RPTR + (Cucst2 << 2); }
+:STW^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
+:LDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 2); RT64 = *[ram]:4 loadAddress; }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:2 RPTR = RT64; RPTR = RPTR + (Cucst2 << 1); }
-:LDHU^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = zext(*[ram]:2 RPTR); RPTR = RPTR + (Cucst2 << 1); }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:2 RPTR = RT64:2; RPTR = RPTR + (Cucst2 << 1); }
+:LDHU^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 1); RT64 = zext(*[ram]:2 loadAddress); }
 
-:STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
-:LDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RT64 = *[ram]:4 RPTR; RPTR = RPTR + (Cucst2 << 2); }
+:STW^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
+:LDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 2); RT64 = *[ram]:4 loadAddress; }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:2 RPTR = RT64; RPTR = RPTR + (Cucst2 << 1); }
-:LDH^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = sext(*[ram]:2 RPTR); RPTR = RPTR + (Cucst2 << 1); }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:2 RPTR = RT64:2; RPTR = RPTR + (Cucst2 << 1); }
+:LDH^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 1); RT64 = sext(*[ram]:2 loadAddress); }
 
-:STW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
-:LDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = *[ram]:4 RPTR; RPTR = RPTR + (Cucst2 << 2); }
+:STW^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
+:LDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 2); RT64 = *[ram]:4 loadAddress; }
 
-:STB^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:1 RPTR = RT64; RPTR = RPTR + (Cucst2 << 0); }
-:LDB^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = sext(*[ram]:1 RPTR); RPTR = RPTR + (Cucst2 << 0); }
+:STB^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:1 RPTR = RT64:1; RPTR = RPTR + (Cucst2 << 0); }
+:LDB^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 0); RT64 = sext(*[ram]:1 loadAddress); }
 
-:STNW^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
-:LDNW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = *[ram]:4 RPTR; RPTR = RPTR + (Cucst2 << 2); }
+:STNW^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:4 RPTR = RT64; RPTR = RPTR + (Cucst2 << 2); }
+:LDNW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 2); RT64 = *[ram]:4 loadAddress; }
 
-:STH^CUnitD " " RT64^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:2 RPTR = RT64; RPTR = RPTR + (Cucst2 << 1); }
-:LDH^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RT64 = sext(*[ram]:2 RPTR); RPTR = RPTR + (Cucst2 << 1); }
+:STH^CUnitD " " RT64^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { *[ram]:2 RPTR = RT64:2; RPTR = RPTR + (Cucst2 << 1); }
+:LDH^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 1); RT64 = sext(*[ram]:2 loadAddress); }
 
 # ---------------------------------------------------------------------------
 # Figure C-13. DincDW - SPRUFE8B appendix C.4.
 # ---------------------------------------------------------------------------
 
-:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDNDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=4 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
-:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDNDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=5 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
-:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDNDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=6 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
-:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=0 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=0 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
-:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"["^Cucst2^"]++" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
-:LDNDW^CUnitD " " "*"^RPTR^"["^Cucst2^"]++"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { RT65Pair = *[ram]:8 RPTR; RPTR = RPTR + (Cucst2 << 3); }
+:STNDW^CUnitD " " RT65Pair^", "^"*"^RPTR^"++["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=0 & q_na=1 & RPTR & Cucst2 & RT65Pair { *[ram]:8 RPTR = RT65Pair; RPTR = RPTR + (Cucst2 << 3); }
+:LDNDW^CUnitD " " "*"^RPTR^"++["^Cucst2^"]"^", "^RT65Pair is c_is16=1 & CUnitD & j15=0 & j14=0 & j11=1 & j10=1 & j2=1 & j1=0 & q_sz=0 & c_dsz=7 & q_ldst=1 & q_na=1 & RPTR & Cucst2 & RT65Pair { local loadAddress:4 = RPTR; RPTR = RPTR + (Cucst2 << 3); RT65Pair = *[ram]:8 loadAddress; }
 
 # ---------------------------------------------------------------------------
 # Figure C-14. Ddec - SPRUFE8B appendix C.4.
@@ -661,37 +590,37 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 :STW^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); *[ram]:4 RPTR = RT64; }
 :LDW^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); RT64 = *[ram]:4 RPTR; }
 
-:STB^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); *[ram]:1 RPTR = RT64; }
+:STB^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); *[ram]:1 RPTR = RT64:1; }
 :LDBU^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=0 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); RT64 = zext(*[ram]:1 RPTR); }
 
 :STW^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); *[ram]:4 RPTR = RT64; }
 :LDW^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); RT64 = *[ram]:4 RPTR; }
 
-:STB^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); *[ram]:1 RPTR = RT64; }
+:STB^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); *[ram]:1 RPTR = RT64:1; }
 :LDB^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=1 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); RT64 = sext(*[ram]:1 RPTR); }
 
 :STW^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); *[ram]:4 RPTR = RT64; }
 :LDW^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); RT64 = *[ram]:4 RPTR; }
 
-:STH^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); *[ram]:2 RPTR = RT64; }
+:STH^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); *[ram]:2 RPTR = RT64:2; }
 :LDHU^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=2 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); RT64 = zext(*[ram]:2 RPTR); }
 
 :STW^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); *[ram]:4 RPTR = RT64; }
 :LDW^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=0 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); RT64 = *[ram]:4 RPTR; }
 
-:STH^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); *[ram]:2 RPTR = RT64; }
+:STH^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); *[ram]:2 RPTR = RT64:2; }
 :LDH^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=3 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); RT64 = sext(*[ram]:2 RPTR); }
 
 :STW^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); *[ram]:4 RPTR = RT64; }
 :LDW^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=4 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); RT64 = *[ram]:4 RPTR; }
 
-:STB^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); *[ram]:1 RPTR = RT64; }
+:STB^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); *[ram]:1 RPTR = RT64:1; }
 :LDB^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=5 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 0); RT64 = sext(*[ram]:1 RPTR); }
 
 :STNW^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); *[ram]:4 RPTR = RT64; }
 :LDNW^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=6 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 2); RT64 = *[ram]:4 RPTR; }
 
-:STH^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); *[ram]:2 RPTR = RT64; }
+:STH^CUnitD " " RT64^", "^"*--"^RPTR^"["^Cucst2^"]" is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=0 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); *[ram]:2 RPTR = RT64:2; }
 :LDH^CUnitD " " "*--"^RPTR^"["^Cucst2^"]"^", "^RT64 is c_is16=1 & CUnitD & j15=0 & j14=1 & j11=1 & j10=1 & j2=1 & j1=0 & c_dsz=7 & q_ldst=1 & q_sz=1 & RPTR & Cucst2 & RT64 { RPTR = RPTR - (Cucst2 << 1); RT64 = sext(*[ram]:2 RPTR); }
 
 # ---------------------------------------------------------------------------
@@ -724,11 +653,12 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 
 # ---------------------------------------------------------------------------
 # Figure C-16. Dstk - SPRUFE8B appendix C.4.  ptr is B15 and s is fixed to 1
-# (so the unit is always .D2); the 5-bit offset is scaled by the word size.
+# (so the unit is always .D2); ucst1:0 = opcode14:13, ucst4:2 = opcode9:7.
+# The reconstructed 5-bit offset is scaled by the word size.
 # ---------------------------------------------------------------------------
 
-:STW^CUnitD^" *B15["^Cucst5stk^"], "^RT64 is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=0 & RT64 & Cucst5stk { *[ram]:4 (B15 + (Cucst5stk << 2)) = RT64; }
-:LDW^CUnitD^" *B15["^Cucst5stk^"], "^RT64 is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=1 & RT64 & Cucst5stk { RT64 = *[ram]:4 (B15 + (Cucst5stk << 2)); }
+:STW^CUnitD " " RT64^", *B15["^Cucst5stk^"]" is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=0 & RT64 & Cucst5stk { *[ram]:4 (B15 + (Cucst5stk << 2)) = RT64; }
+:LDW^CUnitD " " "*B15["^Cucst5stk^"], "^RT64 is c_is16=1 & CUnitD & j15=1 & j11=1 & j10=1 & j2=1 & j1=0 & q_s=1 & q_ldst=1 & RT64 & Cucst5stk { RT64 = *[ram]:4 (B15 + (Cucst5stk << 2)); }
 
 # ---------------------------------------------------------------------------
 # Figure C-17. Dx2op - SPRUFE8B appendix C.4.
@@ -977,7 +907,8 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 
 # ---------------------------------------------------------------------------
 # Figures G-1/G-2. LSDmvto / LSDmvfr - SPRUFE8B appendix G.3.
-# Bits 11:10 extend the source of mvto or destination of mvfr to 5 bits.
+# Bits 11:10 extend the source of mvto or destination of mvfr to 5 bits;
+# that absolute operand ignores RS. RS selects only the other 3-bit operand.
 # ---------------------------------------------------------------------------
 
 :MV^CUnitLSD RMVTo, RA15 is c_is16=1 & CUnitLSD & j6=0 & j5=0 & j2=1 & j1=1 & RMVTo & RA15 { RA15 = RMVTo; }
@@ -996,13 +927,14 @@ CTgt10: reloc is cq_scst10 [ reloc = (inst_start & 0xffffffe0) + (cq_scst10 << 2
 # ---------------------------------------------------------------------------
 # Figure G-4. LSDx1 - SPRUFE8B appendix G.3.  op = 010/011/100/110 defer
 # to the per-unit Figures C-20 (.D), D-11 (.L) and F-31 (.S); only the
-# unit-independent operations are constructed here.
+# unit-independent operations are constructed here.  G-4 spells the shared
+# source/destination explicitly in the three-operand ADD and XOR forms.
 # ---------------------------------------------------------------------------
 
 :MVK^CUnitLSD^" 0, "^RA97 is c_is16=1 & CUnitLSD & j12=1 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=0 & j14=0 & j13=0 & RA97 { RA97 = 0; }
 :MVK^CUnitLSD^" 1, "^RA97 is c_is16=1 & CUnitLSD & j12=1 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=0 & j14=0 & j13=1 & RA97 { RA97 = 1; }
-:ADD^CUnitLSD^" 1, "^RB97 is c_is16=1 & CUnitLSD & j12=1 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=0 & j13=1 & RA97 & RB97 { RB97 = RA97 + 1; }
-:XOR^CUnitLSD^" 1, "^RB97 is c_is16=1 & CUnitLSD & j12=1 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=1 & j13=1 & RA97 & RB97 { RB97 = RA97 ^ 1; }
+:ADD^CUnitLSD RA97, 1, RB97 is c_is16=1 & CUnitLSD & j12=1 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=0 & j13=1 & RA97 & RB97 { RB97 = RA97 + 1; }
+:XOR^CUnitLSD RA97, 1, RB97 is c_is16=1 & CUnitLSD & j12=1 & j11=1 & j10=0 & j6=1 & j5=1 & j2=1 & j1=1 & j15=1 & j14=1 & j13=1 & RA97 & RB97 { RB97 = RA97 ^ 1; }
 
 # ---------------------------------------------------------------------------
 # Figures H-5/H-6. Uspl / Uspldr (SPLOOP / SPLOOPD) - appendix H.4.

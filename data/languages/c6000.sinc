@@ -155,7 +155,7 @@ define token insn32 (32)
   xbit=(12,12)  ybit=(7,7)  hbit=(6,6)  nbit=(13,16)
   scbit=(23,23) nabit=(5,5)  rbit=(8,8)
   ucst5=(13,17) scst5=(13,17) signed cst5=(13,17)
-  cst5_hi=(18,22) crf_dst=(23,27)
+  cst5_hi=(18,22) scst5_hi=(18,22) signed crf_dst=(23,27)
   csta=(13,17)  cstb=(8,12)
   cst16=(7,22)  cst21=(7,27) signed  ucst15=(8,22)
   akpc_disp=(16,22) signed  akpc_nop=(13,15)
@@ -436,6 +436,8 @@ UCst5:  ucst5  is ucst5  { export *[const]:4 ucst5; }
 Cst5:   cst5   is cst5   { export *[const]:4 cst5; }
 SCst5:  scst5  is scst5 { export *[const]:4 scst5; }
 Cst5Hi: cst5_hi is cst5_hi { export *[const]:4 cst5_hi; }
+# SPRUFE8B MVK .L/.D (pp. 380-381): signed five-bit constant.
+SCst5Hi: scst5_hi is scst5_hi { export *[const]:4 scst5_hi; }
 UCst15: ucst15 is ucst15 { export *[const]:4 ucst15; }
 Csta:   csta   is csta   { export *[const]:4 csta; }
 Cstb:   cstb   is cstb   { export *[const]:4 cstb; }

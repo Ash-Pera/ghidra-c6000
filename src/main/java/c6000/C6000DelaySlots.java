@@ -206,8 +206,28 @@ public final class C6000DelaySlots {
             try {
                 boolean issuePacket=true;
                 do {
-                    int cycles=1;
+                    int cycles=issuePacket?packetCycles(issue):1;
+                    if(cycles<0)return null;
+                    Instruction nopGenerator=issuePacket&&C6000ExecutionPackets.startsMulticycleNop(issue)?issue:null;
                     int packetInstructions=issuePacket?1:0;
+                    if(issuePacket)for(var priorAt:C6000ExecutionPackets.issuePrefix(program,issue.getAddress())) {
+                        if(++packetInstructions>8)return null;
+                        var prior=decode(priorAt);if(prior==null)return null;
+                        if(prior.getFlowType().isJump()||prior.getFlowType().isCall()||prior.getFlowType().isTerminal())return null;
+                        var priorOwner=program.getFunctionManager().getFunctionContaining(priorAt);
+                        // A physical predecessor's p bit does not prove that
+                        // an alternate entry executed it. Require the owned
+                        // prefix and reject incoming control into this suffix.
+                        if(owner==null||!owner.equals(priorOwner))return null;
+                        var incoming=program.getReferenceManager().getReferencesTo(issue.getAddress());
+                        while(incoming.hasNext())if(incoming.next().getReferenceType().isFlow())return null;
+                        if(C6000ExecutionPackets.startsMulticycleNop(prior)) {
+                            if(nopGenerator!=null&&!C6000ExecutionPackets.sameMulticycleNop(nopGenerator,prior))return null;
+                            nopGenerator=prior;
+                        }
+                        int priorCycles=packetCycles(prior);if(priorCycles<0)return null;
+                        cycles=Math.max(cycles,priorCycles);
+                    }
                     while(!issuePacket||C6000ExecutionPackets.parallelWithNext(program,current)) {
                         monitor.checkCancelled();if(++packetInstructions>8)return null;var next=next(current);if(next==null||++count>MAX_INSTRUCTIONS)return null;
                         if(next.getAddress().subtract(issue.getMaxAddress())>MAX_BYTES)return null;
@@ -215,6 +235,10 @@ public final class C6000DelaySlots {
                         var other=program.getFunctionManager().getFunctionContaining(next.getAddress());
                         if(other!=null&&!other.equals(owner))return null;
                         if(program.getFunctionManager().getFunctionAt(next.getAddress())!=null)return null;
+                        if(C6000ExecutionPackets.startsMulticycleNop(next)) {
+                            if(nopGenerator!=null&&!C6000ExecutionPackets.sameMulticycleNop(nopGenerator,next))return null;
+                            nopGenerator=next;
+                        }
                         int nextCycles=packetCycles(next);if(nextCycles<0)return null;
                         cycles=Math.max(cycles,nextCycles);current=next;
                         if(!C6000ExecutionPackets.parallelWithNext(program,current))break;

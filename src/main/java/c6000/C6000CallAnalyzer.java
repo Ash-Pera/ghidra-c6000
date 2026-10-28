@@ -336,13 +336,10 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		 */
 		private static long[] copySource(Instruction insn, String name, Map<Register, long[]> regs) {
 			int n = insn.getNumOperands();
-			Register src;
-			if (name.equals("MV") && n == 2) src = insn.getRegister(0);
-			else if ((name.equals("ADD") || name.equals("OR")) && n == 3 &&
-				insn.getScalar(0) != null && insn.getScalar(0).getValue() == 0) {
-				src = insn.getRegister(1);
-			}
-			else return null;
+            // Full32 exact spellings include ADD.D src,0,dst as well as
+            // ADD/OR 0,src,dst. Both are copies; preserve constant recovery
+            // when a scalar MV alias is displayed as its actual primitive.
+            Register src = C6000EncodingInfo.registerCopySource(insn);
 			if (src == null || insn.getRegister(n - 1) == null || insn.getMnemonicString().startsWith("[")) {
 				return null;
 			}

@@ -3,6 +3,18 @@
 ## Unreleased
 
 ### Fixed
+* Schedule exact MPYLI integer products with E1 operand capture and simultaneous
+  E4 pair writeback; retain E1-only .M occupancy and reject conflicting result
+  write ports (SPRUFE8B MPYLI pp.344--345, 3.8.2).
+* Bump all C6000 language definitions to 1.1 so native Ghidra migration rebuilds persisted instruction-prototype partitions after compact operand fixes.
+* Capture updating-load addresses before base modification; preserve distinct E1 pointer and E5 data writes even when registers alias (SPRUFE8B 4.2.5/Table 4-10).
+* Prune only proved-impossible loading exits and predicate paths, using E1 snapshots and delayed counter interfaces; retain all unit and pending-return guards (SPRUFE8B 3.5, 3.8.8, 7.4.3, 7.9).
+* Schedule BDEC/BPOS from their raw predicate/counter decision through five delay cycles, with gated E1 decrement and cross-path hazards (SPRUFE8B pp.159-160,170-171).
+* Respect absolute five-bit compact move registers and fixed low comparison destinations, and use unscaled NDW offset/indirect addresses (SPRUFE8B G-1/G-2, D-7/D-9/D-10, C-9/C-11).
+* Capture ROTL operands in E1 and commit its result in E2 (SPRUFE8B pp.414-415).
+* Correct compact stack offsets, signed five-bit MVK, narrow-store widths and operand display (SPRUFE8B C-16, G-4, MVK/STB/STH entries).
+* Preserve full32 move encoding primitives and expose short/long address identity via `C6000EncodingInfo`; retain constant-copy recovery in call analysis (SPRUFE8B 2.4, 3.9.3, 3.10.2).
+* Reject conflicting multicycle NOP generators before native context priming and pipeline issue; preserve equal-count NOPs and whole execute-packet prefix timing (SPRUFE8B 3.5, 3.8.10, 3.8.11.5, 4.2.6).
 * Extend opt-in exact packet schedules with independent DP read ports, split
   writes through E10, captured predicates and delayed status events. Refuse
   changing repeated-read words. Add normal SPLOOP/D/W load/fetch/drain timing,
@@ -55,6 +67,9 @@
   `application.java.min` and handles missing JDKs without silently exiting.
 
 ### Added
+* Read-only closed caller-continuation traces retain captured STW E3 effects
+  through an immutable caller window and export the exit PC/E1 hazards.
+  Ordinary function scheduling keeps its pending-return refusal.
 * `C6000RepairSwitchOverrides.java` repairs legacy switch metadata on a copy.
   `C6000UseAnalysisLanguage.java` prepares a reading copy with concise float
   p-code, keeping the default language available for detailed semantic checks.

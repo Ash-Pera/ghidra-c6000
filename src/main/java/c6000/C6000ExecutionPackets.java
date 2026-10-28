@@ -2,6 +2,9 @@
 package c6000;
 
 import ghidra.program.model.address.Address;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.Program;
 import ghidra.program.model.mem.MemoryAccessException;
@@ -18,6 +21,24 @@ public final class C6000ExecutionPackets {
         int header = program.getMemory().getInt(at.getNewAddress(base + 28));
         if ((header >>> 28) != 0xe) throw new MemoryAccessException("No compact header");
         return ((header >>> ((at.getOffset() - base) / 2)) & 1) != 0;
+    }
+
+    /** SPRUFE8B 3.8.10: only one such generator may occupy an execute packet. */
+    static boolean startsMulticycleNop(Instruction instruction) {
+        String name = C6000CallAnalyzer.baseName(instruction);
+        if (name.equals("IDLE") || name.startsWith("BNOP") || name.startsWith("ADDKPC")) return true;
+        if (!name.equals("NOP")) return false;
+        var count = instruction.getScalar(0);
+        return count != null && count.getUnsignedValue() > 1;
+    }
+
+    /** Specific equal-count NOP exception, SPRUFE8B 3.8.11.5. */
+    static boolean sameMulticycleNop(Instruction first, Instruction second) {
+        if (!C6000CallAnalyzer.baseName(first).equals("NOP") ||
+                !C6000CallAnalyzer.baseName(second).equals("NOP")) return false;
+        var a = first.getScalar(0); var b = second.getScalar(0);
+        return a != null && b != null && a.getUnsignedValue() > 1 &&
+            a.getUnsignedValue() == b.getUnsignedValue();
     }
 
     /** PROT adds four NOP cycles to either load width: SPRUFE8B 3.10.2.2. */
@@ -58,16 +79,82 @@ public final class C6000ExecutionPackets {
         return new Slot(at, length, parallel, false);
     }
 
+    /** Physical generator recognition before SLEIGH context is primed.
+     * SPRUFE8B 3.8.10/3.8.11.5; F-10/F-11, ADDKPC format,
+     * compact F-17/F-18/F-20/F-21/F-32 and H-9.
+     * Positive values are NOP counts; -1 is a distinct generator; zero is none.
+     */
+    private static int nopGenerator(Program program, Slot instruction) throws MemoryAccessException {
+        if (instruction.length() == 4) {
+            int word=program.getMemory().getInt(instruction.at());
+            if ((word & ~1) == 0x1e000) return -1; // IDLE, before the NOP family
+            if ((word & 0xfffe1ffe) == 0) {
+                int count=((word >>> 13) & 15)+1;
+                return count>1?count:0;
+            }
+            if ((word & 0x1ffc) == 0x120 || // displacement BNOP
+                (word & 0x0f830ffe) == 0x00800362 || // register BNOP
+                (word & 0x1ffe) == 0x162) return -1; // ADDKPC
+            return 0;
+        }
+        int word=Short.toUnsignedInt(program.getMemory().getShort(instruction.at()));
+        if ((word & 0x1fff) == 0xc6e) {
+            int count=(word >>> 13)+1;return count>1?count:0;
+        }
+        if ((word & 0x187e) == 0x6e) return -1; // register BNOP, independent of BR
+        long base=instruction.at().getOffset() & ~31L;
+        int header=program.getMemory().getInt(instruction.at().getNewAddress(base+28));
+        if ((header & (1<<15)) != 0 &&
+            ((word & 0x3e)==0xa || (word & 0x2e)==0x2a)) return -1;
+        return 0;
+    }
+
+    private static Slot previous(Program program, Address at) throws MemoryAccessException {
+        if(at.getOffset()<2)return null;
+        Slot prior;
+        try { prior=slot(program,at.subtract(2)); }
+        catch (MemoryAccessException first) {
+            if(at.getOffset()<4||!program.getMemory().contains(at.subtract(4)))return null;
+            prior=slot(program,at.subtract(4));
+        }
+        return prior.header()?previous(program,prior.at()):prior;
+    }
+
+    /** Earlier instructions in this same execute packet, in issue order. */
+    static List<Address> issuePrefix(Program program, Address at) throws MemoryAccessException {
+        List<Address> result=new ArrayList<>();
+        Slot current=slot(program,at);
+        while(true) {
+            Slot prior=previous(program,current.at());
+            if(prior==null||!prior.parallel())break;
+            if(result.size()==7)throw new MemoryAccessException("Oversized execute packet");
+            result.add(prior.at());current=prior;
+        }
+        Collections.reverse(result);return result;
+    }
+
+    private static int mergeGenerator(int first,int second) throws MemoryAccessException {
+        if(first!=0&&second!=0&&(first<0||second<0||first!=second))
+            throw new MemoryAccessException("Conflicting multicycle NOP generators");
+        return second!=0?second:first;
+    }
+
     /** Bytes after this instruction through its execute-packet end, including crossed headers. */
     public static int parallelBytes(Program program, Address at) throws MemoryAccessException {
         Slot current = slot(program, at);
         if (current.header()) return 0;
         Address firstEnd = at.add(current.length());
-        int instructions = 1;
+        var prefix=issuePrefix(program,at);
+        int instructions = 1+prefix.size();
+        int generator=0;
+        for(var prior:prefix)generator=mergeGenerator(generator,nopGenerator(program,slot(program,prior)));
+        generator=mergeGenerator(generator,nopGenerator(program,current));
         while (current.parallel()) {
             if (++instructions > 8) throw new MemoryAccessException("Oversized execute packet");
             Slot next = slot(program, current.at().add(current.length()));
             if (next.header()) next = slot(program, next.at().add(next.length()));
+            int other=nopGenerator(program,next);
+            generator=mergeGenerator(generator,other);
             current = next;
         }
         return (int) (current.at().add(current.length()).subtract(firstEnd));

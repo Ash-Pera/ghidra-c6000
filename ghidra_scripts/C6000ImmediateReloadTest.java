@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import c6000.C6000LoopBuffer;
+import c6000.C6000EncodingInfo;
 import c6000.C6000LoopBuffer.Cycle;
 import c6000.C6000LoopBuffer.Operation;
 import c6000.C6000LoopBuffer.Origin;
@@ -45,7 +46,7 @@ public class C6000ImmediateReloadTest extends GhidraScript {
 		}
 		assertIssued(trace.get(7), "LDW", 1, 0, Origin.BUFFER);
 		assertIssued(trace.get(12), "STW", 0, 6, Origin.BUFFER);
-		assertIssued(trace.get(12), "MV", 1, 5, Origin.BUFFER);
+		assertIssuedCopy(trace.get(12), "A0", "B0", 1, 5, Origin.BUFFER);
 		assertIssued(trace.get(13), "STW", 1, 6, Origin.BUFFER);
 		assertIssued(trace.get(19), "STW", 1, 6, Origin.BUFFER);
 		if (!trace.get(13).terminatingBoundary ||
@@ -73,6 +74,18 @@ public class C6000ImmediateReloadTest extends GhidraScript {
 		}
 		println("C6000_IMMEDIATE_RELOAD PASS cycles=20/27/23 reloads=1/2/1");
 	}
+
+    private static void assertIssuedCopy(Cycle cycle, String source, String destination,
+            int invocation, int sourceCycle, Origin origin) {
+        for (Operation op : cycle.operations) {
+            var from = C6000EncodingInfo.registerCopySource(op.instruction);
+            var to = op.instruction.getRegister(op.instruction.getNumOperands() - 1);
+            if (from != null && to != null && from.getName().equals(source) &&
+                to.getName().equals(destination) && op.invocation == invocation &&
+                op.sourceCycle == sourceCycle && op.origin == origin) return;
+        }
+        throw new AssertionError("missing register copy at cycle " + cycle.number);
+    }
 
 	private static void assertIssued(Cycle cycle, String mnemonic,
 			int invocation, int sourceCycle, Origin origin) {

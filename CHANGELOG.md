@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+* The `dp-int` and `float-dp-arithmetic` fixtures expect `DPSP` to set INEX when
+  it rounds and `.L` `SUBDP` opfield `0011101` to compute `src1 - src2`, and read
+  the current decode-table format.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

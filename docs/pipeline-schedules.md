@@ -85,10 +85,17 @@ Zero/one counted iterations pad to the last loading boundary. A taken branch
 idles the non-reloading buffer after its five delay slots; previously issued
 writes still mature. TSR.SPLX tracks buffer activity independently of fetch.
 
-The fetch schedule includes six PG-through-DC advances when a stopped program
-frontend must refill (4.1.4). This agrees with the independent emulator on
-ordinary tested paths; its exact interaction with nested reloads still needs
-qualification. No C674x silicon-equivalence claim is made. The separate
+Normal post-loop execution resumes at the SPKERNEL delay, capped at the
+end of the epilog (SPRUFE8B p.481, 7.9.4, 7.12). It does not add six cycles
+for a fresh PG-through-DC fetch: the general pipeline diagram in 4.1.4 does
+not establish that a suspended sequential stream is discarded. The earlier
+six-cycle assertion and emulator agreement shared this unsupported assumption.
+Abrupt SPLOOPW exits retain their separate conservative transition contract;
+nested reloads are unsupported. No C674x silicon-equivalence claim is made.
+A required X-path or AMR stall for a buffered instruction is refused because
+7.15.2 specifies LBX/MSX exception behavior, not an automatic stall. Program
+memory instructions retain automatic stalls; unchanged complementary sampled
+predicates are permitted for buffered E1 readers. The separate
 `C6000LoopBuffer` helper reports abstract buffer issue cycles and exposes an
 external post-body fetch window; it is not a complete frontend or instruction
 writeback emulator.

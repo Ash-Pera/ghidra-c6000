@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Fixed
+* Resume normal post-loop dispatch at the documented SPKERNEL execution delay,
+  without an inferred six-cycle frontend refill; refuse buffered missed X-path
+  or AMR stalls, retain PM stalls, and prove dominated constant suffixes across
+  closed earlier control flow (SPRUFE8B p.481, 7.9.4, 7.12, 7.15.2).
+* Add explicit read-only closed direct-call traces with byte/ownership bounds,
+  raw p-code link proof and unchanged pending effects across call/return edges
+  (SPRUFE8B 3.5, 3.7, 3.10.2, 4.2); preserve ordinary function-schedule guards.
 * Schedule exact MPYLI integer products with E1 operand capture and simultaneous
   E4 pair writeback; retain E1-only .M occupancy and reject conflicting result
   write ports (SPRUFE8B MPYLI pp.344--345, 3.8.2).

@@ -79,13 +79,132 @@ public final class C6000PipelineCompiler {
         b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),c(traceContract.stopPc(),4));b.jump(PcodeOp.BRANCH,"exit",null);
     }
 
+
+    /** Hashes cover complete fetch packets; execution permission is only [start,end). */
+    public record UnownedSpan(long start,long end,String evidence) {
+        public UnownedSpan {if(start<0||end<=start||evidence==null||evidence.isBlank())throw new IllegalArgumentException("explicit unowned code evidence required");}
+        boolean contains(long pc){return pc>=start&&pc<end;}
+    }
+    public record TraceWindow(long ownerEntry,long start,long end,String fetchBytesSha256,List<UnownedSpan> unownedSpans) {
+        public TraceWindow(long ownerEntry,long start,long end,String fetchBytesSha256){this(ownerEntry,start,end,fetchBytesSha256,List.of());}
+        public TraceWindow {unownedSpans=List.copyOf(unownedSpans);if(start<0||end<=start||end>0x100000000L||end-start>4096||fetchBytesSha256==null||!fetchBytesSha256.matches("[0-9a-f]{64}"))throw new IllegalArgumentException("explicit bounded code-window hash required");long previous=start;for(var span:unownedSpans){if(span.start()<previous||span.end()>end)throw new IllegalArgumentException("unowned span outside exact ordered scope");previous=span.end();}}
+        boolean contains(long pc){return pc>=start&&pc<end;}
+        boolean unowned(long pc){return unownedSpans.stream().anyMatch(span->span.contains(pc));}
+    }
+    /** One statically closed direct call; null stop means the caller's actual B3 return. */
+    public record ClosedCallPlan(String languageId,TraceWindow caller,TraceWindow callee,long startPc,Long stopPc,long callPc,long linkPc,long continuation,long calleeReturnPc,Long callerReturnPc,TraceEntry entry,String evidence) {
+        public ClosedCallPlan {if(languageId==null||caller==null||callee==null||entry==null||evidence==null||evidence.isBlank()||!caller.contains(startPc)||!caller.contains(callPc)||!caller.contains(linkPc)||!caller.contains(continuation)||!callee.contains(calleeReturnPc)||(stopPc==null)==(callerReturnPc==null)||stopPc!=null&&stopPc!=caller.end()||callerReturnPc!=null&&!caller.contains(callerReturnPc)||caller.start()<callee.end()&&callee.start()<caller.end())throw new IllegalArgumentException("explicit disjoint closed-call scope required");}
+    }
+    public record PendingEffect(long pc,int age,int remainingAdvances,Varnode predicate,String instructionHex) {}
+    public record BoundaryHazard(String register,Varnode enabled) {}
+    public record ClosedCallBoundary(int pcodeIndex,String kind,long branchPc,Varnode capturedTarget,Long expectedTarget,List<PendingEffect> effects,List<PendingStore> stores,List<BoundaryHazard> hazards) {}
+    public record ClosedCallTraceResult(Result schedule,ClosedCallPlan contract,List<ClosedCallBoundary> boundaries,Set<String> outgoingE1Writes) {}
+    private ClosedCallPlan closedCall;
+    private final Set<Long> closedPackets=new HashSet<>();
+    private final List<ClosedCallBoundary> closedBoundaries=new ArrayList<>();
+    private Set<String> closedExitWrites;
+    /** Read-only multi-owner trace. This result is never an enable()/function contract. */
+    public static ClosedCallTraceResult compileClosedCallTrace(Program program,Function caller,ClosedCallPlan plan)throws Exception {
+        var compiler=new C6000PipelineCompiler(program,caller,plan.entry().previousE1Writes(),plan.startPc());
+        compiler.closedCall=plan;compiler.validateClosedCall();var result=compiler.compileInternal();
+        if(compiler.closedExitWrites==null||compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_ENTER"))||compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_RETURN")))throw compiler.fail("closed-call trace did not close all declared edges");
+        return new ClosedCallTraceResult(result,plan,List.copyOf(compiler.closedBoundaries),Set.copyOf(compiler.closedExitWrites));
+    }
+    private TraceWindow closedWindow(long pc){if(closedCall==null)return null;if(closedCall.caller().contains(pc))return closedCall.caller();if(closedCall.callee().contains(pc))return closedCall.callee();return null;}
+    private boolean observesStores(){return traceContract!=null||closedCall!=null;}
+    private int closedPhysicalLength(Address at){
+        try{return C6000ExecutionPackets.instructionLengthAt(program,at);}
+        catch(ghidra.program.model.mem.MemoryAccessException invalid){throw fail("closed-call invalid physical instruction start at "+at+": "+invalid.getMessage());}
+    }
+    private void validateClosedInstruction(Instruction instruction)throws Exception {
+        long start=instruction.getAddress().getOffset(),end=start+instruction.getLength();var window=closedWindow(start);
+        if(window==null||end>window.end())throw fail("closed-call instruction leaves declared window at "+instruction.getAddress());
+        UnownedSpan gap=null;for(var candidate:window.unownedSpans())if(candidate.start()<end&&start<candidate.end()){
+            if(gap!=null||candidate.start()>start||candidate.end()<end)throw fail("closed-call unowned span cuts an instruction at "+instruction.getAddress());gap=candidate;
+        }
+        for(long pc=start;pc<end;pc++){
+            var at=entry.getNewAddress(pc);if(program.getListing().getDefinedDataContaining(at)!=null)throw fail("closed-call instruction overlaps defined data at "+at);
+            var owner=program.getFunctionManager().getFunctionContaining(at);
+            if(gap!=null?owner!=null:owner==null||owner.getEntryPoint().getOffset()!=window.ownerEntry()||!owner.getBody().contains(at))throw fail("closed-call instruction leaves declared byte ownership at "+at);
+        }
+    }
+    private void validateWindow(TraceWindow window)throws Exception {
+        if(program.getFunctionManager().getFunctionAt(entry.getNewAddress(window.ownerEntry()))==null)throw fail("closed-call owner identity missing");
+        long first=window.start()&~31L,last=(window.end()+31)&~31L;byte[] bytes=new byte[(int)(last-first)];
+        if(program.getMemory().getBytes(entry.getNewAddress(first),bytes)!=bytes.length)throw fail("closed-call short byte window");
+        if(!java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)).equals(window.fetchBytesSha256()))throw fail("closed-call byte hash mismatch");
+        for(var gap:window.unownedSpans())for(long pc=gap.start();pc<gap.end();pc++){
+            var at=entry.getNewAddress(pc);if(program.getFunctionManager().getFunctionContaining(at)!=null)throw fail("closed-call unowned span overlaps an owner at "+at);
+            if(program.getListing().getDefinedDataContaining(at)!=null)throw fail("closed-call unowned span overlaps defined data at "+at);
+        }
+        var boundaries=new HashSet<Long>();long pc=window.start();while(pc<window.end()){
+            closedPhysicalLength(entry.getNewAddress(pc));if(!C6000ExecutionPackets.issuePrefix(program,entry.getNewAddress(pc)).isEmpty())throw fail("closed-call declared packet start has a parallel prefix at "+entry.getNewAddress(pc));
+            if(!closedPackets.add(pc))throw fail("closed-call overlapping execute packets");var packet=packet(pc);if(packet.get(0).instruction().getAddress().getOffset()!=pc)throw fail("closed-call declared packet start skips a fetch header");if(packet.size()==8)for(var instruction:packet)if(C6000PacketContext.physicalDecodeFields(program,instruction.instruction().getAddress()).get("c_hdrpkt")==1)throw fail("closed-call eight-instruction header-based execute packet");for(var instruction:packet){boundaries.add(instruction.instruction().getAddress().getOffset());boundaries.add(instruction.instruction().getMaxAddress().getOffset()+1);}long next=after(packet.get(packet.size()-1));if(next>window.end()||next<=pc)throw fail("closed-call window cuts an execute packet");
+            for(var insn:packet){long at=insn.instruction().getAddress().getOffset();for(var gap:window.unownedSpans())if(gap.contains(at)&&at+insn.instruction().getLength()>gap.end())throw fail("closed-call unowned span cuts an instruction");boolean branch=Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(insn.name());
+                if(insn.name().startsWith("SPLOOP")||Set.of("SPKERNEL","SPMASK","IDLE").contains(insn.name()))throw fail("closed-call scope requires straight-line control");
+                if(branch&&at!=closedCall.callPc()&&at!=closedCall.calleeReturnPc()&&!Objects.equals(at,closedCall.callerReturnPc()))throw fail("closed-call undeclared control edge");
+                if(branch&&insn.predicate()!=null)throw fail("closed-call control edge must be unconditional");
+                long b3=program.getRegister("B3").getAddress().getOffset();if(window.equals(closedCall.callee()))for(var dest:insn.outputs())if(dest.offset()<b3+4&&b3<dest.offset()+dest.size())throw fail("closed-call callee changes B3");
+            }pc=next;
+        }if(pc!=window.end())throw fail("closed-call window is not exact");for(var gap:window.unownedSpans())if(!boundaries.contains(gap.start())||!boundaries.contains(gap.end()))throw fail("closed-call unowned span boundary is not an instruction boundary");
+    }
+    private void validateClosedTargetPacket(long pc)throws Exception {
+        var target=packet(pc);long fetch=pc&~31L;
+        for(var instruction:target)if((instruction.instruction().getMinAddress().getOffset()&~31L)!=fetch||(instruction.instruction().getMaxAddress().getOffset()&~31L)!=fetch)throw fail("closed-call branch-target execute packet spans fetch packets at "+entry.getNewAddress(pc));
+    }
+    private void validateReturn(long pc)throws Exception {var insn=decode(pc);var register=insn.instruction().getRegister(0);if(!Set.of("B","BNOP").contains(insn.name())||register==null||!register.getName().equals("B3")||insn.predicate()!=null)throw fail("closed-call expected unconditional B3 return");}
+    private void validateClosedCall()throws Exception {
+        if(!closedCall.entry().drained())throw fail("closed-call requires explicit drained entry");
+        if(!program.getLanguageID().getIdAsString().equals(closedCall.languageId())||function.getEntryPoint().getOffset()!=closedCall.caller().ownerEntry())throw fail("closed-call language/owner identity mismatch");
+        if(closedCall.callee().start()!=closedCall.callee().ownerEntry())throw fail("closed-call callee must enter at its owner entry");
+        validateWindow(closedCall.caller());validateWindow(closedCall.callee());
+        if(!closedPackets.contains(closedCall.startPc())||!closedPackets.contains(closedCall.callPc())||!closedPackets.contains(closedCall.continuation())||closedCall.stopPc()!=null&&closedCall.stopPc()<=closedCall.continuation())throw fail("closed-call start/continuation is not a packet boundary");
+        var call=decode(closedCall.callPc());if(!call.name().equals("B")||call.predicate()!=null||call.instruction().getRegister(0)!=null||call.instruction().getAddress(0)==null||call.instruction().getAddress(0).getOffset()!=closedCall.callee().start())throw fail("closed-call target is not the declared direct call");
+        // SPRUFE8B 4.2.6 and 3.10.4 require target fetch timing not yet modeled here.
+        validateClosedTargetPacket(closedCall.startPc());validateClosedTargetPacket(closedCall.callee().start());validateClosedTargetPacket(closedCall.continuation());
+        validateReturn(closedCall.calleeReturnPc());if(closedCall.callerReturnPc()!=null)validateReturn(closedCall.callerReturnPc());
+        // Five delay cycles, not five source rows: multicycle NOPs keep their full span.
+        long pc=closedCall.callPc();int elapsed=0;boolean found=false;long b3=program.getRegister("B3").getAddress().getOffset();
+        while(elapsed<6){var pack=packet(pc);int span=1;for(var i:pack){long at=i.instruction().getAddress().getOffset();span=Math.max(span,i.span());for(var d:i.outputs())if(d.offset()<b3+4&&b3<d.offset()+d.size()){
+            if(at!=closedCall.linkPc()||elapsed!=5||!i.name().equals("ADDKPC")||i.predicate()!=null||i.span()!=1||d.offset()!=b3||d.size()!=4||d.phase()!=1||!rawConstantLink(i,b3,closedCall.continuation()))throw fail("closed-call link lacks exact unconditional final-delay B3 proof at "+i.instruction().getAddress());found=true;
+        }}elapsed+=span;pc=after(pack.get(pack.size()-1));}
+        if(elapsed!=6||pc!=closedCall.continuation()||!found)throw fail("closed-call delay/link window does not reach continuation");
+        // No incoming late effects, no earlier B3 write with a late phase, and no
+        // callee B3 writer: the actual E1-captured return target is the proven link.
+        for(var i:instructions.values())if(closedCall.caller().contains(i.instruction().getAddress().getOffset())&&i.instruction().getAddress().getOffset()<closedCall.continuation())for(var d:i.outputs())if(d.offset()<b3+4&&b3<d.offset()+d.size()&&d.phase()!=1)throw fail("closed-call pre-link late B3 writer");
+    }
+    private boolean rawConstantLink(Insn instruction,long b3,long expected){
+        // Evaluate the existing raw p-code with every architectural input unknown.
+        // Only an independently known constant B3 output can prove this link.
+        Long value=C6000LoopCounterProof.constantOutput(program.getLanguage(),instruction.raw(),b3,4);
+        return value!=null&&(value&0xffffffffL)==expected;
+    }
+    private void closedBoundary(String kind,Branch landing,List<Flight> flights,List<Hazard> hazards)throws Exception {
+        var effects=new ArrayList<PendingEffect>();var stores=new ArrayList<PendingStore>();var recent=new ArrayList<BoundaryHazard>();
+        for(var flight:flights){var i=decode(flight.pc());effects.add(new PendingEffect(flight.pc(),flight.age(),i.latency()-flight.age(),slot("predicate",flight.pc(),flight.age(),0,1),java.util.HexFormat.of().formatHex(i.instruction().getBytes())));if(i.name().equals("STW")){var inputs=new LinkedHashMap<String,Varnode>();for(long offset:i.regs()){var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(offset),4);if(register!=null)inputs.put(register.getName(),slot("input",flight.pc(),flight.age(),offset,4));}stores.add(new PendingStore(flight.pc(),flight.age(),3-flight.age(),slot("predicate",flight.pc(),flight.age(),0,1),slot("store_address",flight.pc(),flight.age(),0,4),slot("store_value",flight.pc(),flight.age(),0,4),Map.copyOf(inputs),java.util.HexFormat.of().formatHex(i.instruction().getBytes())));}}
+        for(var hazard:hazards)for(long offset:hazard.registers()){var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(offset),4);if(register!=null)recent.add(new BoundaryHazard(register.getName(),slot("hazard",hazard.pc(),0,0,1)));}
+        int marker=b.code.size();b.op(PcodeOp.COPY,temp(1),c(0,1));Varnode target=landing.returns()?slot("target",landing.pc(),landing.age(),0,4):arch(program.getRegister("B3").getAddress().getOffset(),4);
+        closedBoundaries.add(new ClosedCallBoundary(marker,kind,landing.pc(),target,kind.equals("CALLER_RETURN")?null:closedCall.continuation(),List.copyOf(effects),List.copyOf(stores),List.copyOf(recent)));
+    }
+    private Set<String> closedHazards(List<Hazard> hazards)throws Exception {
+        Set<String> writes=new TreeSet<>();for(var hazard:hazards){if(decode(hazard.pc()).predicate()!=null)throw fail("closed-call exit has a conditional hazard");for(long offset:hazard.registers()){var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(offset),4);if(register==null)throw fail("closed-call exit hazard is unknown");writes.add(register.getName());}}return Set.copyOf(writes);
+    }
+    private void closeClosedTrace(State state)throws Exception {
+        if(state.idle()!=0||!state.flights().isEmpty()||!state.branches().isEmpty()||state.loop()!=null)throw fail("closed-call endpoint still has pending effects");
+        var writes=closedHazards(state.hazards());if(closedExitWrites!=null&&!closedExitWrites.equals(writes))throw fail("closed-call incompatible exit hazards");closedExitWrites=writes;
+        b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),c(closedCall.stopPc(),4));b.jump(PcodeOp.BRANCH,"exit",null);
+    }
+
     private record Flight(long pc,int age,int predicateTruth){
     }
 
     private record Branch(long pc,int age,long target,boolean returns){
     }
 
-    private record Hazard(long pc,List<Long> registers){
+    private record Hazard(long pc,List<Long> registers,boolean predicateUnchanged){
+        // Unknown external/legacy history cannot establish sampled-predicate
+        // identity. Ordinary compile captures this from all committed writes.
+        Hazard(long pc,List<Long> registers){this(pc,registers,false);}
     }
 
     private record LoopFrame(long start,int time,int drain,boolean zero,boolean refill,boolean abrupt) {}
@@ -149,9 +268,12 @@ public final class C6000PipelineCompiler {
     }
 
     public C6000PipelineCompiler(Program p,Function f,Set<String> previousE1Writes){
+        this(p,f,previousE1Writes,f.getEntryPoint().getOffset());
+    }
+    private C6000PipelineCompiler(Program p,Function f,Set<String> previousE1Writes,long startPc){
         program=p;
         function=f;
-        entry=f.getEntryPoint();
+        entry=f.getEntryPoint().getNewAddress(startPc);
         unique=p.getAddressFactory().getUniqueSpace();
         constant=p.getAddressFactory().getConstantSpace();
         b=new Builder();
@@ -217,16 +339,20 @@ public final class C6000PipelineCompiler {
         if(instructions.containsKey(pc))return instructions.get(pc);
         Address at=entry.getNewAddress(pc);
         var owner=program.getFunctionManager().getFunctionContaining(at);
+        var window=closedWindow(pc);
+        if(closedCall!=null){if(window==null)throw fail("closed-call flow leaves declared ownership at "+at);if(window.unowned(pc)?owner!=null:owner==null||owner.getEntryPoint().getOffset()!=window.ownerEntry()||!owner.getBody().contains(at))throw fail("closed-call flow leaves declared ownership at "+at);}
         if(callerPc(pc)){
             if(owner!=null&&owner.getEntryPoint().getOffset()!=traceContract.callerFunctionEntry())throw fail("caller continuation has conflicting ownership at "+at);
             if(owner==null&&!traceContract.allowUnownedWindow())throw fail("caller continuation has unowned code at "+at);
         }
         if(program.getListing().getDefinedDataContaining(at)!=null)throw fail("scheduled code conflicts with defined data at "+at);
-        if(owner!=null&&!owner.equals(function)&&!callerPc(pc))throw fail("flow enters another function at "+at);
-        if(!callerPc(pc)&&(pc>function.getBody().getMaxAddress().getOffset()+254||pc<function.getBody().getMinAddress().getOffset()))throw fail("flow leaves owned code at "+at);
+        if(owner!=null&&!owner.equals(function)&&!callerPc(pc)&&closedCall==null)throw fail("flow enters another function at "+at);
+        if(closedCall==null&&!callerPc(pc)&&(pc>function.getBody().getMaxAddress().getOffset()+254||pc<function.getBody().getMinAddress().getOffset()))throw fail("flow leaves owned code at "+at);
+        int physicalLength=closedCall==null?0:closedPhysicalLength(at);
         var context=new ProcessorContextImpl(program.getLanguage());
         var value=program.getProgramContext().getRegisterValue(program.getLanguage().getContextBaseRegister(),at);
         if(value!=null)context.setRegisterValue(value);
+        if(closedCall!=null)for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
         if(callerPc(pc))for(String name:List.of("c_is16","c_rs","c_dsz","c_sat","c_br","c_prot","c_isheader","c_pfollow","c_hdrpkt"))context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));
@@ -234,6 +360,7 @@ public final class C6000PipelineCompiler {
         var memory=new DumbMemBufferImpl(program.getMemory(),at);
         var prototype=program.getLanguage().parse(memory,context,false);
         var ins=new PseudoInstruction(program,at,prototype,memory,context);
+        if(closedCall!=null){if(ins.getLength()!=physicalLength)throw fail("closed-call decoder width conflicts with physical fetch layout at "+at);validateClosedInstruction(ins);}
         String name=base(ins);
         boolean load=name.startsWith("LD"),store=name.startsWith("ST");
         int latency;
@@ -469,7 +596,7 @@ public final class C6000PipelineCompiler {
         // Capture the exact address/data already produced by native store
         // p-code in E1. This observes temporaries, never performs memory early.
         StoreCapture traceStore=null;
-        if(traceContract!=null&&i.name().equals("STW")&&!actualMemory){
+        if(observesStores()&&i.name().equals("STW")&&!actualMemory){
             var address=temp(4);var value=temp(4);b.op(PcodeOp.COPY,address,c(0,4));b.op(PcodeOp.COPY,value,c(0,4));traceStore=new StoreCapture(address,value);traceEvaluatedStores.put(pc,traceStore);
         }
         int traceStoreCount=0;
@@ -558,7 +685,7 @@ public final class C6000PipelineCompiler {
 
     private List<Long> e1Outputs(Insn i){
         List<Long> r=new ArrayList<>();
-        for(var d:i.outputs())if(!d.flags()&&d.phase()==1)for(long off=d.offset()&~3L;off<d.offset()+d.size();off+=4)if(off<0x2000)r.add(off);
+        for(var d:i.outputs())if(!d.flags()&&d.phase()==1)for(long off=d.offset()&~3L;off<d.offset()+d.size();off+=4)if(off<0x2000||off==program.getRegister("AMR").getAddress().getOffset())r.add(off);
         return List.copyOf(r);
     }
 
@@ -570,16 +697,38 @@ public final class C6000PipelineCompiler {
             int side=mn.matches(".*\\.[LSDM]1.*")?0:mn.matches(".*\\.[LSDM]2.*")?1:-1;
             if(side<0)continue;
             int count=i.instruction().getNumOperands()-(i.name().equals("B")||i.name().equals("BNOP")?0:1);
-            for(int k=0;k<count;k++)for(Object obj:i.instruction().getOpObjects(k))if(obj instanceof Register reg){
-                long off=reg.getAddress().getOffset();
-                if(off<0x2000&&((off>=0x1000)?1:0)!=side)for(long x=off;x<off+reg.getMinimumByteSize();x+=4)r.add(x);
+            for(int k=0;k<count;k++){
+                // Pair operands can expose an empty getOpObjects array while
+                // getRegister identifies their full read port (3.8.4, 4.2.7--16).
+                Set<Register> registers=new HashSet<>();var direct=i.instruction().getRegister(k);if(direct!=null)registers.add(direct);
+                for(Object object:i.instruction().getOpObjects(k))if(object instanceof Register register)registers.add(register);
+                for(var register:registers){long off=register.getAddress().getOffset();
+                    if(off<0x2000&&((off>=0x1000)?1:0)!=side)for(long x=off;x<off+register.getMinimumByteSize();x+=4)r.add(x);
+                }
             }
         }
         return r;
     }
 
+    private boolean usesAmr(Insn instruction){
+        if(!instruction.load()&&!instruction.store())return false;
+        int operand=instruction.load()?0:1;
+        for(Object object:instruction.instruction().getOpObjects(operand))if(object instanceof Register register&&register.getName().matches("[AB][4-7]"))return true;
+        return false;
+    }
+    private boolean harmlessPredicates(Hazard hazard,Insn reader,State state){
+        if(predicateTruth(reader,state.facts())==0)return true;
+        if(hazard.pc()<0)return false;
+        var writer=decodeKnown(hazard.pc());
+        if(!hazard.predicateUnchanged())return false;
+        if(predicateTruth(writer,state.facts())==0)return true;
+        // 7.15.2 explicitly permits complementary predicates when their sampled
+        // value is unchanged. Do not infer this after a predicate register write.
+        return writer.predicate()!=null&&writer.predicate().equals(reader.predicate())&&writer.inverted()!=reader.inverted();
+    }
+
     public Result compile()throws Exception{
-        if(traceContract!=null)throw fail("trace compiler is not an ordinary function schedule");
+        if(traceContract!=null||closedCall!=null)throw fail("trace compiler is not an ordinary function schedule");
         return compileInternal();
     }
     private Result compileInternal()throws Exception{
@@ -602,6 +751,8 @@ public final class C6000PipelineCompiler {
             int id=selected.getValue();
             b.label("node"+id);
             processed++;
+            if(closedCall!=null&&closedCall.stopPc()!=null&&s.pc()==closedCall.stopPc()&&s.idle()==0){closeClosedTrace(s);continue;}
+            if(closedCall!=null&&s.idle()==0&&!closedPackets.contains(s.pc()))throw fail("closed-call entered undeclared packet");
             if(traceContract!=null&&s.pc()==traceContract.stopPc()&&s.idle()==0){closeTrace(s);continue;}
             if(callerPc(s.pc())&&s.idle()==0&&!traceContract.callerPackets().contains(s.pc()))throw fail("caller continuation entered an undeclared packet");
             LoopPlan loop=s.loop()==null?null:loopPlans.get(s.loop().start());
@@ -638,11 +789,33 @@ public final class C6000PipelineCompiler {
                 if(flight.age()<latency)for(var instruction:pack)if(unit(old)!=0&&unit(old)==unit(instruction))throw fail("functional unit still occupied by "+old.instruction());
             }
             if(!pack.isEmpty())packets++;
+            Set<Long> fetchedPcs=new HashSet<>();for(var instruction:fetched)fetchedPcs.add(instruction.instruction().getAddress().getOffset());
             Set<Long> crosses=new HashSet<>();
-            for(var instruction:pack){Set<Long> ports=crossReads(List.of(instruction));for(var read:instruction.reads())if(read.first()>1)ports.remove(read.offset());crosses.addAll(ports);}
+            for(var instruction:fetched){Set<Long> ports=crossReads(List.of(instruction));for(var read:instruction.reads())if(read.first()>1)ports.remove(read.offset());crosses.addAll(ports);}
             for(var flight:s.flights()){
                 var instruction=decode(flight.pc());Set<Long> ports=crossReads(List.of(instruction));
-                for(var read:instruction.reads())if((read.phases()&(1<<flight.age()))!=0&&ports.contains(read.offset()))crosses.add(read.offset());
+                for(var read:instruction.reads())if((read.phases()&(1<<flight.age()))!=0&&ports.contains(read.offset())){
+                    boolean buffered=false;
+                    for(var candidate:loopPlans.values())for(int k=0;k<candidate.cells().size();k++)for(var old:candidate.cells().get(k).buffered())if(old.instruction().getAddress().getOffset()==flight.pc())buffered=loop==null||candidate!=loop||s.loop().time()-flight.age()!=k;
+                    if(buffered){for(var hazard:s.hazards())if(hazard.registers().contains(read.offset())&&flight.predicateTruth()!=0){
+                        // This reader sampled its predicate in an earlier E1;
+                        // current facts/complementarity do not describe it.
+                        boolean disabled=hazard.pc()>=0&&hazard.predicateUnchanged()&&predicateTruth(decodeKnown(hazard.pc()),s.facts())==0;
+                        if(!disabled)throw fail("buffered late port may require a missed X-path stall (LBX/MSX): "+instruction.instruction());
+                    }}
+                    else crosses.add(read.offset());
+                }
+            }
+            // SPRUFE8B 7.15.2, 7.16--17: PM instructions retain automatic
+            // stalls, but a required stall for a buffer instruction is LBX/MSX,
+            // not permission to insert a global cycle. Refuse possible missed
+            // stalls rather than approximate exception state.
+            long amr=program.getRegister("AMR").getAddress().getOffset();
+            for(var instruction:pack){
+                boolean amrRead=usesAmr(instruction);Set<Long> ports=crossReads(List.of(instruction));
+                for(var read:instruction.reads())if(read.first()>1)ports.remove(read.offset());
+                if(fetchedPcs.contains(instruction.instruction().getAddress().getOffset())){if(amrRead)crosses.add(amr);continue;}
+                for(var hazard:s.hazards())if((amrRead&&hazard.registers().contains(amr)||hazard.registers().stream().anyMatch(ports::contains))&&!harmlessPredicates(hazard,instruction,s))throw fail("buffered instruction may require a missed X-path/AMR stall (LBX/MSX): "+instruction.instruction());
             }
             Varnode stall=null;
             for(var h:s.hazards())if(h.registers().stream().anyMatch(crosses::contains)){
@@ -723,7 +896,7 @@ public final class C6000PipelineCompiler {
                 int age=f.age()+1;
                 nextFlights.add(new Flight(f.pc(),age,f.predicateTruth()));
                 copy(moves,slot("predicate",f.pc(),age,0,1),slot("predicate",f.pc(),f.age(),0,1));
-                if(traceContract!=null&&i.name().equals("STW")){copy(moves,slot("store_address",f.pc(),age,0,4),slot("store_address",f.pc(),f.age(),0,4));copy(moves,slot("store_value",f.pc(),age,0,4),slot("store_value",f.pc(),f.age(),0,4));}
+                if(observesStores()&&i.name().equals("STW")){copy(moves,slot("store_address",f.pc(),age,0,4),slot("store_address",f.pc(),f.age(),0,4));copy(moves,slot("store_value",f.pc(),age,0,4),slot("store_value",f.pc(),f.age(),0,4));}
                 for(long off:i.regs())copy(moves,slot("input",f.pc(),age,off,4),lateInputs.get(f).getOrDefault(off,slot("input",f.pc(),f.age(),off,4)));
                 for(var d:i.outputs())if(d.phase()>age&&!i.store()&&f.age()>=(i.load()?3:i.ready())-1){
                     var e=mature.get(f);
@@ -738,13 +911,19 @@ public final class C6000PipelineCompiler {
                 var e=issued.get(pc);
                 var writes=e1Outputs(i);
                 if(!writes.isEmpty()){
-                    hazards.add(new Hazard(pc,writes));
+                    // The next packet must know whether this writer's E1
+                    // predicate sample still denotes the same value. Include
+                    // ALL writes at this commit, even a final-phase flight
+                    // that disappears from nextFlights (3.5, 7.15.2).
+                    long predicate=i.predicate()==null?-1:i.predicate().getAddress().getOffset();
+                    boolean unchanged=predicate<0||writesThisCycle.stream().noneMatch(d->d.offset()<predicate+4&&predicate<d.offset()+d.size());
+                    hazards.add(new Hazard(pc,writes,unchanged));
                     copy(moves,slot("hazard",pc,0,0,1),writesWhen(i,e));
                 }
                 if(i.latency()>1){
                     nextFlights.add(new Flight(pc,1,-1));
                     copy(moves,slot("predicate",pc,1,0,1),e.predicate());
-                    if(traceContract!=null&&i.name().equals("STW")){var store=traceEvaluatedStores.get(pc);if(store==null)throw fail("trace STW capture missing");copy(moves,slot("store_address",pc,1,0,4),store.address());copy(moves,slot("store_value",pc,1,0,4),store.value());}
+                    if(observesStores()&&i.name().equals("STW")){var store=traceEvaluatedStores.get(pc);if(store==null)throw fail("trace STW capture missing");copy(moves,slot("store_address",pc,1,0,4),store.address());copy(moves,slot("store_value",pc,1,0,4),store.value());}
                     for(var v:captured.get(pc).entrySet())copy(moves,slot("input",pc,1,v.getKey(),4),v.getValue());
                     if(!i.load()&&!i.store()&&i.ready()==1)for(var d:i.outputs())if(d.phase()>1)copy(moves,outputSlot(pc,1,d),outputValue(e,d));
                 }
@@ -767,14 +946,19 @@ public final class C6000PipelineCompiler {
             if(landing!=null){
                 idle=0;
                 if(landing.returns()){
-                    if(traceContract!=null)nextPc=continueReturn(landing,nextFlights,nextBranches,issueBranch,loop);
+                    if(closedCall!=null&&landing.pc()==closedCall.calleeReturnPc()){
+                        if(loop!=null||!nextBranches.isEmpty()||issueBranch!=null)throw fail("closed-call callee return has unresolved control effects");
+                        closedBoundary("CALL_RETURN",landing,nextFlights,hazards);nextPc=closedCall.continuation();
+                    }
+                    else if(traceContract!=null)nextPc=continueReturn(landing,nextFlights,nextBranches,issueBranch,loop);
                     else {
                         if(!nextFlights.isEmpty()||!nextBranches.isEmpty()||issueBranch!=null)throw fail("return leaves architectural pipeline effects pending; source="+s+"; next="+nextFlights);
+                        if(closedCall!=null){if(!Objects.equals(landing.pc(),closedCall.callerReturnPc()))throw fail("closed-call undeclared return");closedBoundary("CALLER_RETURN",landing,nextFlights,hazards);var writes=closedHazards(hazards);if(closedExitWrites!=null&&!closedExitWrites.equals(writes))throw fail("closed-call incompatible return hazards");closedExitWrites=writes;}
                         b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),slot("target",landing.pc(),landing.age(),0,4));
                         if(loop!=null){var tsr=program.getRegister("TSR");b.op(PcodeOp.INT_AND,new Varnode(tsr.getAddress(),4),new Varnode(tsr.getAddress(),4),c(0xffffbfffL,4));}
                         b.jump(PcodeOp.BRANCH,"exit",null);continue;
                     }
-                } else nextPc=landing.target();
+                } else {if(closedCall!=null){if(landing.pc()!=closedCall.callPc())throw fail("closed-call undeclared direct landing");closedBoundary("CALL_ENTER",landing,nextFlights,hazards);}nextPc=landing.target();}
             }
             // SPRUFE8B 7.14: a taken branch idles a non-reloading buffer
             // after its five delay slots. Effects already issued still mature.
@@ -1000,7 +1184,9 @@ public final class C6000PipelineCompiler {
         if(!found||cells.size()>48)throw fail("loop source exceeds 48 dynamic cycles or lacks SPKERNEL");
         if(cells.size()<(start.name().equals("SPLOOPW")?ii:ii+1))throw fail("loop dynamic length below documented minimum");
         int cap=((Math.max(cells.size(),4)+ii-1)/ii)*ii;var plan=new LoopPlan(at,start.name(),ii,fetchDelay,cap,List.copyOf(cells),pc);loopPlans.put(at,plan);
-        loadingCountProofs.put(at,proveLoadingCount(start,plan));return plan;
+        var proof=proveLoadingCount(start,plan);
+        if(!proof.noLoadingExit())proof=proveLoadingSuffix(start,plan);
+        loadingCountProofs.put(at,proof);return plan;
     }
 
     private List<C6000LoopCounterProof.Operation> proofOperations(List<Insn> packet){
@@ -1035,6 +1221,76 @@ public final class C6000PipelineCompiler {
         return C6000LoopCounterProof.Proof.unknown("prefix proof packet bound");
     }
 
+    private record ProofPacket(long pc,long next,int span,List<Insn> instructions) {}
+    private boolean proofControl(Insn instruction){
+        var flow=instruction.instruction().getFlowType();
+        return flow.isJump()||flow.isCall()||flow.isTerminal()||Set.of("B","BNOP","BDEC","BPOS","CALLP","SPLOOP","SPLOOPD","SPLOOPW","SPKERNEL","SPMASK").contains(instruction.name());
+    }
+    private int proofCycles(List<ProofPacket> packets,int first,int last){int cycles=0;for(int k=first;k<last;k++)cycles+=packets.get(k).span();return cycles;}
+    private int proofDistance(List<ProofPacket> packets,Map<Long,Integer> indices,Map<Long,Set<Long>> edges,long after,long target){
+        Map<Long,Integer> distances=new HashMap<>();var queue=new PriorityQueue<long[]>(Comparator.comparingLong(x->x[1]));
+        for(long next:edges.getOrDefault(after,Set.of())){distances.put(next,0);queue.add(new long[]{next,0});}
+        while(!queue.isEmpty()){var item=queue.remove();long at=item[0];int distance=(int)item[1];if(distance!=distances.get(at))continue;if(at==target)return distance;
+            int nextDistance=distance+packets.get(indices.get(at)).span();for(long next:edges.getOrDefault(at,Set.of()))if(nextDistance<distances.getOrDefault(next,Integer.MAX_VALUE)){distances.put(next,nextDistance);queue.add(new long[]{next,nextDistance});}}
+        return -1;
+    }
+    /** Conservative suffix proof across earlier loops: raw CFG dominance, not
+     * analysis references, and no guessed predecessor register values. This
+     * changes only the proof of impossible loading exits, never issue timing. */
+    private C6000LoopCounterProof.Proof proveLoadingSuffix(Insn start,LoopPlan plan){
+        try{
+            if(!Set.of("SPLOOP","SPLOOPD").contains(start.name())||start.predicate()!=null)return C6000LoopCounterProof.Proof.unknown("not an unconditional counted loop");
+            List<ProofPacket> packets=new ArrayList<>();Map<Long,Integer> indices=new HashMap<>();
+            long pc=entry.getOffset(),end=function.getBody().getMaxAddress().getOffset();int delay=-1,maxLatency=1;
+            for(int count=0;count<1000;count++){
+                var decoded=packet(pc);int span=1;boolean returns=false;
+                for(var item:decoded){span=Math.max(span,item.span());maxLatency=Math.max(maxLatency,item.latency());if(Set.of("B","BNOP").contains(item.name())&&item.instruction().getRegister(0)!=null&&item.instruction().getRegister(0).getName().equals("B3"))returns=true;}
+                long next=after(decoded.get(decoded.size()-1));indices.put(pc,packets.size());packets.add(new ProofPacket(pc,next,span,decoded));
+                if(delay>=0)delay-=span;if(returns)delay=6-span;pc=next;if(delay==0||delay<0&&pc>end)break;
+                if(count==999)return C6000LoopCounterProof.Proof.unknown("suffix raw packet bound");
+            }
+            Integer target=indices.get(plan.start());if(target==null)return C6000LoopCounterProof.Proof.unknown("loop not at packet boundary");
+            Map<Long,Set<Long>> edges=new HashMap<>();List<LoopPlan> previous=new ArrayList<>();
+            for(var pack:packets){
+                Set<Long> next=new HashSet<>();if(indices.containsKey(pack.next()))next.add(pack.next());
+                for(var item:pack.instructions()){
+                    var flow=item.instruction().getFlowType();
+                    if(flow.isJump()||flow.isCall()||Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(item.name())){
+                        var destination=item.instruction().getAddress(0);
+                        if(destination!=null){if(!indices.containsKey(destination.getOffset()))return C6000LoopCounterProof.Proof.unknown("raw CFG leaves scope");next.add(destination.getOffset());}
+                        else if(item.instruction().getRegister(0)==null||!item.instruction().getRegister(0).getName().equals("B3"))return C6000LoopCounterProof.Proof.unknown("unresolved raw CFG target");
+                    }
+                    if(item.instruction().getAddress().getOffset()<plan.start()&&Set.of("SPLOOP","SPLOOPD","SPLOOPW").contains(item.name()))previous.add(planLoop(item));
+                }
+                edges.put(pack.pc(),next);
+            }
+            for(var old:previous){
+                int position=indices.get(old.start());long body=packets.get(position).next();var oldProof=loadingCountProofs.get(old.start());if((oldProof==null||!oldProof.noLoadingExit())&&indices.containsKey(old.postPc()))edges.get(old.start()).add(old.postPc());
+                for(var cell:old.cells())for(var item:cell.source())if(item.name().equals("SPKERNEL"))for(var pack:packets)if(pack.instructions().contains(item))edges.get(pack.pc()).add(body);
+            }
+            // Include the target loop's possible skip/backedges too: a later raw
+            // edge into the candidate suffix may not be ignored.
+            if(indices.containsKey(plan.postPc()))edges.get(plan.start()).add(plan.postPc());
+            for(var cell:plan.cells())for(var item:cell.source())if(item.name().equals("SPKERNEL"))for(var pack:packets)if(pack.instructions().contains(item))edges.get(pack.pc()).add(packets.get(target).next());
+            Set<Long> reachable=new HashSet<>();var queue=new ArrayDeque<Long>();queue.add(entry.getOffset());while(!queue.isEmpty()){long at=queue.remove();if(reachable.add(at))queue.addAll(edges.getOrDefault(at,Set.of()));}
+            Map<Long,Set<Long>> dominators=new HashMap<>();for(long at:reachable)dominators.put(at,new HashSet<>(at==entry.getOffset()?Set.of(at):reachable));
+            boolean changed;do{changed=false;for(long at:reachable){if(at==entry.getOffset())continue;Set<Long> common=null;for(var edge:edges.entrySet())if(reachable.contains(edge.getKey())&&edge.getValue().contains(at)){if(common==null)common=new HashSet<>(dominators.get(edge.getKey()));else common.retainAll(dominators.get(edge.getKey()));}if(common==null)common=new HashSet<>();common.add(at);if(!common.equals(dominators.get(at))){dominators.put(at,common);changed=true;}}}while(changed);
+            int lastControl=-1;for(int k=0;k<target;k++)for(var item:packets.get(k).instructions())if(proofControl(item))lastControl=k;
+            if(lastControl<0)return C6000LoopCounterProof.Proof.unknown("no suffix boundary");
+            int anchor=lastControl+1,slots=5;while(anchor<target&&slots>0){slots-=packets.get(anchor).span();anchor++;}
+            if(slots!=0||anchor>=target||!dominators.getOrDefault(plan.start(),Set.of()).contains(packets.get(anchor).pc()))return C6000LoopCounterProof.Proof.unknown("suffix does not dominate loop after delay work");
+            long begin=packets.get(anchor).pc();for(var edge:edges.entrySet())for(long destination:edge.getValue())if(destination>begin&&destination<=plan.start()&&!(edge.getKey()>=begin&&edge.getKey()<plan.start()&&packets.get(indices.get(edge.getKey())).next()==destination))return C6000LoopCounterProof.Proof.unknown("nonlinear edge enters suffix");
+            for(var old:previous){
+                int kernel=-1;for(int k=0;k<anchor;k++)for(var item:packets.get(k).instructions())if(item.name().equals("SPKERNEL")&&old.cells().stream().anyMatch(cell->cell.source().contains(item)))kernel=k;
+                var proof=loadingCountProofs.get(old.start());int bound=old.cells().size()+6+maxLatency-1;
+                if(kernel<0||proof==null||!proof.noLoadingExit()||!dominators.getOrDefault(begin,Set.of()).contains(packets.get(kernel).pc())||proofDistance(packets,indices,edges,packets.get(kernel).pc(),begin)<bound)return C6000LoopCounterProof.Proof.unknown("earlier loop not proved quiescent on every raw CFG path");
+            }
+            var constants=new C6000LoopCounterProof(program.getLanguage());int warmup=maxLatency-1;
+            for(int k=anchor;k<target;k++){var pack=packets.get(k);for(int t=0;t<pack.span();t++){if(warmup>0)constants.forgetRegisters();constants.packet(t==0?proofOperations(pack.instructions()):List.of());if(warmup>0){constants.forgetRegisters();warmup--;}}}
+            return constants.finish(start.name(),plan.ii(),plan.cells().size(),program.getRegister("C6000_PIPE_ILC").getAddress().getOffset(),proofOperations(packets.get(target).instructions()));
+        }catch(Exception unknown){return C6000LoopCounterProof.Proof.unknown("suffix proof unavailable: "+unknown.getMessage());}
+    }
+
     private boolean provedLoadingContinue(LoopPlan loop,LoopFrame frame,Insn start){
         long address=start==null?loop.start():start.instruction().getAddress().getOffset();
         var proof=loadingCountProofs.get(address);
@@ -1060,10 +1316,12 @@ public final class C6000PipelineCompiler {
     }
     private boolean postFetch(LoopPlan plan,LoopFrame frame){
         if(frame.zero()||frame.drain()<0||singleIteration(plan,frame)&&frame.time()<=lastLoadingBoundary(plan))return false;
-        // When program fetch stopped at the kernel, PG->PS->PW->PR->DP->DC
-        // must refill before a resumed program packet reaches E1 (4.1.4).
+        // SPRUFE8B SPKERNEL p.481 and 7.9.4/7.12 specify when execution of
+        // sequential post-loop packets resumes. A suspended PM stream is not a
+        // new branch target: do not infer six extra E1 cycles from 4.1.4's
+        // general fetch pipeline. Abrupt branch-like exit remains separate.
         if(frame.abrupt())return frame.drain()>=7;
-        int delay=Math.min(plan.fetchDelay(),Math.max(0,plan.cells().size()-plan.ii()))+(frame.refill()?6:0);
+        int delay=Math.min(plan.fetchDelay(),Math.max(0,plan.cells().size()-plan.ii()));
         return frame.time()>=plan.cells().size()&&frame.drain()>=1+delay;
     }
     private List<Insn> loopOperations(LoopPlan plan,LoopFrame frame,List<Insn> fetched){

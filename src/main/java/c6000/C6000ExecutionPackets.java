@@ -79,6 +79,13 @@ public final class C6000ExecutionPackets {
         return new Slot(at, length, parallel, false);
     }
 
+    /** Raw fetch-layout shape for explicit trace scopes, independent of listing context. */
+    static int instructionLengthAt(Program program,Address at)throws MemoryAccessException {
+        var instruction=slot(program,at);
+        if(instruction.header())throw new MemoryAccessException("Fetch-packet header is not an instruction start");
+        return instruction.length();
+    }
+
     /** Physical generator recognition before SLEIGH context is primed.
      * SPRUFE8B 3.8.10/3.8.11.5; F-10/F-11, ADDKPC format,
      * compact F-17/F-18/F-20/F-21/F-32 and H-9.

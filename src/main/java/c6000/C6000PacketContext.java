@@ -16,6 +16,7 @@
 package c6000;
 
 import java.math.BigInteger;
+import java.util.Map;
 
 import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.Register;
@@ -201,6 +202,17 @@ public final class C6000PacketContext {
 			setField(program, "c_branch_terminal", at, 0);
 		}
 	}
+
+    /** Read-only physical header fields for isolated decoders; never writes ProgramContext. */
+    static Map<String,Integer> physicalDecodeFields(Program program,Address at)throws Exception {
+        long base=at.getOffset()&~31L;int offset=(int)(at.getOffset()-base);
+        Address headerAt=at.getNewAddress(base+28);int header=program.getMemory().contains(headerAt.add(3))?program.getMemory().getInt(headerAt):0;
+        if((header>>>28)!=0xe)return Map.of("c_is16",0,"c_isheader",0,"c_hdrpkt",0,"c_rs",0,"c_dsz",0,"c_prot",0,"c_br",0,"c_sat",0,"c_pfollow",0);
+        int layout=(header>>>LAYOUT_SHIFT)&LAYOUT_MASK;
+        return Map.of("c_is16",offset<28&&((layout>>>(offset/4))&1)!=0?1:0,"c_isheader",offset==28?1:0,"c_hdrpkt",1,
+            "c_rs",(header>>>RS_SHIFT)&1,"c_dsz",(header>>>DSZ_SHIFT)&7,"c_prot",(header>>>PROT_SHIFT)&1,
+            "c_br",(header>>>BR_SHIFT)&1,"c_sat",(header>>>SAT_SHIFT)&1,"c_pfollow",offset==28?0:parallelFollowers(header,layout,offset/2));
+    }
 
 	/** Number of following instructions in the same execute packet. */
 	private static int parallelFollowers(int header, int layout, int halfword) {

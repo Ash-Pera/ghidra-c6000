@@ -29,6 +29,14 @@ public final class C6000LoopCounterProof {
         arithmetic = BytesPcodeArithmetic.forLanguage(language);
     }
 
+    /** Constant-only raw p-code proof; unknown architectural inputs never get defaults. */
+    static Long constantOutput(Language language,PcodeOp[] code,long offset,int size) {
+        var proof=new C6000LoopCounterProof(language);
+        var image=proof.evaluate(new Operation(code,List.of(),null,false));
+        if(image==null)return null;var value=proof.read(image,offset,size);
+        return value==null?null:proof.arithmetic.toLong(value,PcodeArithmetic.Purpose.INSPECT);
+    }
+
     private byte[] read(Map<Long,Byte> bytes, long at, int size) {
         var result = new byte[size];
         for (int k=0;k<size;k++) {
@@ -109,6 +117,10 @@ public final class C6000LoopCounterProof {
         }
         return index==operation.code().length?image:null;
     }
+
+    /** Forget incoming register knowledge without discarding writes captured in
+     * this proof's own packets. Used while unknown predecessor effects drain. */
+    public void forgetRegisters(){registers.clear();}
 
     /** Capture all sources before applying any writeback in this cycle. */
     public void packet(List<Operation> operations) {

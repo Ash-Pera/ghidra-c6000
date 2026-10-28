@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+* An unconditional `GMPY4` decodes: bit 28 is `z` (SPRUFE8B Figure E-1), not a
+  constant 1, so every predicate encodes as for other instructions.
+
 ## 1.0.4 - 2026-10-27
 
 ### Fixed

@@ -20,9 +20,9 @@ CASES = [
 
 def opcode(side, cross):
     decode = Path(__file__).resolve().parents[2] / "data/languages/c6000_decode.sinc"
-    prefix = f":GMPY4.M{side} "
+    prefixes = (f":GMPY4.M{side} ", f':^Cond^"GMPY4.M{side}" ')
     line = next(line for line in decode.read_text().splitlines()
-                if line.startswith(prefix))
+                if line.startswith(prefixes))
     fixed = {int(bit): int(value) for bit, value in
              re.findall(r"\bi(\d+)=(\d)\b", line)}
     word = sum(value << bit for bit, value in fixed.items())
@@ -30,7 +30,6 @@ def opcode(side, cross):
     word |= 2 << 18  # src2
     word |= 3 << 23  # dst
     word |= cross << 12
-    word |= 1 << 29  # GMPY4 fixes z=1; use the valid [!B0] predicate
     return word
 
 

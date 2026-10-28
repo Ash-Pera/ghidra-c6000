@@ -167,6 +167,10 @@ def main():
                 skipped.append((name, u["heading"], "leftover"))
                 continue
             fields = u["fields"]
+            if name == "GMPY4":
+                # Figure E-1: bit 28 of GMPY4 is z, not the 1 its page shows.
+                fields = [dict(f, name="z", const=None) if f["lo"] == 28 else f
+                          for f in fields]
             heading = u["heading"]
             unit_syn = rec.get("unit_syntax", "")
             ul = unit_letter(heading) or unit_letter(unit_syn)

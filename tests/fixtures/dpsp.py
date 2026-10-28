@@ -34,7 +34,7 @@ CASES = [
 def opcode(side):
     decode = Path(__file__).resolve().parents[2] / "data/languages/c6000_decode.sinc"
     line = next(line for line in decode.read_text().splitlines()
-                if line.startswith(f":DPSP.L{side} "))
+                if f'"DPSP.L{side}"' in line)
     fixed = {int(bit): int(value) for bit, value in re.findall(r"\bi(\d+)=(\d)\b", line)}
     return sum(value << bit for bit, value in fixed.items()) | (3 << 18) | (4 << 23)
 

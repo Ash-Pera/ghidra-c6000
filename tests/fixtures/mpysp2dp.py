@@ -38,7 +38,7 @@ CASES = [
 def opcode(side, cross):
     decode = Path(__file__).resolve().parents[2] / "data/languages/c6000_decode.sinc"
     line = next(line for line in decode.read_text().splitlines()
-                if line.startswith(f":MPYSP2DP.M{side} "))
+                if f'"MPYSP2DP.M{side}"' in line)
     fixed = {int(bit): int(value) for bit, value in re.findall(r"\bi(\d+)=(\d)\b", line)}
     word = sum(value << bit for bit, value in fixed.items())
     return word | (1 << 13) | (2 << 18) | (2 << 24) | (int(cross) << 12)

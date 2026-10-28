@@ -177,7 +177,18 @@ floating-point status and special rounding. Changing the language is a
 reading aid, not a fix to the exact floating-point model.
 
 The default `C6000:LE:32:default` and `C6000:BE:32:default` languages retain
-the detailed floating-point rounding and status-register model. For reading
+the detailed floating-point rounding and status-register model. Its SP
+add/subtract, multiply and DP-to-SP rounding helpers use mask selections
+instead of internal p-code branches. All four rounding modes, signed zeros,
+NaNs, denormal handling, sticky status bits and the lost-small-addend
+correction remain explicit; no opaque arithmetic userop is introduced.
+This keeps repeated instructions from multiplying the decompiler block graph.
+The inputs are captured before the destination is written, including aliases.
+Pure speculative p-code arithmetic on special values is discarded before
+architectural results or flags are selected (SPRUFE8B sections 2.10.1, 2.10.3
+and 3.12 ADDSP/SUBSP/MPYSP/DPSP execution descriptions).
+
+For reading
 float-heavy functions, explicitly select `C6000:LE:32:analysis` or
 `C6000:BE:32:analysis` when importing a program. This variant uses native
 single-precision p-code for `INTSP`, `INTSPU`, `MPYSP`, `ADDSP`, `SUBSP`, and

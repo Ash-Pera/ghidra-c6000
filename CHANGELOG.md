@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Fixed
+* Exact single-precision arithmetic and shared DP-to-SP rounding use equivalent
+  mask selections instead of internal p-code branch trees. This preserves
+  rounding modes, special values and sticky status flags while allowing large
+  float-heavy functions to decompile within the same timeout. Add alias,
+  predication and branch-count regressions, and repair affected fixture lookup
+  for the predicated decoder constructors.
 * Repair generated switch overrides left on a former function after body
   recovery. Code-verified cases are rehomed or retained outside function
   namespaces without deleting labels; detached duplicates no longer crash

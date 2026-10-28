@@ -191,6 +191,20 @@ halfword still decodes as two 16-bit instructions. Both endian variants pass.
 and `SUBU`. The seven cases include the 40-bit register-pair forms, sign
 boundaries, and a negative 40-bit subtraction result.
 
+`tests/fixtures/exact-fp-selection.py <image.bin> <cases.tsv> [be]` and
+`C6000ExactFloatSelectionTest.java <cases.tsv>` execute 14,688 default-language
+SP arithmetic cases per endian mode. An exact-rational oracle checks ADDSP,
+SUBSP and MPYSP, all four rounding modes, destination/source aliases and
+unconditional, true and false predicates (including inverted predicates).
+Source registers, the other status register and sticky status bits are checked.
+The script also rejects opaque arithmetic userops and more than the single
+architectural predicate branch per instruction. Run with `-noanalysis` after
+raw import at `0x1000` using the matching `C6000:LE:32:default` or BE language.
+The `float-addsub-sp.py` / `C6000FloatAddTest.java`, `mpysp.py` and
+`mpysp2dp.py` / `C6000FloatMultiplyTest.java`, and `dpsp.py` and
+`int-to-sp.py` / `C6000ConvertStatusTest.java` suites cover the other consumers
+of these shared helpers, including cross paths and register-pair results.
+
 `tests/fixtures/fp-int.py <image.bin> <cases.tsv> [be]` and
 `C6000FpConvertTest.java <cases.tsv>` check `SPINT` and `SPTRUNC` in both
 endian modes. The 23 cases per mode cover all FADCR rounding modes, ties to

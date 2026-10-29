@@ -45,6 +45,7 @@ CORE = [
     case("branch-flow", "FlowTarget", "C6000_FLOW_TARGET_OK"),
     case("delayed-call", "DelayedCall", "C6000_DELAYED_CALL_OK", None, analysis=True),
     case("delayed-call-timing", "DelayedCallTiming", "C6000_DELAYED_CALL_TIMING_OK", "json", ["check", "cases.json"], analysis=True),
+    case("call-packet-slots", "CallPacketSlots", "C6000_CALL_PACKET_SLOTS_OK", None, analysis=True),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
     ("jump-table", [], [("JumpTable", [], "C6000_JUMP_TABLE_OK"),
                         ("SwitchOwnership", [], "C6000_SWITCH_OWNERSHIP_OK")], True),

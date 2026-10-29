@@ -49,6 +49,11 @@ public class C6000DelayedCallSafetyTest extends GhidraScript {
             var item = row.getAsJsonObject();
             var instruction = getInstructionAt(toAddr(item.get("site").getAsLong()));
             if (instruction == null) throw new AssertionError("Missing test instruction: " + item);
+            if (item.has("parallel_follower")) {
+                var follower = getInstructionAt(toAddr(item.get("parallel_follower").getAsLong()));
+                if (follower == null || !follower.getMnemonicString().startsWith("_["))
+                    throw new AssertionError("Missing native predicated follower prefix: " + item + " " + follower);
+            }
             boolean actual = recognize.invoke(walker, instruction) != null;
             boolean expected = item.get("call").getAsBoolean();
             println(item.get("name").getAsString() + " expected=" + expected + " actual=" + actual);

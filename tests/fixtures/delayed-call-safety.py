@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Independent PR #11 path/refusal cases. IMAGE CASES.json [be].
+"""Independent delayed-call path/refusal cases. IMAGE CASES.json [be].
 
 SPRUFE8B 3.5 and 3.12 B: predicates are sampled before delay-slot writes;
 a jump's pending transfer does not suppress execution of its delay slots.
@@ -111,6 +111,53 @@ for i, name in enumerate(["stable_fallthrough", "fallthrough_predicate_write", "
         code[base + 8] = nop(1)
         code[base + 0x14] = A2 | mvk(base + 0x20, 3)
     add(name, base, base + 0x18, name in ("stable_fallthrough", "fallthrough_skipped_predicate_write"), code)
+
+
+# Branch followers receive Ghidra's native "_" delay-slot prefix. A false or
+# unknown guard cannot supply a B3 constant (SPRUFE8B 3.5, 3.6, 4.2.6).
+predicates = [("B0", 0x20000000), ("B1", 0x40000000), ("B2", 0x60000000),
+              ("A1", 0x80000000), ("A2", 0xa0000000), ("A0", 0xc0000000)]
+ordinal = 0
+for index, (register, predicate) in enumerate(predicates):
+    unrelated = predicates[(index + 1) % len(predicates)][1]
+    for inverted in [False, True]:
+        taken = predicate ^ (0x10000000 if inverted else 0)
+        for mode, guard in [("skipped", taken ^ 0x10000000),
+                            ("matching", taken), ("unknown", unrelated)]:
+            base = 0x2400 + ordinal * 0x40
+            ordinal += 1
+            ret = base + 0x10
+            code = {base: taken | branch(base, CALLEE) | 1,
+                    base + 4: guard | mvk(ret, 3), base + 8: mvkh(0, 3),
+                    base + 0xc: nop(4), ret: B3, ret + 4: nop(5)}
+            add(f"parallel_link_{register}_{'zero' if inverted else 'nonzero'}_{mode}",
+                base, base, mode == "matching", code, parallel_follower=base + 4)
+
+# Cover full PC links, high-half replacements, and register-copy clobbers.
+for producer_index, producer in enumerate(["addkpc", "mvkh", "copy"]):
+    for mode_index, (mode, guard) in enumerate([("skipped", 0xd0000000),
+                                             ("matching", 0xc0000000),
+                                             ("unknown", A1)]):
+        base = 0x2e00 + (producer_index * 3 + mode_index) * 0x40
+        prefix = {}
+        if producer == "addkpc":
+            site, ret = base, base + 0xc
+            writer = d["addkpc"](site + 4, ret, 0)
+        else:
+            site, ret = base + 8, base + 0x14
+            if producer == "mvkh":
+                prefix = {base: mvk(ret, 3), base + 4: mvkh(0x1234, 3)}
+                writer = mvkh(0, 3)
+            else:
+                # B3 already holds the link; an enabled/unknown copy from
+                # incoming B13 destroys that proof, while a skipped copy retains it.
+                prefix = {base: mvk(ret, 3), base + 4: mvkh(0, 3)}
+                writer = COPY
+        code = {**prefix, site: 0xc0000000 | branch(site, CALLEE) | 1,
+                site + 4: guard | writer, site + 8: nop(5), ret: B3, ret + 4: nop(5)}
+        add(f"parallel_link_{producer}_{mode}", base, site,
+            mode == ("skipped" if producer == "copy" else "matching"), code,
+            parallel_follower=site + 4)
 
 
 def main():

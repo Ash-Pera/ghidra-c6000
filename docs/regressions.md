@@ -364,6 +364,17 @@ the call path. 210c checks the backward step: B3 is set under `[A0]` before an
 unconditional `MVK 1,A0`, and A0 being true at the call says nothing about its value
 when B3 was written, so 210c is not a call.
 
+The independent `delayed-call-safety.py` / `C6000DelayedCallSafetyTest.java` fixture
+also checks native `_[predicate]` followers through both the read-only recognizer
+and the analyzer. Thirty-six cases vary all six predicate registers, both senses,
+and matching/skipped/unknown guards on a parallel B3 low-half writer. Nine more
+cover guarded ADDKPC links, high-half replacements and register-copy clobbers.
+A skipped or unknown write cannot supply a return link; a skipped copy must retain
+an already known link. Each case requires the actual native delay-slot prefix so a
+plain instruction cannot accidentally stand in for the regression. Together with
+its existing controls, this fixture checks 72 cases per endian (24 accepted and
+48 refused). These follow SPRUFE8B 3.5, 3.6 and 4.2.6.
+
 ## Encoding identity and updating-load phases
 
 `tests/fixtures/full32-encoding-info.py <image.bin> <cases.tsv> [be]` and

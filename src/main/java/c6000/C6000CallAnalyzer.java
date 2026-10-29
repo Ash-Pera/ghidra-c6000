@@ -521,8 +521,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				Instruction instruction = path.get(i);
 				// A packet reads predicates before any of its writes commit.
 				if (samePacket(path, i, Math.max(query, anchor))) continue;
-				// A parallel follower's "_" delay-slot marker hides its guard (SPRUFE8B 3.5, 3.6).
-				String p = predicate(instruction.getMnemonicString().replaceFirst("^_", ""));
+				String p = predicate(instruction);
 				if (query >= anchor && p != null && p.replace("!", "").equals(register.getName()) &&
 					(p.startsWith("!") ? !nonzero : nonzero) == false) continue;
 				// A constant replacement can preserve the predicate's truth value,
@@ -705,6 +704,10 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	}
 
 	private static String predicate(String name) {
+		// Native delay-slot followers carry "_" before their predicate. Every
+		// path proof must read the E1 guard, including constant tracking, not
+		// just stability checks (SPRUFE8B 3.5, 3.6 and 4.2.6).
+		if (name.startsWith("_")) name = name.substring(1);
 		int end = name.indexOf(']');
 		return name.startsWith("[") && end > 0 ? name.substring(1, end) : null;
 	}

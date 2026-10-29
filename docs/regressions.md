@@ -34,6 +34,29 @@ from observed disassembler output.
 
 ## Memory and arithmetic
 
+`tests/fixtures/pipeline-bnop.py IMAGE CASES.json [be]` and
+`C6000PipelineBnopTest.java CASES.json` check 118 schedules per endian.
+The 28 fixed-five Sbu8/Sbu8c cases retain their literal display without a
+scalar operand. Variable counts 0-5, both register sides, both RS selections,
+both predicate polarities, zero/nonzero predicates, backward displacements,
+BR-independent compact register targets and full-width register targets
+provide controls. Displacement schedules take 15 hand-counted cycles; register
+returns take seven. Each completes an
+E5 load during the branch window, returns to B3 and checks that fallthrough
+guards execute only for false predicates (SPRUFE8B 4.2.5-4.2.6 and Figures
+F-17/F-18/F-20/F-21/F-32). The TI-assisted `caller-tail.py` /
+`C6000CallerTailTest.java` fixture additionally checks fixed-five entry
+evidence on both S units and rejects wrong idle counts and stale hazards.
+
+`tests/fixtures/pipeline-andn.py IMAGE CASES.json [be]` and
+`C6000PipelineAndnTest.java CASES.json` exercise 234 cases per endian mode:
+228 native/scheduled checks and six functional-unit collision refusals.
+All six `.L`/`.S`/`.D` units cover both cross paths, destination/source
+aliases, both predicate polarities with zero/nonzero values, parallel source
+and predicate writers, and consumers before and after E1 writeback. CSR and
+AMR remain unchanged. Opcode fields, expected results and the single-cycle
+contract follow SPRUFE8B pp. 145-146. This is a core release regression.
+
 `tests/fixtures/compact-memory.py IMAGE CASES.json [be]` and
 `C6000CompactMemoryTest.java CASES.json` execute 960 native instruction checks
 and 960 exact-schedule checks per endian mode. They cover compact offset,

@@ -13,6 +13,22 @@ import ghidra.program.model.mem.MemoryAccessException;
 public final class C6000ExecutionPackets {
     private C6000ExecutionPackets() { }
 
+    /** Inserted NOP advances, SPRUFE8B Figures F-17/F-18/F-20/F-21/F-32.
+     * Sbu8/Sbu8c encode a fixed five, rendered by SLEIGH as literal text
+     * rather than a Scalar. Other BNOP forms expose their encoded count.
+     */
+    static int bnopCount(Program program, Instruction instruction) throws MemoryAccessException {
+        var count = instruction.getScalar(1);
+        if (count != null) return (int) count.getUnsignedValue();
+        if (instruction.getLength() == 2 &&
+                C6000CallAnalyzer.baseName(instruction).startsWith("BNOP.")) {
+            int word = Short.toUnsignedInt(program.getMemory().getShort(instruction.getAddress()));
+            // Fixed-five Sbu8 and Sbu8c only; do not guess for other forms.
+            if ((word & 0xc03e) == 0xc00a || (word & 0xc02e) == 0xc02a) return 5;
+        }
+        throw new IllegalArgumentException("missing BNOP NOP count at " + instruction.getAddress());
+    }
+
     public static boolean parallelWithNext(Program program, Instruction instruction)
             throws MemoryAccessException {
         Address at = instruction.getAddress();

@@ -57,6 +57,8 @@ CORE = [
     case("pipeline-loop", "PipelineDp", "C6000_PIPELINE_DP_OK", "json", ["cases.json", "decompile"]),
     case("loop-counter-proof", "LoopCounterProof", "C6000_LOOP_COUNTER_PROOF_OK", "json"),
     case("pipeline-counter-branch", "PipelineCounterBranch", "C6000_PIPELINE_COUNTER_BRANCH_OK", "json"),
+    case("pipeline-bnop", "PipelineBnop", "C6000_PIPELINE_BNOP_OK", "json"),
+    case("pipeline-andn", "PipelineAndn", "C6000_PIPELINE_ANDN_OK", "json"),
     case("pipeline-rotl", "PipelineRotl", "C6000_PIPELINE_ROTL_OK", "json"),
     case("pipeline-mpyli", "PipelineMpyli", "C6000_PIPELINE_MPYLI_OK", "json"),
     case("pipeline-load-alias", "PipelineLoadAlias", "C6000_PIPELINE_LOAD_ALIAS_OK", "json"),
@@ -83,6 +85,7 @@ CORE = [
     case("dp-int", "DpConvert", "C6000_DP_INT_OK"),
 ]
 TI = [
+    case("caller-tail", "CallerTail", "C6000_CALLER_TAIL_OK", "json", ["cases.json", "results.json"]),
     case("pipeline-predicate-facts", "PredicateFacts", "PREDICATE_FACTS_TEST_OK", "json"),
     case("pipeline-caller-continuation", "CallerContinuation", "CONTINUATION_CONTRACT_TEST_OK",
          "json", ["cases.json", "results.json"]),

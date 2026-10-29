@@ -4,6 +4,9 @@
 
 ### Added
 
+* Support `ANDN` on `.L`, `.S` and `.D` in exact packet schedules, with
+  E1 source capture and writeback, predication and register aliases
+  (SPRUFE8B pp. 145-146).
 * Integrate exact same-packet reads and delayed writeback into reviewed function
   analysis using the existing scheduling backend. Add read-only report/review/apply
   tooling, a contract-gated analyzer, and source-bound decompiler injection.
@@ -12,6 +15,10 @@
 
 ### Fixed
 
+* Read the implicit five NOPs of compact `BNOP` Sbu8/Sbu8c from their
+  encoding when no scalar operand exists (SPRUFE8B Figures F-18/F-21).
+  Share the count reader across exact schedules, caller-entry evidence and
+  loop-buffer timing; preserve variable-count and full-width forms.
 * Apply AMR circular addressing to compact memory forms, including per-byte
   wrapping for nonaligned transfers, and preserve the incoming store source
   when predecrement updates an overlapping pointer (SPRUFE8B 3.9.2 and

@@ -8,6 +8,7 @@ def main():
  image_path,manifest_path=map(Path,sys.argv[1:3]);be=len(sys.argv)>3 and sys.argv[3]=='be';endian='>' if be else '<';image_path.parent.mkdir(parents=True,exist_ok=True)
  spec=importlib.util.spec_from_file_location('continuation_fixture',Path(__file__).with_name('pipeline-caller-continuation.py'));module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
  cases=[('owned',None),('unowned_tail',None),('unreachable_data',None),('stale_context',None),('callee_bad_hash','byte hash mismatch'),('caller_bad_hash','scope/continuation mismatch'),('entry_bad_hash','byte hash mismatch'),('wrong_language','language/callee identity'),('missing_unowned_tail','declared ownership'),('body_ends_inside_instruction','byte ownership'),('data_in_suffix','instruction overlaps defined data'),('first_B3_writer','unchanged entry B3'),('header_start','invalid physical instruction start'),('halfword_start','invalid physical instruction start'),('caller_target_spans','branch-target execute packet spans fetch packets'),('omitted_B4','E1 inventory mismatch'),('wrong_idle','source span/idle evidence mismatch'),('entry_suffix_data','instruction overlaps defined data'),('outside_callee_branch','callee branch leaves declared scope'),('callp_idle',None),('callp_stale_hazards','E1 inventory mismatch'),('callp_wrong_idle','source span/idle evidence mismatch')]
+ cases += [('bnop5_idle_s1',None),('bnop5_idle_s2',None),('bnop5_wrong_idle','source span/idle evidence mismatch'),('bnop5_stale_hazards','E1 inventory mismatch')]
  lines=[];rows=[]
  for i,(name,error) in enumerate(cases):
   tag='ct_strict_'+name;at=0x1000+i*0x800;caller=at+0x200
@@ -22,6 +23,11 @@ def main():
   row.update(trailing_idle=0,declared_writes=[])
   if name.startswith('callp_'):
    final=row['caller']-8;row.update(final_packet=final,trailing_idle=4 if name=='callp_wrong_idle' else 5,declared_writes=['B4'] if name=='callp_stale_hazards' else []);data=sections['.ct_strict_'+name+'_setup'];image[final-0x1000:final-0x1000+8]=data[:8]
+  if name.startswith('bnop5_'):
+   final=row['caller']-8;row.update(final_packet=final,trailing_idle=4 if name=='bnop5_wrong_idle' else 5,declared_writes=['B4'] if name=='bnop5_stale_hazards' else [])
+   # SPRUFE8B F-18: fixed-five branch with an unsigned <<1 target.
+   # The BNOP and NOP1 share the last payload word, then skip the header.
+   struct.pack_into('<HHI',image,final-0x1000,0xc40a|int(name=='bnop5_idle_s2'),0x0c6e,0xe8009000)
   if name=='omitted_B4':struct.pack_into('<I',image,row['final_packet']-0x1000,(4<<23)|(9<<7)|0x2a)
   if name=='unreachable_data':row['callee_end']=at+0x40
   if name=='header_start':struct.pack_into('<I',image,at-0x1000+28,0xe0000000);row.update(at=at+28,callee_end=at+36)
@@ -30,6 +36,10 @@ def main():
    caller=row['caller']+28;row.update(caller=caller,caller_end=caller+8,setup_end=caller,final_packet=caller-4,packets=[caller]);struct.pack_into('<II',image,caller-0x1000,1,0)
   if name=='outside_callee_branch':
    old=struct.unpack_from('<I',image,at-0x1000+8)[0];word=(old&0xe0000000)|0x12|(((((at+128)-((at+8)&~31))>>2)&0x1fffff)<<7);struct.pack_into('<I',image,at-0x1000+8,word)
- if be:image=b''.join(image[k:k+4][::-1] for k in range(0,len(image),4))
+ if be:
+  image=bytearray(b''.join(image[k:k+4][::-1] for k in range(0,len(image),4)))
+  # Compact slots retain their physical halfword order in both languages.
+  for row in rows:
+   if row['name'].startswith('bnop5_'):struct.pack_into('>HH',image,row['final_packet']-0x1000,0xc40a|int(row['name']=='bnop5_idle_s2'),0x0c6e)
  image_path.write_bytes(image);manifest_path.write_text(json.dumps(rows,indent=2)+'\n')
 if __name__=='__main__':main()

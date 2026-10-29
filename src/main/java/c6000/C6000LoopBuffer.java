@@ -312,7 +312,7 @@ public final class C6000LoopBuffer {
 				if (mnemonic.contains("SPMASK")) mask |= scalar(insn) & 0xff;
 				boolean protectedLoad = isProtectedLoad(program, insn);
 				if (protectedLoad) protectedLoads.add(insn.getMinAddress());
-				duration = Math.max(duration, instructionCycles(insn, protectedLoad));
+				duration = Math.max(duration, instructionCycles(program, insn, protectedLoad));
 			}
 			List<Instruction> programOps = new ArrayList<>();
 			List<Instruction> bufferedOps = new ArrayList<>();
@@ -706,18 +706,17 @@ public final class C6000LoopBuffer {
 		return ops;
 	}
 
-	private static int instructionCycles(Instruction insn, boolean protectedLoad) {
+	private static int instructionCycles(Program program, Instruction insn, boolean protectedLoad) throws MemoryAccessException {
 		if (protectedLoad) return 5;
 		String name = insn.getMnemonicString();
 		int operand;
 		if (name.equals("NOP")) operand = 0;
-		else if (name.contains("BNOP")) operand = 1;
+		else if (name.contains("BNOP")) return 1 + C6000ExecutionPackets.bnopCount(program, insn);
 		else if (name.contains("ADDKPC")) operand = 2;
 		else return 1;
 		Scalar count = insn.getScalar(operand);
 		if (count != null) return name.equals("NOP") ? Math.max(1, (int) count.getUnsignedValue()) : (int) count.getUnsignedValue() + 1;
-		// The compact BNOP encoding with a fixed count of five has no Scalar
-		// object; Ghidra renders its literal operand as decimal text.
+		// Accept remaining SLEIGH literal idle operands conservatively.
 		String rendered = insn.getDefaultOperandRepresentation(operand);
 		if (rendered != null && rendered.matches("[0-7]")) {
 			return Integer.parseInt(rendered) + 1;

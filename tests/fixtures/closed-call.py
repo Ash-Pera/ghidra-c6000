@@ -10,7 +10,7 @@ def link(pc,target):return 3<<23|((((target-(pc&~31))>>2)&0x7f)<<16)|0x162
 
 def main():
     endian='>' if len(sys.argv)>3 and sys.argv[3]=='be' else '<';image=bytearray(0x24000);rows=[]
-    specs=[('late_mpyli',None),('captured_store',None),('bad_hash','byte hash mismatch'),('callee_B3_writer','callee changes B3'),('unknown_link','link lacks exact'),('wrong_link','link lacks exact'),('unplanned_branch','undeclared control edge'),('not_drained','explicit drained entry'),('wrong_owner','language/owner identity mismatch'),('bad_stop','endpoint still has pending effects'),('declared_unowned_tail',None),('missing_unowned_span','flow leaves declared ownership'),('claimed_gap_has_owner','unowned span overlaps an owner'),('owned_body_mid_instruction','byte ownership'),('span_starts_mid_instruction','unowned span cuts an instruction'),('data_in_instruction_suffix','instruction overlaps defined data'),('header_start','invalid physical instruction start'),('full32_halfword_start','invalid physical instruction start'),('straddling_return_target','branch-target execute packet spans fetch packets'),('stale_compact_context',None),('header_eight_instruction_ep','eight-instruction header-based execute packet'),('second_call_site','undeclared control edge'),('early_valid_link','link lacks exact'),('ordinary_callp_s2','unimplemented phase contract CALLP.S2'),('ordinary_saved_link_return','unresolved register branch')]
+    specs=[('late_mpyli',None),('captured_store',None),('bad_hash','byte hash mismatch'),('callee_B3_writer','callee changes B3'),('unknown_link','link lacks exact'),('wrong_link','link lacks exact'),('unplanned_branch','undeclared control edge'),('not_drained','explicit drained entry'),('wrong_owner','language/owner identity mismatch'),('bad_stop','endpoint still has pending effects'),('declared_unowned_tail',None),('missing_unowned_span','flow leaves declared ownership'),('claimed_gap_has_owner','unowned span overlaps an owner'),('owned_body_mid_instruction','byte ownership'),('span_starts_mid_instruction','unowned span cuts an instruction'),('data_in_instruction_suffix','instruction overlaps defined data'),('header_start','invalid physical instruction start'),('full32_halfword_start','invalid physical instruction start'),('straddling_return_target','branch-target execute packet spans fetch packets'),('stale_compact_context',None),('header_eight_instruction_ep','eight-instruction header-based execute packet'),('early_valid_link',None),('early_addkpc_nops',None)]
     for index,(name,error) in enumerate(specs):
         c=0x1000+index*0x800+(4 if name=='captured_store' else 0);f=c+0x200;continuation=c+0x1c
         words=[3<<23|15<<18|1<<13|10<<9|0xf6,branch(c+4,f),0,0,0,0,link(c+0x18,continuation),mv(4,8),0,0,mv(4,9),3<<23|15<<18|1<<13|9<<9|0xe6,0x6000,0x8ca362]
@@ -21,12 +21,8 @@ def main():
         if name=='callee_B3_writer':callee[0]=mv(2,3,2)
         if name=='unknown_link':words[6]=mv(2,3,2)
         if name=='wrong_link':words[6]=link(c+0x18,continuation+4)
+        if name=='early_addkpc_nops':words=words[:2]+[link(c+8,c+12)|(4<<13)]+words[7:];continuation=c+12
         if name=='early_valid_link':words[5]=link(c+0x14,continuation);words[6]=0
-        if name=='second_call_site':words[7:7]=[branch(c+0x1c,f),0,0,0,0,link(c+0x30,c+0x34)]
-        # SPRUFE8B CALLP and 4.2.6: implicit B3 link and five NOP cycles.
-        # This synthetic shape is also emitted by TI CGT for a one-call C wrapper.
-        if name=='ordinary_callp_s2':words=[mv(3,0,cross=True)|1,branch(c+4,f)|0x10000002,0x0080b362]
-        if name=='ordinary_saved_link_return':words=[mv(3,0,cross=True),0x0080b362]
         if name=='unplanned_branch':callee[3]=branch(f+12,f+0x80)
         if name=='header_start':words[1]=branch(c+4,f+0x1c)
         if name=='full32_halfword_start':words[1]=branch(c+4,f) # plan alone is malformed below
@@ -52,8 +48,7 @@ def main():
         if name=='full32_halfword_start':row.update(callee=f+2,callee_end=f+0x1c,callee_return=f+4)
         if name=='bad_stop':row['caller_end']=c+0x20
         if name=='early_valid_link':row['link']=c+0x14
-        if name=='second_call_site':row['caller_return']=c+len(words)*4-4
-        if name.startswith('ordinary_'):row['ordinary_refusal']=True
+        if name=='early_addkpc_nops':row.update(link=c+8,caller_return=c+len(words)*4-4)
         if error:row['refused']=error
         rows.append(row)
     # SPRUFE8B 3.5/3.7, B/MVK/MVKH: independent full-width fields.

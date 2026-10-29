@@ -16,20 +16,23 @@ the contract.
 ## Flow references and ownership
 
 `tests/fixtures/closed-call.py IMAGE CASES.json [be]` and
-`C6000ClosedCallTraceTest.java CASES.json RESULTS.json` cover 50 checks per endian
-(12 executed schedules and 38 refusals). New cases prove split MVK/MVKH targets and
-links, B5/B3/cross-path calls, E1 target capture across register overwrites, conditional
-forward edges and an internal counted loop. Invalid halves/order, unknown or memory
-targets, competing/conditional writers, wrong link timing and out-of-window, indirect
-or mid-packet callee edges must refuse. Existing late MPYLI/store return effects,
-hashes, ownership, compact context and annotation checks remain in the same fixture.
+`C6000ClosedCallTraceTest.java CASES.json RESULTS.json` cover 48 contracts per endian
+(14 executed schedules and 34 refusals). Split MVK/MVKH targets and links,
+B5/B3/cross-path calls, target overwrites, callee branches and an internal counter loop
+are checked alongside ownership, physical layout and late effects. Early correct links
+now execute, including ADDKPC with four inserted NOPs; wrong link identities still
+refuse.
 
-Two additional closed-call refusals isolate a second call site and a correct link
-established one cycle before the current final-delay requirement. Two ordinary-schedule
-refusals retain the next TI compilation blockers: `CALLP.S2` and a saved-link
-`BNOP.S2X A0,5` return. These checks document current capability limits; they do not
-claim those valid instruction sequences are supported. See the
-[multiple-call experiment](multi-call-roundtrip.md).
+`tests/fixtures/pipeline-calls.py IMAGE CASES.json [be]` and
+`C6000PipelineCallsTest.java CASES.json RESULTS.json` cover 55 checks per endian
+(35 executed schedules and 20 refusals). Execution covers full32/compact CALLP on both
+S units, both RS settings, peers before/after CALLP, next-packet links across headers,
+repeated and distinct callees, and saved return links in A0. Store observations check
+captured pending effects and maturity before a second callee can mask the first store.
+Unsafe unknown/conditional/late/clobbered links, nonlocal returns, simultaneous link
+writers, pending branches and conflicting NOP generators remain refusals. The four
+previously documented capability gaps now have execution checks. See the
+[production round-trip](multi-call-roundtrip.md).
 
 `C6000SwitchOwnershipTest.java` runs after `C6000JumpTableTest.java` on the existing
 `tests/fixtures/jump-table.py` image. Run both with little- and big-endian languages.

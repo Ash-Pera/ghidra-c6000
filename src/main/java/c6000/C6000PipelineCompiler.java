@@ -93,7 +93,7 @@ public final class C6000PipelineCompiler {
         int marker=b.code.size();b.op(PcodeOp.COPY,temp(1),c(0,1));
         storeTailBoundaries.add(new StoreTailBoundary(marker,landing.pc(),stores));
         b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),slot("target",landing.pc(),landing.age(),0,4));
-        b.jump(PcodeOp.BRANCH,"node"+state(new State(POST_RETURN_IDLE_PC,storeTailContract.idleAdvances(),flights,List.of(),hazards,null,source.facts())),null);
+        b.jump(PcodeOp.BRANCH,"node"+state(new State(POST_RETURN_IDLE_PC,storeTailContract.idleAdvances(),flights,List.of(),hazards,null,source.facts(),source.returns())),null);
     }
 
     /** Explicit read-only trace boundary, never an enable()/function contract. */
@@ -183,7 +183,7 @@ public final class C6000PipelineCompiler {
         boolean contains(long pc){return pc>=start&&pc<end;}
         boolean unowned(long pc){return unownedSpans.stream().anyMatch(span->span.contains(pc));}
     }
-    /** One statically proved closed call; null stop means the caller's actual B3 return. */
+    /** One statically proved closed call; null stop means the caller's actual register return. */
     public record ClosedCallPlan(String languageId,TraceWindow caller,TraceWindow callee,long startPc,Long stopPc,long callPc,long linkPc,long continuation,long calleeReturnPc,Long callerReturnPc,TraceEntry entry,String evidence) {
         public ClosedCallPlan {if(languageId==null||caller==null||callee==null||entry==null||evidence==null||evidence.isBlank()||!caller.contains(startPc)||!caller.contains(callPc)||!caller.contains(linkPc)||!caller.contains(continuation)||!callee.contains(calleeReturnPc)||(stopPc==null)==(callerReturnPc==null)||stopPc!=null&&stopPc!=caller.end()||callerReturnPc!=null&&!caller.contains(callerReturnPc)||caller.start()<callee.end()&&callee.start()<caller.end())throw new IllegalArgumentException("explicit disjoint closed-call scope required");}
     }
@@ -195,21 +195,36 @@ public final class C6000PipelineCompiler {
     public record ClosedCallTraceResult(Result schedule,ClosedCallPlan contract,List<ClosedCallBoundary> boundaries,Set<String> outgoingE1Writes,ClosedCallProof proof) {
         public ClosedCallTraceResult(Result schedule,ClosedCallPlan contract,List<ClosedCallBoundary> boundaries,Set<String> outgoingE1Writes){this(schedule,contract,boundaries,outgoingE1Writes,null);}
     }
+    /** Sequential, nonrecursive calls to owned leaf windows, with one active invocation. */
+    public record ClosedCallsTraceResult(Result schedule,List<ClosedCallPlan> contracts,List<ClosedCallBoundary> boundaries,Set<String> outgoingE1Writes,List<ClosedCallProof> proofs) {}
     private ClosedCallPlan closedCall;
-    private ClosedCallProof closedProof;
+    private final Map<Long,ClosedCallPlan> closedCalls=new LinkedHashMap<>();
+    private final Map<Long,ClosedCallProof> closedProofs=new LinkedHashMap<>();
+    private final Map<Long,Long> closedInstructionPackets=new HashMap<>();
     private final Set<Long> closedInternalBranches=new HashSet<>();
     private final Set<Long> closedPackets=new HashSet<>();
     private final List<ClosedCallBoundary> closedBoundaries=new ArrayList<>();
     private Set<String> closedExitWrites;
     /** Read-only multi-owner trace. This result is never an enable()/function contract. */
     public static ClosedCallTraceResult compileClosedCallTrace(Program program,Function caller,ClosedCallPlan plan)throws Exception {
-        var compiler=new C6000PipelineCompiler(program,caller,plan.entry().previousE1Writes(),plan.startPc());
-        compiler.closedCall=plan;compiler.validateClosedCall();var result=compiler.compileInternal();
-        if(compiler.closedExitWrites==null||compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_ENTER"))||compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_RETURN")))throw compiler.fail("closed-call trace did not close all declared edges");
-        return new ClosedCallTraceResult(result,plan,List.copyOf(compiler.closedBoundaries),Set.copyOf(compiler.closedExitWrites),compiler.closedProof);
+        var result=compileClosedCallsTrace(program,caller,List.of(plan));
+        return new ClosedCallTraceResult(result.schedule(),plan,result.boundaries(),result.outgoingE1Writes(),result.proofs().get(0));
     }
+    public static ClosedCallsTraceResult compileClosedCallsTrace(Program program,Function caller,List<ClosedCallPlan> plans)throws Exception {
+        plans=List.copyOf(plans);if(plans.isEmpty()||plans.size()>16)throw new IllegalArgumentException("one to sixteen explicit leaf calls required");
+        var first=plans.get(0);var compiler=new C6000PipelineCompiler(program,caller,first.entry().previousE1Writes(),first.startPc());compiler.closedCall=first;
+        for(var plan:plans){
+            if(!plan.languageId().equals(first.languageId())||!plan.caller().equals(first.caller())||plan.startPc()!=first.startPc()||!Objects.equals(plan.stopPc(),first.stopPc())||!Objects.equals(plan.callerReturnPc(),first.callerReturnPc())||!plan.entry().equals(first.entry()))throw compiler.fail("closed-call shared caller/entry/endpoint mismatch");
+            if(compiler.closedCalls.put(plan.callPc(),plan)!=null)throw compiler.fail("closed-call duplicate call site");
+        }
+        compiler.validateClosedCall();var result=compiler.compileInternal();
+        for(var plan:plans)if(compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_ENTER")&&x.branchPc()==plan.callPc())||compiler.closedBoundaries.stream().noneMatch(x->x.kind().equals("CALL_RETURN")&&x.branchPc()==plan.calleeReturnPc()))throw compiler.fail("closed-call trace did not close all declared edges");
+        if(compiler.closedExitWrites==null)throw compiler.fail("closed-call trace did not close caller endpoint");
+        return new ClosedCallsTraceResult(result,plans,List.copyOf(compiler.closedBoundaries),Set.copyOf(compiler.closedExitWrites),List.copyOf(compiler.closedProofs.values()));
+    }
+    private boolean declaredCalleeReturn(long pc){return closedCalls.values().stream().anyMatch(p->p.calleeReturnPc()==pc);}
     private boolean strictScope(){return closedCall!=null||callerTail!=null;}
-    private TraceWindow closedWindow(long pc){if(callerTail!=null){if(callerTail.callee().contains(pc))return callerTail.callee();if(callerTail.caller().contains(pc))return callerTail.caller();return null;}if(closedCall==null)return null;if(closedCall.caller().contains(pc))return closedCall.caller();if(closedCall.callee().contains(pc))return closedCall.callee();return null;}
+    private TraceWindow closedWindow(long pc){if(callerTail!=null){if(callerTail.callee().contains(pc))return callerTail.callee();if(callerTail.caller().contains(pc))return callerTail.caller();return null;}if(closedCall==null)return null;if(closedCall.caller().contains(pc))return closedCall.caller();for(var plan:closedCalls.values())if(plan.callee().contains(pc))return plan.callee();return null;}
     private boolean observesStores(){return traceContract!=null||closedCall!=null;}
     private int closedPhysicalLength(Address at){
         try{return C6000ExecutionPackets.instructionLengthAt(program,at);}
@@ -283,16 +298,18 @@ public final class C6000PipelineCompiler {
         validateWindowMetadata(window);
         var boundaries=new HashSet<Long>();long pc=window.start();while(pc<window.end()){
             closedPhysicalLength(entry.getNewAddress(pc));if(!C6000ExecutionPackets.issuePrefix(program,entry.getNewAddress(pc)).isEmpty())throw fail("closed-call declared packet start has a parallel prefix at "+entry.getNewAddress(pc));
-            if(!closedPackets.add(pc))throw fail("closed-call overlapping execute packets");var packet=packet(pc);if(packet.get(0).instruction().getAddress().getOffset()!=pc)throw fail("closed-call declared packet start skips a fetch header");if(packet.size()==8)for(var instruction:packet)if(C6000PacketContext.physicalDecodeFields(program,instruction.instruction().getAddress()).get("c_hdrpkt")==1)throw fail("closed-call eight-instruction header-based execute packet");for(var instruction:packet){boundaries.add(instruction.instruction().getAddress().getOffset());boundaries.add(instruction.instruction().getMaxAddress().getOffset()+1);}long next=after(packet.get(packet.size()-1));if(next>window.end()||next<=pc)throw fail("closed-call window cuts an execute packet");
+            if(!closedPackets.add(pc))throw fail("closed-call overlapping execute packets");var packet=packet(pc);if(packet.get(0).instruction().getAddress().getOffset()!=pc)throw fail("closed-call declared packet start skips a fetch header");if(packet.size()==8)for(var instruction:packet)if(C6000PacketContext.physicalDecodeFields(program,instruction.instruction().getAddress()).get("c_hdrpkt")==1)throw fail("closed-call eight-instruction header-based execute packet");for(var instruction:packet){closedInstructionPackets.put(instruction.instruction().getAddress().getOffset(),pc);boundaries.add(instruction.instruction().getAddress().getOffset());boundaries.add(instruction.instruction().getMaxAddress().getOffset()+1);}long next=after(packet.get(packet.size()-1));if(next>window.end()||next<=pc)throw fail("closed-call window cuts an execute packet");
             for(var insn:packet){long at=insn.instruction().getAddress().getOffset();for(var gap:window.unownedSpans())if(gap.contains(at)&&at+insn.instruction().getLength()>gap.end())throw fail("closed-call unowned span cuts an instruction");boolean branch=Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(insn.name());
                 if(insn.name().startsWith("SPLOOP")||Set.of("SPKERNEL","SPMASK","IDLE").contains(insn.name()))throw fail("closed-call scope excludes software-loop/idle control");
-                if(branch&&at!=closedCall.callPc()&&at!=closedCall.calleeReturnPc()&&!Objects.equals(at,closedCall.callerReturnPc())){
+                if(branch&&!closedCalls.containsKey(at)&&!declaredCalleeReturn(at)&&!Objects.equals(at,closedCall.callerReturnPc())){
                     var target=insn.instruction().getAddress(0);
-                    if(!window.equals(closedCall.callee())||insn.name().equals("CALLP")||insn.instruction().getRegister(0)!=null||target==null||!window.contains(target.getOffset()))throw fail("closed-call undeclared control edge");
+                    if(window.equals(closedCall.caller())||insn.name().equals("CALLP")||insn.instruction().getRegister(0)!=null||target==null||!window.contains(target.getOffset()))throw fail("closed-call undeclared control edge");
                     closedInternalBranches.add(at);
                 }
                 if(branch&&!closedInternalBranches.contains(at)&&insn.predicate()!=null)throw fail("closed-call control edge must be unconditional");
-                long b3=program.getRegister("B3").getAddress().getOffset();if(window.equals(closedCall.callee()))for(var dest:insn.outputs())if(dest.offset()<b3+4&&b3<dest.offset()+dest.size())throw fail("closed-call callee changes B3");
+                if(!window.equals(closedCall.caller()))for(var plan:closedCalls.values())if(plan.callee().equals(window)){
+                    var link=callLinkRegister(decode(plan.callPc()));long offset=link.getAddress().getOffset();for(var dest:insn.outputs())if(dest.offset()<offset+4&&offset<dest.offset()+dest.size())throw fail("closed-call callee changes "+link.getName());
+                }
             }pc=next;
         }if(pc!=window.end())throw fail("closed-call window is not exact");for(var gap:window.unownedSpans())if(!boundaries.contains(gap.start())||!boundaries.contains(gap.end()))throw fail("closed-call unowned span boundary is not an instruction boundary");
     }
@@ -301,48 +318,71 @@ public final class C6000PipelineCompiler {
         var target=packet(pc);long fetch=pc&~31L;
         for(var instruction:target)if((instruction.instruction().getMinAddress().getOffset()&~31L)!=fetch||(instruction.instruction().getMaxAddress().getOffset()&~31L)!=fetch)throw fail("closed-call branch-target execute packet spans fetch packets at "+entry.getNewAddress(pc));
     }
-    private void validateReturn(long pc)throws Exception {var insn=decode(pc);var register=insn.instruction().getRegister(0);if(!Set.of("B","BNOP").contains(insn.name())||register==null||!register.getName().equals("B3")||insn.predicate()!=null)throw fail("closed-call expected unconditional B3 return");}
+    private Register validateReturn(long pc)throws Exception {
+        var insn=decode(pc);var register=insn.instruction().getRegister(0);
+        if(!Set.of("B","BNOP").contains(insn.name())||register==null||!register.getName().matches("[AB]([0-9]|[12][0-9]|3[01])")||insn.predicate()!=null)throw fail("closed-call expected unconditional register return");return register;
+    }
+    private Register callLinkRegister(Insn call){
+        if(!call.name().equals("CALLP"))return program.getRegister("B3");
+        var outputs=call.outputs().stream().filter(d->d.size()==4&&d.phase()==1).toList();
+        if(outputs.size()!=1)throw fail("CALLP must have one exact E1 link output");var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(outputs.get(0).offset()),4);
+        if(register==null||!Set.of("A3","B3").contains(register.getName()))throw fail("invalid CALLP link register");return register;
+    }
     private void validateClosedCall()throws Exception {
         if(!closedCall.entry().drained())throw fail("closed-call requires explicit drained entry");
         if(!program.getLanguageID().getIdAsString().equals(closedCall.languageId())||function.getEntryPoint().getOffset()!=closedCall.caller().ownerEntry())throw fail("closed-call language/owner identity mismatch");
-        if(closedCall.callee().start()!=closedCall.callee().ownerEntry())throw fail("closed-call callee must enter at its owner entry");
-        validateWindow(closedCall.caller());validateWindow(closedCall.callee());
-        if(!closedPackets.contains(closedCall.startPc())||!closedPackets.contains(closedCall.callPc())||!closedPackets.contains(closedCall.continuation())||closedCall.stopPc()!=null&&closedCall.stopPc()<=closedCall.continuation())throw fail("closed-call start/continuation is not a packet boundary");
+        var windows=new LinkedHashSet<TraceWindow>();windows.add(closedCall.caller());
+        for(var plan:closedCalls.values()){if(plan.callee().start()!=plan.callee().ownerEntry())throw fail("closed-call callee must enter at its owner entry");windows.add(plan.callee());}
+        var ordered=new ArrayList<>(windows);for(int a=0;a<ordered.size();a++)for(int b=a+1;b<ordered.size();b++)if(ordered.get(a).start()<ordered.get(b).end()&&ordered.get(b).start()<ordered.get(a).end())throw fail("closed-call overlapping or inconsistent owner windows");
+        for(var window:windows)validateWindow(window);
+        if(!closedPackets.contains(closedCall.startPc())||closedCall.stopPc()!=null&&closedCall.stopPc()<=closedCall.startPc())throw fail("closed-call start/continuation is not a packet boundary");
         for(long at:closedInternalBranches){long target=decode(at).instruction().getAddress(0).getOffset();if(!closedPackets.contains(target))throw fail("closed-call internal target is not a packet boundary");validateClosedTargetPacket(target);}
-        var call=decode(closedCall.callPc());var targetRegister=call.instruction().getRegister(0);
-        if(!call.name().equals("B")||call.predicate()!=null)throw fail("closed-call target must be an unconditional B");
-        // SPRUFE8B 3.5/3.7 and B, MVK, MVKH instruction descriptions: sample
-        // packet-old operands, then apply simultaneous phased raw-p-code writes.
-        var constants=new C6000LoopCounterProof(program.getLanguage());long prefix=closedCall.startPc();
-        while(prefix<closedCall.callPc()){
-            var pack=packet(prefix);int span=pack.stream().mapToInt(Insn::span).max().orElse(1);
-            if(pack.stream().anyMatch(i->Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(i.name())))throw fail("closed-call target prefix is not straight-line");
-            constants.packet(proofOperations(pack));for(int t=1;t<span;t++)constants.packet(List.of());prefix=after(pack.get(pack.size()-1));
+        validateClosedTargetPacket(closedCall.startPc());if(closedCall.callerReturnPc()!=null)validateReturn(closedCall.callerReturnPc());
+        var plans=new ArrayList<>(closedCalls.values());plans.sort(Comparator.comparingLong(ClosedCallPlan::callPc));
+        var constants=new C6000LoopCounterProof(program.getLanguage());var shadows=new ArrayList<C6000LoopCounterProof.UnknownWrite>();long pc=closedCall.startPc();
+        for(var plan:plans){
+            Long callPacket=closedInstructionPackets.get(plan.callPc());if(callPacket==null||!closedPackets.contains(plan.continuation())||callPacket<pc)throw fail("closed-call start/continuation is not a packet boundary");
+            while(pc<callPacket){var pack=packet(pc);if(pack.stream().anyMatch(i->Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(i.name())))throw fail("closed-call target prefix is not straight-line");proofPacket(constants,pack,shadows);pc=after(pack.get(pack.size()-1));}
+            var call=decode(plan.callPc());var targetRegister=call.instruction().getRegister(0);
+            if(!Set.of("B","CALLP").contains(call.name())||call.predicate()!=null)throw fail("closed-call target must be an unconditional B or CALLP");
+            Long destination=targetRegister==null?(call.instruction().getAddress(0)==null?null:call.instruction().getAddress(0).getOffset()):constants.registerValue(targetRegister.getAddress().getOffset(),4);
+            if(pc!=callPacket||destination==null||(destination&0xffffffffL)!=plan.callee().start())throw fail("closed-call target lacks exact packet-old constant proof");
+            var linkRegister=callLinkRegister(call);long linkOffset=linkRegister.getAddress().getOffset();
+            if(!validateReturn(plan.calleeReturnPc()).equals(linkRegister))throw fail("closed-call callee return does not use the proved link register");
+            validateClosedTargetPacket(plan.callee().start());validateClosedTargetPacket(plan.continuation());
+            // SPRUFE8B 3.5/3.7, CALLP p.172 and 4.2.6: six advances,
+            // packet-old target, E1 links. An early correct link remains valid.
+            int elapsed=0;long lastWriter=-1;var writers=new ArrayList<Long>();
+            while(elapsed<6){var pack=packet(pc);int span=pack.stream().mapToInt(Insn::span).max().orElse(1);
+                for(var i:pack){long at=i.instruction().getAddress().getOffset();if(at!=plan.callPc()&&Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(i.name()))throw fail("closed-call control edge in call delay window");
+                    for(var d:i.outputs())if(d.offset()<linkOffset+4&&linkOffset<d.offset()+d.size()){
+                        if(!Set.of("ADDKPC","MVK","MVKL","MVKH","CALLP").contains(i.name())||i.predicate()!=null||d.offset()!=linkOffset||d.size()!=4||d.phase()!=1||(!Set.of("CALLP","ADDKPC").contains(i.name())&&i.span()!=1))throw fail("closed-call link lacks exact unconditional E1 "+linkRegister.getName()+" proof at "+i.instruction().getAddress());
+                        writers.add(at);lastWriter=at;
+                    }
+                }proofPacket(constants,pack,shadows);elapsed+=span;pc=after(pack.get(pack.size()-1));
+            }
+            Long link=constants.registerValue(linkOffset,4);
+            if(elapsed!=6||pc!=plan.continuation()||lastWriter!=plan.linkPc()||link==null||(link&0xffffffffL)!=plan.continuation())throw fail("closed-call link lacks exact continuation proof");
+            for(var i:instructions.values())if(plan.caller().contains(i.instruction().getAddress().getOffset())&&i.instruction().getAddress().getOffset()<plan.continuation())for(var d:i.outputs())if(d.offset()<linkOffset+4&&linkOffset<d.offset()+d.size()&&d.phase()!=1)throw fail("closed-call pre-link late register writer");
+            closedProofs.put(plan.callPc(),new ClosedCallProof(plan.callPc(),targetRegister==null?null:targetRegister.getName(),destination&0xffffffffL,plan.continuation(),List.copyOf(writers),slot("call_target",plan.callPc(),5,0,4)));
+            var outputs=new ArrayList<C6000LoopCounterProof.Output>();for(var i:instructions.values())if(plan.callee().contains(i.instruction().getAddress().getOffset()))for(var d:i.outputs())outputs.add(new C6000LoopCounterProof.Output(d.offset(),d.size(),d.valueOffset(),d.phase(),true));
+            shadows.addAll(constants.returnFromCall(outputs));
         }
-        Long destination=targetRegister==null?(call.instruction().getAddress(0)==null?null:call.instruction().getAddress(0).getOffset()):constants.registerValue(targetRegister.getAddress().getOffset(),4);
-        if(prefix!=closedCall.callPc()||destination==null||(destination&0xffffffffL)!=closedCall.callee().start())throw fail("closed-call target lacks exact packet-old constant proof");
-        // SPRUFE8B 4.2.6 and 3.10.4 require target fetch timing not yet modeled here.
-        validateClosedTargetPacket(closedCall.startPc());validateClosedTargetPacket(closedCall.callee().start());validateClosedTargetPacket(closedCall.continuation());
-        validateReturn(closedCall.calleeReturnPc());if(closedCall.callerReturnPc()!=null)validateReturn(closedCall.callerReturnPc());
-        // Five delay cycles, not five source rows: multicycle NOPs keep their full span.
-        long pc=closedCall.callPc();int elapsed=0;long b3=program.getRegister("B3").getAddress().getOffset();var writers=new ArrayList<Long>();long finalWriter=-1;int finalCycle=-1;
-        while(elapsed<6){var pack=packet(pc);int span=1;for(var i:pack){long at=i.instruction().getAddress().getOffset();span=Math.max(span,i.span());if(at!=closedCall.callPc()&&Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(i.name()))throw fail("closed-call control edge in call delay window");for(var d:i.outputs())if(d.offset()<b3+4&&b3<d.offset()+d.size()){
-            if(!Set.of("ADDKPC","MVK","MVKL","MVKH").contains(i.name())||i.predicate()!=null||i.span()!=1||d.offset()!=b3||d.size()!=4||d.phase()!=1)throw fail("closed-call link lacks exact unconditional E1 B3 proof at "+i.instruction().getAddress());
-            writers.add(at);finalWriter=at;finalCycle=elapsed;
-        }}constants.packet(proofOperations(pack));for(int t=1;t<span;t++)constants.packet(List.of());elapsed+=span;pc=after(pack.get(pack.size()-1));}
-        Long link=constants.registerValue(b3,4);
-        if(elapsed!=6||pc!=closedCall.continuation()||finalWriter!=closedCall.linkPc()||finalCycle!=5||link==null||(link&0xffffffffL)!=closedCall.continuation())throw fail("closed-call link lacks exact final-delay continuation proof");
-        closedProof=new ClosedCallProof(closedCall.callPc(),targetRegister==null?null:targetRegister.getName(),destination&0xffffffffL,closedCall.continuation(),List.copyOf(writers),slot("call_target",closedCall.callPc(),5,0,4));
-        // No incoming late effects, no earlier B3 write with a late phase, and no
-        // callee B3 writer: the actual E1-captured return target is the proven link.
-        for(var i:instructions.values())if(closedCall.caller().contains(i.instruction().getAddress().getOffset())&&i.instruction().getAddress().getOffset()<closedCall.continuation())for(var d:i.outputs())if(d.offset()<b3+4&&b3<d.offset()+d.size()&&d.phase()!=1)throw fail("closed-call pre-link late B3 writer");
     }
-    private void closedBoundary(String kind,Branch landing,List<Flight> flights,List<Hazard> hazards)throws Exception {
+    private void proofPacket(C6000LoopCounterProof constants,List<Insn> pack,List<C6000LoopCounterProof.UnknownWrite> shadows){
+        int span=pack.stream().mapToInt(Insn::span).max().orElse(1);for(int cycle=0;cycle<span;cycle++){
+            var operations=new ArrayList<C6000LoopCounterProof.Operation>(cycle==0?proofOperations(pack):List.of());var outputs=new ArrayList<C6000LoopCounterProof.Output>();
+            for(var shadow:shadows)outputs.add(new C6000LoopCounterProof.Output(shadow.offset(),shadow.size(),shadow.offset(),1,true));
+            if(!outputs.isEmpty())operations.add(new C6000LoopCounterProof.Operation(new PcodeOp[0],outputs,null,false));constants.packet(operations);
+            shadows.replaceAll(w->new C6000LoopCounterProof.UnknownWrite(w.offset(),w.size(),w.advances()-1));shadows.removeIf(w->w.advances()<=0);
+        }
+    }
+    private void closedBoundary(String kind,Branch landing,List<Flight> flights,List<Hazard> hazards,ClosedCallPlan plan)throws Exception {
         var effects=new ArrayList<PendingEffect>();var stores=new ArrayList<PendingStore>();var recent=new ArrayList<BoundaryHazard>();
         for(var flight:flights){var i=decode(flight.pc());effects.add(new PendingEffect(flight.pc(),flight.age(),i.latency()-flight.age(),slot("predicate",flight.pc(),flight.age(),0,1),java.util.HexFormat.of().formatHex(i.instruction().getBytes())));if(i.name().equals("STW")){var inputs=new LinkedHashMap<String,Varnode>();for(long offset:i.regs()){var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(offset),4);if(register!=null)inputs.put(register.getName(),slot("input",flight.pc(),flight.age(),offset,4));}stores.add(new PendingStore(flight.pc(),flight.age(),3-flight.age(),slot("predicate",flight.pc(),flight.age(),0,1),slot("store_address",flight.pc(),flight.age(),0,4),slot("store_value",flight.pc(),flight.age(),0,4),Map.copyOf(inputs),java.util.HexFormat.of().formatHex(i.instruction().getBytes())));}}
         for(var hazard:hazards)for(long offset:hazard.registers()){var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(offset),4);if(register!=null)recent.add(new BoundaryHazard(register.getName(),slot("hazard",hazard.pc(),0,0,1)));}
-        int marker=b.code.size();b.op(PcodeOp.COPY,temp(1),c(0,1));Varnode target=landing.returns()?slot("target",landing.pc(),landing.age(),0,4):arch(program.getRegister("B3").getAddress().getOffset(),4);
-        closedBoundaries.add(new ClosedCallBoundary(marker,kind,landing.pc(),target,kind.equals("CALLER_RETURN")?null:closedCall.continuation(),List.copyOf(effects),List.copyOf(stores),List.copyOf(recent)));
+        int marker=b.code.size();b.op(PcodeOp.COPY,temp(1),c(0,1));Varnode target=landing.returns()?slot("target",landing.pc(),landing.age(),0,4):arch(callLinkRegister(decode(plan.callPc())).getAddress().getOffset(),4);
+        closedBoundaries.add(new ClosedCallBoundary(marker,kind,landing.pc(),target,kind.equals("CALLER_RETURN")?null:plan.continuation(),List.copyOf(effects),List.copyOf(stores),List.copyOf(recent)));
     }
     private Set<String> closedHazards(List<Hazard> hazards)throws Exception {
         Set<String> writes=new TreeSet<>();for(var hazard:hazards){if(decode(hazard.pc()).predicate()!=null)throw fail("closed-call exit has a conditional hazard");for(long offset:hazard.registers()){var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(offset),4);if(register==null)throw fail("closed-call exit hazard is unknown");writes.add(register.getName());}}return Set.copyOf(writes);
@@ -368,7 +408,9 @@ public final class C6000PipelineCompiler {
     private record LoopFrame(long start,int time,int drain,boolean zero,boolean refill,boolean abrupt) {}
     private record LoopCell(List<Insn> source,List<Insn> buffered,int mask,long nextPc) {}
     private record LoopPlan(long start,String kind,int ii,int fetchDelay,int cap,List<LoopCell> cells,long postPc) {}
-    private record State(long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,PredicateFacts facts){
+    private static final long NO_CALL=-1,ENTRY_LINK=-2;
+    private record ReturnFlow(long activeCall,Map<Long,Long> links) {}
+    private record State(long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,PredicateFacts facts,ReturnFlow returns){
     }
 
     // Zero/nonzero facts refer only to the six architectural predicate GPRs.
@@ -544,9 +586,19 @@ public final class C6000PipelineCompiler {
                 }
             }
         }
-        else if(SINGLE.contains(name)||Set.of("NOP","B","BNOP","BDEC","BPOS","ADDKPC","SPLOOP","SPLOOPD","SPLOOPW","SPMASK","SPKERNEL").contains(name))latency=1;
+        else if(SINGLE.contains(name)||Set.of("NOP","B","BNOP","BDEC","BPOS","CALLP","ADDKPC","SPLOOP","SPLOOPD","SPLOOPW","SPMASK","SPKERNEL").contains(name))latency=1;
         else throw fail("unimplemented phase contract "+ins+" at "+at);
         var raw=Set.of("SPLOOP","SPLOOPD","SPLOOPW","SPMASK","SPKERNEL").contains(name)?new PcodeOp[0]:ins.getPcode(false);
+        if(name.equals("CALLP")){
+            long next;try{next=ins.getMaxAddress().getOffset()+1+C6000ExecutionPackets.parallelBytes(program,at);}
+            catch(ghidra.program.model.mem.MemoryAccessException invalid){throw fail("CALLP invalid execute packet: "+invalid.getMessage());}
+            if((next&31)==28&&program.getMemory().contains(entry.getNewAddress(next+3))&&(program.getMemory().getInt(entry.getNewAddress(next))>>>28)==14)next+=4;
+            raw=Arrays.copyOf(raw,raw.length);int links=0;
+            for(int k=0;k<raw.length;k++){var op=raw[k];var out=op.getOutput();if(out!=null&&out.isRegister()){
+                var register=program.getRegister(out.getAddress(),out.getSize());if(op.getOpcode()!=PcodeOp.COPY||register==null||!Set.of("A3","B3").contains(register.getName())||!op.getInput(0).isConstant())throw fail("unexpected raw CALLP link");
+                raw[k]=new PcodeOp(at,k,PcodeOp.COPY,new Varnode[]{c(next,4)},out);links++;
+            }}if(links!=1)throw fail("missing raw CALLP E1 link");
+        }
         TreeSet<Long> regs=new TreeSet<>();
         Map<String,Dest> destinations=new LinkedHashMap<>();
         Set<Integer> loadWrites=load?C6000MemoryWritePhases.loadWrites(raw):Set.of();
@@ -623,6 +675,7 @@ public final class C6000PipelineCompiler {
             if(left.phase()==right.phase()&&left.offset()<right.offset()+right.size()&&right.offset()<left.offset()+left.size())throw fail("ambiguous raw memory writes in one phase at "+at);
         }}
         int span=1;
+        if(name.equals("CALLP"))span=6;
         if(name.equals("NOP"))span=Math.max(1,(int)ins.getScalar(0).getValue());
         if(name.equals("BNOP"))span=1+C6000ExecutionPackets.bnopCount(program,ins);
         if(name.equals("ADDKPC"))span=1+(int)ins.getScalar(2).getValue();
@@ -915,7 +968,7 @@ public final class C6000PipelineCompiler {
             incoming=List.of(new Hazard(-1,entryWrites));
             b.op(PcodeOp.COPY,slot("hazard",-1,0,0,1),c(1,1));
         }
-        State start=new State(entry.getOffset(),0,List.of(),List.of(),incoming,null,PredicateFacts.unknown());
+        State start=new State(entry.getOffset(),0,List.of(),List.of(),incoming,null,PredicateFacts.unknown(),new ReturnFlow(NO_CALL,Map.of(program.getRegister("B3").getAddress().getOffset(),ENTRY_LINK)));
         state(start);
         int processed=0;
         while(processed<states.size()){
@@ -1007,7 +1060,7 @@ public final class C6000PipelineCompiler {
                 }
             }
             if(stall!=null){
-                String target="node"+state(new State(s.pc(),s.idle(),s.flights(),s.branches(),List.of(),s.loop(),s.facts()));
+                String target="node"+state(new State(s.pc(),s.idle(),s.flights(),s.branches(),List.of(),s.loop(),s.facts(),s.returns()));
                 stallLabels.put(b.code.size(),target);
                 b.jump(PcodeOp.CBRANCH,target,stall);
             }
@@ -1032,8 +1085,9 @@ public final class C6000PipelineCompiler {
                 else{var pred=temp(1);if(i.predicate()==null)b.op(PcodeOp.COPY,pred,c(1,1));else b.op(i.inverted()?PcodeOp.INT_EQUAL:PcodeOp.INT_NOTEQUAL,pred,arch(i.predicate().getAddress().getOffset(),4),c(0,4));e=new Eval(0,pred,Map.of(),null);}
                 issued.put(pc,e);
                 span=Math.max(span,i.span());
-                if(Set.of("B","BNOP","BDEC","BPOS").contains(i.name())){
+                if(Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(i.name())){
                     if(issueBranch!=null)throw fail("multiple branches in a packet");
+                    if(i.name().equals("CALLP")&&(!s.branches().isEmpty()||s.returns().activeCall()!=NO_CALL||loop!=null))throw fail("CALLP requires no pending branch or nested invocation");
                     issueBranch=i;
                 }
             }
@@ -1049,6 +1103,7 @@ public final class C6000PipelineCompiler {
             List<Dest> writesThisCycle=new ArrayList<>();
             for(var i:pack)for(var d:i.outputs())if(d.phase()==1)writesThisCycle.add(d);
             for(var f:s.flights())for(var d:decode(f.pc()).outputs())if(d.phase()==f.age()+1)writesThisCycle.add(d);
+            for(var i:pack)if(i.name().equals("CALLP")){long link=callLinkRegister(i).getAddress().getOffset();if(writesThisCycle.stream().filter(d->d.offset()<link+4&&link<d.offset()+d.size()).count()>1)throw fail("CALLP link has a potential simultaneous E1 writer");}
             validateMemoryWriteCollisions(s,pack);
             validateMpyliWritePorts(s,pack);
             for(var i:pack)checkStable(i,1,writesThisCycle);
@@ -1121,27 +1176,39 @@ public final class C6000PipelineCompiler {
                 else{
                     nextBranches.add(new Branch(branch.pc(),branch.age()+1,branch.target(),branch.returns()));
                     if(branch.returns())copy(moves,slot("target",branch.pc(),branch.age()+1,0,4),slot("target",branch.pc(),branch.age(),0,4));
-                    if(closedCall!=null&&branch.pc()==closedCall.callPc())copy(moves,slot("call_target",branch.pc(),branch.age()+1,0,4),slot("call_target",branch.pc(),branch.age(),0,4));
+                    if(closedCall!=null&&closedCalls.containsKey(branch.pc()))copy(moves,slot("call_target",branch.pc(),branch.age()+1,0,4),slot("call_target",branch.pc(),branch.age(),0,4));
                 }
             }
             for(var move:moves)move.run();
+            ReturnFlow returnFlow=advanceReturnFlow(s,pack);
             if(landing!=null){
                 idle=0;
                 if(landing.returns()){
-                    if(closedCall!=null&&landing.pc()==closedCall.calleeReturnPc()){
+                    if(s.returns().activeCall()!=NO_CALL){
                         if(loop!=null||!nextBranches.isEmpty()||issueBranch!=null)throw fail("closed-call callee return has unresolved control effects");
-                        closedBoundary("CALL_RETURN",landing,nextFlights,hazards);nextPc=closedCall.continuation();
+                        long site=s.returns().activeCall();var plan=closedCalls.get(site);
+                        if(plan!=null){if(landing.pc()!=plan.calleeReturnPc())throw fail("closed-call undeclared callee return");closedBoundary("CALL_RETURN",landing,nextFlights,hazards,plan);nextPc=plan.continuation();}
+                        else nextPc=callpContinuation(decode(site));
+                        returnFlow=new ReturnFlow(NO_CALL,returnFlow.links());
                     }
                     else if(traceContract!=null)nextPc=continueReturn(landing,nextFlights,nextBranches,issueBranch,loop);
                     else if(storeTailContract!=null){storeTailReturn(s,landing,nextFlights,nextBranches,issueBranch,loop,hazards);continue;}
                     else {
                         if(!nextFlights.isEmpty()||!nextBranches.isEmpty()||issueBranch!=null)throw fail("return leaves architectural pipeline effects pending; source="+s+"; next="+nextFlights);
-                        if(closedCall!=null){if(!Objects.equals(landing.pc(),closedCall.callerReturnPc()))throw fail("closed-call undeclared return");closedBoundary("CALLER_RETURN",landing,nextFlights,hazards);var writes=closedHazards(hazards);if(closedExitWrites!=null&&!closedExitWrites.equals(writes))throw fail("closed-call incompatible return hazards");closedExitWrites=writes;}
+                        if(closedCall!=null){if(!Objects.equals(landing.pc(),closedCall.callerReturnPc()))throw fail("closed-call undeclared return");closedBoundary("CALLER_RETURN",landing,nextFlights,hazards,closedCall);var writes=closedHazards(hazards);if(closedExitWrites!=null&&!closedExitWrites.equals(writes))throw fail("closed-call incompatible return hazards");closedExitWrites=writes;}
                         b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),slot("target",landing.pc(),landing.age(),0,4));
                         if(loop!=null){var tsr=program.getRegister("TSR");b.op(PcodeOp.INT_AND,new Varnode(tsr.getAddress(),4),new Varnode(tsr.getAddress(),4),c(0xffffbfffL,4));}
                         b.jump(PcodeOp.BRANCH,"exit",null);continue;
                     }
-                } else {if(closedCall!=null){if(landing.pc()==closedCall.callPc())closedBoundary("CALL_ENTER",landing,nextFlights,hazards);else if(!closedInternalBranches.contains(landing.pc()))throw fail("closed-call undeclared direct landing");}nextPc=landing.target();}
+                } else {
+                    var plan=closedCalls.get(landing.pc());boolean call=plan!=null||decode(landing.pc()).name().equals("CALLP");
+                    if(call){
+                        if(s.returns().activeCall()!=NO_CALL)throw fail("nested closed call requires a call-stack contract");
+                        if(plan!=null)closedBoundary("CALL_ENTER",landing,nextFlights,hazards,plan);
+                        var links=new HashMap<>(returnFlow.links());if(plan!=null&&!decode(landing.pc()).name().equals("CALLP"))links.put(callLinkRegister(decode(landing.pc())).getAddress().getOffset(),landing.pc());returnFlow=new ReturnFlow(landing.pc(),Map.copyOf(links));
+                    }else if(closedCall!=null&&!closedInternalBranches.contains(landing.pc()))throw fail("closed-call undeclared direct landing");
+                    nextPc=landing.target();
+                }
             }
             // SPRUFE8B 7.14: a taken branch idles a non-reloading buffer
             // after its five delay slots. Effects already issued still mature.
@@ -1172,12 +1239,12 @@ public final class C6000PipelineCompiler {
                 // Proven positive ILC removes only the impossible stop edge. Keep
                 // the exact decrement, and retain every post-loading/refill state.
                 if(decrementOnContinue){b.op(PcodeOp.INT_SUB,ilc(),loopTest,c(1,4));b.op(PcodeOp.COPY,new Varnode(program.getRegister("ILC").getAddress(),4),ilc());}
-                emitTransfer(s,pack,nextPc,idle,nextFlights,nextBranches,hazards,normal,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
+                emitTransfer(s,returnFlow,pack,nextPc,idle,nextFlights,nextBranches,hazards,normal,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
             }else if(loopTest!=null){
                 String stop="loop_stop_"+b.labelCounter++;var zero=temp(1);b.op(PcodeOp.INT_EQUAL,zero,loopTest,c(0,loopTest.getSize()));b.jump(PcodeOp.CBRANCH,stop,zero);if(decrementOnContinue){b.op(PcodeOp.INT_SUB,ilc(),loopTest,c(1,4));b.op(PcodeOp.COPY,new Varnode(program.getRegister("ILC").getAddress(),4),ilc());}
-                emitTransfer(s,pack,nextPc,idle,nextFlights,nextBranches,hazards,normal,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
-                b.label(stop);emitTransfer(s,pack,stoppedPc,idle,nextFlights,nextBranches,hazards,stopped,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
-            }else emitTransfer(s,pack,nextPc,idle,nextFlights,nextBranches,hazards,normal,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
+                emitTransfer(s,returnFlow,pack,nextPc,idle,nextFlights,nextBranches,hazards,normal,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
+                b.label(stop);emitTransfer(s,returnFlow,pack,stoppedPc,idle,nextFlights,nextBranches,hazards,stopped,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
+            }else emitTransfer(s,returnFlow,pack,nextPc,idle,nextFlights,nextBranches,hazards,normal,issueBranch,captured,issued,loop!=null||loopStart!=null,loop!=null&&bufferFinished(loop,s.loop()));
 
         }
         b.label("exit");
@@ -1190,12 +1257,15 @@ public final class C6000PipelineCompiler {
 
     private Varnode ilc(){return new Varnode(program.getRegister("C6000_PIPE_ILC").getAddress(),4);}
 
-    private void emitTransfer(State source,List<Insn> pack,long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,Insn issueBranch,Map<Long,Map<Long,Varnode>> captured,Map<Long,Eval> issued,boolean updateLoopStatus,boolean finishedCurrentBuffer){
+    private void emitTransfer(State source,ReturnFlow returnFlow,List<Insn> pack,long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,Insn issueBranch,Map<Long,Map<Long,Varnode>> captured,Map<Long,Eval> issued,boolean updateLoopStatus,boolean finishedCurrentBuffer){
         if(updateLoopStatus){var tsr=new Varnode(program.getRegister("TSR").getAddress(),4);boolean active=loop!=null&&!loop.abrupt()&&!finishedCurrentBuffer;b.op(active?PcodeOp.INT_OR:PcodeOp.INT_AND,tsr,tsr,c(active?0x4000:0xffffbfffL,4));}
-        if(issueBranch==null){emitFactTransfer(source,pack,pc,idle,flights,branches,hazards,loop,source.facts());return;}
-        var instruction=issueBranch.instruction();long at=instruction.getAddress().getOffset();var register=instruction.getRegister(0);boolean call=closedCall!=null&&at==closedCall.callPc();boolean returns=!call&&register!=null&&register.getName().equals("B3");
+        if(issueBranch==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,source.facts());return;}
+        var instruction=issueBranch.instruction();long at=instruction.getAddress().getOffset();var register=instruction.getRegister(0);var plan=closedCalls.get(at);boolean call=plan!=null||issueBranch.name().equals("CALLP");
+        Long origin=register==null?null:source.returns().links().get(register.getAddress().getOffset());
+        boolean returns=!call&&register!=null&&(source.returns().activeCall()!=NO_CALL?origin!=null&&origin==source.returns().activeCall():origin!=null&&origin==ENTRY_LINK||register.getName().equals("B3"));
+        if(closedCall!=null&&!call&&register!=null){var active=closedCalls.get(source.returns().activeCall());if(active!=null&&at!=active.calleeReturnPc()||active==null&&!Objects.equals(at,closedCall.callerReturnPc()))throw fail("closed-call undeclared register edge");}
         if(register!=null&&!returns&&!call)throw fail("unresolved register branch "+instruction);
-        long target=call?closedCall.callee().start():returns?0:instruction.getAddress(0).getOffset();
+        long target=plan!=null?plan.callee().start():returns?0:instruction.getAddress(0).getOffset();
         if(call)b.op(PcodeOp.COPY,slot("call_target",at,1,0,4),register==null?c(target,4):captured.get(at).get(register.getAddress().getOffset()));
         if(callerTail!=null&&!returns){if(!callerTail.callee().contains(target))throw fail("caller-tail callee branch leaves declared scope");validateCallerTailTarget(target);}
         if(returns)b.op(PcodeOp.COPY,slot("target",at,1,0,4),captured.get(at).get(register.getAddress().getOffset()));
@@ -1205,21 +1275,39 @@ public final class C6000PipelineCompiler {
             // Preserve raw transfer truth and leave these fact partitions broad.
             String no="counter_not_taken_"+b.labelCounter++;
             b.jump(PcodeOp.CBRANCH,no,invert(issued.get(at).transferTaken()));
-            emitFactTransfer(source,pack,pc,idle,flights,yes,hazards,loop,source.facts());
-            b.label(no);emitFactTransfer(source,pack,pc,idle,flights,branches,hazards,loop,source.facts());
+            emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,source.facts());
+            b.label(no);emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,source.facts());
             return;
         }
-        if(issueBranch.predicate()==null){emitFactTransfer(source,pack,pc,idle,flights,yes,hazards,loop,source.facts());return;}
+        if(issueBranch.predicate()==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,source.facts());return;}
         int index=Set.of("B","BNOP").contains(issueBranch.name())?predicateIndex(issueBranch.predicate().getAddress().getOffset()):-1;
         // Fork the E1 snapshot before evaluating any same-packet writes. A copied
         // old predicate and a changed predicate must never be conflated here.
         PredicateFacts taken=index<0?source.facts():source.facts().constrain(index,issueBranch.inverted()?0:1);
         PredicateFacts skipped=index<0?source.facts():source.facts().constrain(index,issueBranch.inverted()?1:0);
-        if(taken==null){emitFactTransfer(source,pack,pc,idle,flights,branches,hazards,loop,skipped);return;}
-        if(skipped==null){emitFactTransfer(source,pack,pc,idle,flights,yes,hazards,loop,taken);return;}
+        if(taken==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);return;}
+        if(skipped==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,taken);return;}
         String no="predicate_not_taken_"+b.labelCounter++;b.jump(PcodeOp.CBRANCH,no,invert(issued.get(at).predicate()));
-        emitFactTransfer(source,pack,pc,idle,flights,yes,hazards,loop,taken);b.label(no);
-        emitFactTransfer(source,pack,pc,idle,flights,branches,hazards,loop,skipped);
+        emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,taken);b.label(no);
+        emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);
+    }
+
+    private long callpContinuation(Insn call){
+        var link=callLinkRegister(call);Long value=C6000LoopCounterProof.constantOutput(program.getLanguage(),call.raw(),link.getAddress().getOffset(),4);
+        if(value==null)throw fail("CALLP lacks exact E1 link proof");return value&0xffffffffL;
+    }
+    private ReturnFlow advanceReturnFlow(State source,List<Insn> pack){
+        var before=source.returns().links();var after=new HashMap<>(before);var written=new HashSet<Long>();
+        for(var flight:source.flights())if(flight.predicateTruth()!=0){var instruction=decodeKnown(flight.pc());for(var d:instruction.outputs())if(d.phase()==flight.age()+1)forgetReturnOutput(after,written,d,null,false);}
+        for(var instruction:pack){int truth=predicateTruth(instruction,source.facts());if(truth==0)continue;var copied=copiedSource(instruction);Long origin=copied==null?null:before.get(copied.getAddress().getOffset());if(instruction.name().equals("CALLP"))origin=instruction.instruction().getAddress().getOffset();
+            for(var d:instruction.outputs())if(d.phase()==1){Long value=d.size()==4&&d.mask()==-1&&d.sourceWrite()<0?origin:null;if(truth<0&&!Objects.equals(before.get(d.offset()),value))value=null;forgetReturnOutput(after,written,d,value,true);}
+        }
+        return new ReturnFlow(source.returns().activeCall(),Map.copyOf(after));
+    }
+    private void forgetReturnOutput(Map<Long,Long> links,Set<Long> written,Dest output,Long value,boolean exact){
+        for(String bank:List.of("A","B"))for(int k=0;k<32;k++){long offset=program.getRegister(bank+k).getAddress().getOffset();if(output.offset()>=offset+4||offset>=output.offset()+output.size())continue;
+            if(!written.add(offset)||!exact||output.offset()!=offset||output.size()!=4||value==null)links.remove(offset);else links.put(offset,value);
+        }
     }
 
     private Varnode invert(Varnode value){var inverted=temp(1);b.op(PcodeOp.BOOL_NEGATE,inverted,value);return inverted;}
@@ -1262,13 +1350,13 @@ public final class C6000PipelineCompiler {
         }
         return new PredicateFacts(List.copyOf(after));
     }
-    private void emitFactTransfer(State source,List<Insn> pack,long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,PredicateFacts before){
+    private void emitFactTransfer(State source,ReturnFlow returnFlow,List<Insn> pack,long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,PredicateFacts before){
         var facts=advanceFacts(source,pack,before);
         List<Flight> captured=new ArrayList<>();for(var flight:flights){var instruction=instructions.get(flight.pc());boolean fresh=flight.age()==1&&pack.contains(instruction);captured.add(new Flight(flight.pc(),flight.age(),fresh?predicateTruth(instruction,before):flight.predicateTruth()));}
         // A backward redirect or buffered time wrap must not turn an entry fact
         // into a loop invariant. Widen to independent unknown values there.
         if(pc<source.pc()||loop!=null&&source.loop()!=null&&loop.time()<source.loop().time())facts=PredicateFacts.unknown();
-        State target=new State(pc,idle,List.copyOf(captured),List.copyOf(branches),List.copyOf(hazards),loop,facts.canonical());
+        State target=new State(pc,idle,List.copyOf(captured),List.copyOf(branches),List.copyOf(hazards),loop,facts.canonical(),returnFlow);
         b.jump(PcodeOp.BRANCH,"node"+state(target),null);
     }
 
@@ -1361,7 +1449,7 @@ public final class C6000PipelineCompiler {
                 duration=Math.max(duration,instruction.span());
             }
             List<Insn> buffered=new ArrayList<>();for(var instruction:instructions)if(!Set.of("SPKERNEL","SPMASK").contains(instruction.name())&&(unit(instruction)&mask)==0&&!instruction.name().equals("BNOP")){
-                if(Set.of("B","MVC","ADDKPC").contains(instruction.name()))throw fail("unmasked control instruction in software loop buffer");buffered.add(instruction);
+                if(Set.of("B","CALLP","MVC","ADDKPC").contains(instruction.name()))throw fail("unmasked control instruction in software loop buffer");buffered.add(instruction);
             }
             long next=after(instructions.get(instructions.size()-1));cells.add(new LoopCell(List.copyOf(instructions),List.copyOf(buffered),mask,next));for(int t=1;t<duration;t++)cells.add(new LoopCell(List.of(),List.of(),0,next));pc=next;
             if(kernel){found=true;break;}

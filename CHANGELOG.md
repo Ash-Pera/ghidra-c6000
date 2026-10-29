@@ -4,6 +4,12 @@
 
 ### Added
 
+* Schedule sequential leaf calls, including repeated callees, with invocation-specific
+  continuations and live pipeline effects. Accept proved early MVK/MVKH/ADDKPC links.
+* Schedule full32/compact CALLP on both S units: E1 A3/B3 link, next execute-packet
+  return address and five implicit NOP advances. Track saved return-link provenance
+  for returns through registers such as A0, while rejecting unknown/clobbered links
+  (SPRUFE8B 3.5, 3.7, 3.8.10, 4.2.6, CALLP p.172).
 * Prove closed-call register destinations and MVK/MVKH return links from packet-old
   raw p-code; expose the captured call destination and ordered link writers. Permit
   validated direct branches and ordinary counter loops within the callee while
@@ -13,10 +19,10 @@
 
 ### Validation
 
-* Exercise a two-call integer state update through TI recompilation: the diagnostic
-  trace and rebuilt C match 1,056 bounded cases on unchanged firmware. Document and
-  regress the current multiple-call, early-link, CALLP and saved-register-return
-  capability refusals in both endians; production support is unchanged.
+* Rerun bitstream_flush through the production call model: unchanged bytes and
+  trace-derived TI C match all 1,056 cases. The ordinary-C binary now executes and
+  exposes its memory mismatches. Add CALLP, repeated-callee and saved-link execution
+  regressions in both endians; correct an older CALLP fixture's illegal NOP 2 peer.
 
 ### Fixed
 

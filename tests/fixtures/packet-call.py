@@ -17,7 +17,7 @@ def main():
    store=0x274|(4<<18)|(3<<23)|(side<<1)
    if compact:
     word=0x1a|side|((0x80//4)<<6)
-    struct.pack_into(e+'H',data,off,word);struct.pack_into(e+'H',data,off+2,0x2c6e)
+    struct.pack_into(e+'H',data,off,word);struct.pack_into(e+'H',data,off+2,0x0c6e) # NOP 1: CALLP cannot share a multicycle NOP
     struct.pack_into(e+'I',data,off+4,store);struct.pack_into(e+'I',data,off+8,store|(7<<13))
     struct.pack_into(e+'I',data,off+28,0xe0000000|(1<<21)|(1<<15)|3);nextpc=base+8;delay=6
    else:

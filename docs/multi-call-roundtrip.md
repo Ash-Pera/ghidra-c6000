@@ -1,11 +1,13 @@
 # Multiple-call integer round-trip experiment
 
-On 2026-10-28, `bitstream_flush` and its two integer leaf helpers were tested from the
-same DSP image as `codec_op_state_copy`. The production call model stopped at its
-existing capability guards. A disposable diagnostic extension let the experiment
-continue without changing firmware bytes or merging function owners. Its trace-derived
-C compiled with TI and matched the original trace and an independent oracle in all
-1,056 cases. This is experimental evidence, not production multiple-call support.
+The production `compileClosedCallsTrace` API now runs `bitstream_flush` and its two
+integer leaf helpers on unchanged firmware bytes with separate owners. Fresh
+trace-derived C, compiled with TI, matches the original trace and an independent oracle
+in all 1,056 cases. No alternate scheduler classes or scratch compiler extension are
+loaded. The ordinary-C TI binary also runs now and fails all 1,056 memory comparisons.
+
+The initial investigation in commit `5549d9a` required a diagnostic two-call extension.
+This follow-up replaces that extension with production support and execution tests.
 
 ## Target and behavior
 
@@ -35,29 +37,30 @@ carries those effects through actual caller packets; it does not drain or restar
 pipeline at either call boundary. Live target/link checks observe exactly two call
 entries, two helper returns and the original caller return.
 
-## Confirmed production limits
+## Production changes
 
-1. The single-call plan rejects the second call site as an undeclared control edge.
-2. A bounded first-call-only plan independently refuses its valid early link. The
-   first call issues at `0xc003184c`; MVK/MVKH establish B3 at `0xc0031860` /
-   `0xc0031864`, followed by the final NOP delay advance at `0xc0031868`. The second
-   call similarly finishes its link before its last delay cycle. The current contract
-   requires the final link writer in the final delay cycle.
-3. TI compiles the ordinary-C caller to a packet containing `MV.L1X B3,A0` and
-   `CALLP.S2`. The scheduler refuses `CALLP.S2` with an unimplemented phase contract.
-4. That rebuilt caller returns via `BNOP.S2X A0,5`. An isolated saved-link return
-   independently refuses as an unresolved register branch; only B3 is recognized as a
-   return target by the current scheduler.
+The plural API accepts up to sixteen sequential calls to owned leaf windows. All plans
+share the actual entry and endpoint. The scheduler carries the active invocation in
+its state, so repeated calls to the same callee return to their own continuations.
+Pending loads, stores, hazards and branch ages continue across each boundary.
 
-The [closed-call fixture](regressions.md) now contains synthetic regressions for all
-four observations in both endian modes. These are explicit expected refusals, not
-assertions that valid firmware is erroneous. Relevant rules are SPRUFE8B 3.5, 3.7,
-4.2.6 and the CALLP/B/BNOP/MVK/MVKH instruction descriptions.
+Both calls here establish B3 before their final delay cycle. The proof now accepts an
+early correct E1 link and tracks the complete six-advance delay window. It retains
+unaffected constants across callees while conservatively invalidating possible callee
+outputs and subsequent late register effects.
 
-Ordinary decompilation also loses the count load in the first call's delay window,
-the second call and the final clear. Its remaining call uses an unresolved incoming B4
-value. The source was compiled with explicit input/type bindings, but no behavioral
-comparison of that TI binary is claimed: execution stops at the CALLP phase guard.
+`CALLP.S2` in TI's ordinary-C wrapper now has an E1 B3 output and five implicit idle
+advances. Full32/compact forms on both S units are supported; `.S1` uses A3. The link
+points after the entire execute packet, including peers and fetch headers. Saved links
+are tracked through exact register copies: the wrapper's `MV.L1X B3,A0` preserves the
+original return link while CALLP overwrites B3, and `BNOP.S2X A0,5` returns through the
+E1-captured A0 value. Clobbered, memory-derived or otherwise unproved saved links still
+refuse, as do nested calls and invalid CALLP packets.
+
+The new [call regressions](regressions.md) execute the formerly unsupported shapes in
+both endians, including repeated callees and pending stores. The old single-call API
+remains available. Cross-owner schedules remain read-only contracts, not function-body
+merges or automatically installed decompiler overrides.
 
 ## Round-trip results
 
@@ -73,40 +76,51 @@ and memory are checked, rather than inventing a return value.
 | Original bytes, diagnostic two-call trace | 832 pass | 224 pass |
 | Fresh trace-derived C, TI compiled | 832 pass | 224 pass |
 | Deliberately corrupted output control | 832 detected | 224 detected |
-| Ordinary-C TI binary | CALLP refusal | CALLP refusal |
+| Ordinary-C TI binary | 832 memory mismatches | 224 memory mismatches |
 
 The first corpus covers 12 boundary values each for consumed/remaining counts across
 four context offsets, plus 256 seeded random cases. AMR controls vary seven unaffected
 pointer modes, two modes per pointer and two BK pairs. The actual context addressing
 mode stays linear. Each case checks the complete 4 KiB context arena against the
 independent oracle, bounded private-stack writes, PC/B3, A10-A15/B10-B15 and AMR.
-Both aligned and nonaligned bit counts exercise pending-store predicates.
+Both aligned and nonaligned bit counts exercise pending-store predicates. The native
+caller restores B3; the ordinary-C binary returns through A0 and may leave its volatile
+B3 holding an internal link. Its actual return PC and ABI-preserved registers are
+checked without requiring that volatile B3 equal the return PC.
+
+Ordinary decompilation still loses the first call's count load, the second call and the
+final clear. Its first call uses an unresolved incoming B4; the C adapter exposes that
+input as an explicit parameter. An unused incoming A11:A10 pair feeds only a dead
+private C stack temporary and is bound to zero. No missing logic is repaired by hand.
+The resulting 12-byte caller and scheduled helper compile and execute, confirming that
+the remaining memory mismatch is a C-recovery failure rather than a CALLP refusal.
 
 ## Scope and retained evidence
 
-The probe is a copy of the verified scheduler in a separate Java package, loaded only
-in a disposable project. It adds two explicit, nonrecursive call edges to distinct
-leaf callees, selects the corresponding return continuation and accepts an earlier
-proved link. Each call destination and link is proved from its local constant-setup
-prefix and checked from actual E1 snapshots during execution. The second prefix starts
-after the first return; that helper has only pending stores, with no pending register
-writes. This is a target-specific experiment, not a general interprocedural proof or a
-nested/repeated-callee implementation. The installed extension is unchanged.
+The original and both callees retain their byte hashes and distinct owners. The only
+scheduler used is the pinned production extension. For C export, a temporary payload
+in the disposable project supplies that production trace to Ghidra's decompiler and is
+restored afterward; it adds no scheduler semantics or call-model implementation.
+
+The contract supports sequential, nonrecursive leaf calls. Callee link registers must
+remain unchanged. Constant and saved-link proofs are conservative; this is not arbitrary
+indirect-call, stack-value or nested-call support. The native trace has 46 states and
+2,475 p-code operations, with two pending stores at each helper return and the caller's
+clear store pending at the second callee entry.
 
 These are bounded LE emulator results, not silicon validation or a portable-C
 correctness proof. The recovered C includes signed arithmetic; matching TI output on
 overflow cases does not prove freedom from C signed-overflow undefined behavior.
 
 Local evidence is retained in the development checkout's ignored directory
-`scratch/bitstream-flush-multicall-20261028/`: runtime/source hashes, unchanged image
-hash, `probe.patch`, ordinary and trace-derived C, TI assembly/ELFs, command receipts,
-production refusals, native boundary metadata, behavioral summaries and witnesses, and
-an audit/evidence index. `headless.py prepare`, `compile.py`, `headless.py compare` and
-`headless.py amr`, invoked from that checkout, reproduce the experiment when its local
-image and pinned runtime are available. Firmware bytes and the generated probe stay
-out of Git.
+`scratch/bitstream-flush-production-20261028/`: source/runtime hashes, unchanged image
+hash, original and recovered C, TI assembly/ELFs, command receipts, production proof and
+boundary metadata, behavioral summaries and witnesses, and an audit/evidence index.
+`headless.py prepare`, `compile.py`, `headless.py compare` and `headless.py amr`, invoked
+from that checkout, reproduce the run with its local image and pinned runtime. There
+is no `probe` package in its script directory. Firmware bytes stay out of Git.
 
-The full `tools/verify.py --with-ti --jobs 2` run passed all 110 release checks,
-including 50 closed-call/capability checks per endian. All seven Python release-tool
-tests passed. The retained audit verifies the positive/negative outcomes, captured
-call boundaries, compiled input hashes, unchanged image and installed runtime.
+Verification passed all 112 `tools/verify.py --with-ti --jobs 2` release checks and
+all seven Python release-tool tests. Per endian, the call fixtures execute 49 valid
+schedules and check 54 unsafe or unsupported contracts. The retained audit confirms
+that the production runtime and release-verification build have identical class bytes.

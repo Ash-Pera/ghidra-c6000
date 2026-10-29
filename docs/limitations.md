@@ -37,7 +37,7 @@ emulator can fail on mixed-width delay windows; direct listing p-code execution 
 native decompilation have separate checks.
 
 Read-only trace contracts are documented for
-[closed direct calls](closed-call-traces.md),
+[closed calls](closed-call-traces.md),
 [caller continuations](caller-continuation-traces.md) and
 [strict caller/store tails](caller-tail-traces.md). A function boundary or ABI prototype
 does not establish an empty incoming pipeline.

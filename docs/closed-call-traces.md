@@ -9,12 +9,25 @@ unplanned transfers to another owner.
 
 ## Plan and scope
 
-The immutable `ClosedCallPlan` specifies the language, caller and callee code windows
-and owner entry points, trace start, call instruction, final link instruction, continuation, callee
-return, drained entry and preceding E1 hazards, and evidence. A bounded plan supplies
-`stopPc` equal to the caller window's exclusive end. A complete caller plan instead
-supplies `callerReturnPc`; the actual captured B3 value at that final return determines
-its exit. The caller can save and restore its original B3 using its normal instructions.
+`compileClosedCallsTrace(program, caller, plans)` accepts one to sixteen sequential,
+nonrecursive leaf calls. Each `ClosedCallPlan` declares a call site, callee window,
+link writer, continuation and callee return. All plans share the same caller window,
+actual trace start, drained entry/hazards and endpoint. There is no fresh entry or
+pipeline restart between calls. Repeated calls can share an identical hashed callee
+window. The scheduler's state includes the active call site, so a shared return PC
+selects the correct invocation's continuation. Nested calls remain refused.
+
+The single-call API delegates to the same implementation and retains its result type.
+The plural result provides `contracts()`, `proofs()` and the existing boundary metadata.
+Neither result is an installable multi-owner function contract.
+
+A bounded plan supplies `stopPc` equal to the caller window's exclusive end. A complete
+caller plan supplies `callerReturnPc`; its E1-captured register target determines the
+exit. B3 retains its existing return interpretation. Another GPR, such as A0, must be
+proved to hold the entry B3 value through exact register copies. Possible nonpreserving,
+partial, colliding or late writes invalidate that provenance. Memory round trips are
+not assumed to preserve it. The same provenance follows CALLP links to their matching
+internal returns; unrelated register branches remain unresolved.
 
 Each `TraceWindow.fetchBytesSha256` hashes bytes from `start & ~31` through
 `(end + 31) & ~31`, exclusive. These full fetch packets include compact decoding
@@ -31,28 +44,38 @@ function or change an annotation.
 
 ## Call and link proof
 
-The contract includes one unconditional `B` call, an unconditional `B` / `BNOP B3`
-callee return and an optional final caller B3 return. The call and continuation must be execute-packet starts. The call can use a direct address
-or a register, including B3 and cross-path operands. A conservative constant evaluator
-executes the straight-line caller prefix's raw p-code with all architectural inputs
-unknown. It must prove the destination equals the declared callee entry **before** the
-call packet's E1 writes. Memory-derived, unknown, conflicting or incorrectly assembled
-targets cannot establish that proof. The schedule captures the actual E1 destination;
-a same-packet or delay-slot overwrite cannot redirect the call.
+Each call is an unconditional `B` or `CALLP`. The callee returns unconditionally
+through B3, or A3 for `.S1 CALLP`. Calls may occur inside an execute packet; the start
+and continuation must be packet starts. Direct and register `B` targets, including B3
+and cross-path operands, are supported when raw p-code proves the packet-old target
+equals the declared callee entry. The schedule captures the actual E1 target, so
+same-packet and delay-slot register overwrites cannot redirect it.
 
-The same evaluator follows the six call/delay advances and must derive B3 equal to the
-continuation. Unconditional exact E1 `MVK` / `MVKL`, `MVKH` and `ADDKPC` link writes are
-supported. The last link writer must be the declared `linkPc` in the final delay cycle.
-MVK sign extension, MVKH preservation of the low half, old packet reads, collisions
-and late effects use the existing raw-p-code/phase model. Missing or wrong halves,
-conditional link writers, pre-link late B3 writers and any callee B3 writer are refused.
-No caller-supplied register value or ABI convention substitutes for these proofs
-(SPRUFE8B 3.5, 3.7, 3.12, 4.2.6 and the B/MVK/MVKH/ADDKPC instruction descriptions).
+The constant evaluator follows the six call/delay advances and must derive the declared
+link register equal to the continuation. Exact unconditional E1 `MVK` / `MVKL`, `MVKH`
+and `ADDKPC` writes are supported. The final writer must match `linkPc`; it may occur
+before the final delay advance. ADDKPC's inserted NOPs count as real advances. Wrong or
+missing halves, competing writers, pre-link late writes and callee link-register
+clobbers still refuse. After each call, the proof invalidates all possible callee
+outputs and incoming pending writes. Possible late register outputs shadow subsequent
+prefix proofs conservatively, while unaffected constants can survive a call. No ABI
+preservation rule or drained-return assumption supplies a missing constant.
+
+`CALLP` writes A3/B3 in E1 and inserts five idle advances. Its link is the next physical
+execute packet, including parallel peers and skipped fetch headers. The scheduler
+keeps its CALLP invocation until a return register is proved to hold that call's link.
+It refuses a CALLP with another branch pending, a nested invocation, software-loop
+execution, a conflicting multicycle NOP generator or a simultaneous link writer.
+The single-owner scheduler can execute such CALLP closures without an external call
+plan; transfers to other owners still require the explicit closed-call API.
+
+These rules follow SPRUFE8B 3.5, 3.7, 3.8.10, 4.2.6 and the CALLP (p.172),
+B/MVK/MVKH/ADDKPC instruction descriptions.
 
 Inside the callee, direct `B`, `BNOP`, `BDEC` and `BPOS` edges may be conditional,
 forward or backward. Every target must be a validated execute-packet start inside the
 callee's hashed ownership window. Their existing predicates, delay work and pipeline
-state are retained; internal redirects do not generate call-boundary markers. Additional
+state are retained; internal redirects do not generate call-boundary markers. Undeclared
 calls, indirect callee jumps, undeclared returns, caller control edges, software loops
 and IDLE remain refused. Branch-target packets crossing fetch packets are refused:
 their fetch stall or compact target restriction is not approximated. Eight-instruction
@@ -68,7 +91,7 @@ exact unconditional set of outgoing E1 hazards. A complete caller return retains
 ordinary pending-effect refusal.
 
 `ClosedCallBoundary` records a p-code marker, edge kind, branch PC, and a live
-`capturedTarget` varnode. At `CALL_ENTER` this is B3 after the link instruction; at
+`capturedTarget` varnode. At `CALL_ENTER` this is the proved A3/B3 link register after the link instruction; at
 `CALL_RETURN` and `CALLER_RETURN` it is the actual E1-captured return target.
 `expectedTarget` is the statically proved continuation for the first two edges, and null
 for the caller's dynamic final return. Effects retain their original instruction bytes,
@@ -77,7 +100,7 @@ captured address, value and inputs using the continuation trace API's `PendingSt
 record. Boundary hazards expose their actual enable varnodes; they are not replaced by
 an unconditional union.
 
-`ClosedCallTraceResult.proof()` supplies the call PC, source register (null for a direct
+`ClosedCallTraceResult.proof()` (or each plural `proofs()` entry) supplies the call PC, source register (null for a direct
 call), expected destination, continuation, ordered delay-window link-writer PCs and a
 live E1-captured destination varnode. Inspect that varnode at `CALL_ENTER`. Existing
 `ClosedCallBoundary.capturedTarget` semantics remain unchanged.
@@ -99,3 +122,10 @@ Generate with `python3 tests/fixtures/closed-call.py IMAGE CASES.json [be]`. Imp
 `CLOSED_CALL_TRACE_TEST_OK`; no external assembler or firmware is needed. The release
 runner includes both endian variants; use
 `python3 tools/verify.py --only closed-call --jobs 2` for a focused rerun.
+
+`pipeline-calls.py` / `C6000PipelineCallsTest.java` additionally execute CALLP on both S
+units, compact forms and both RS settings, packet peers and header seams, repeated and
+distinct callees, pending return stores and saved-link returns. Refusal cases cover
+unknown or clobbered saved links, nonlocal returns, late CALLP-link corruption, pending
+branches, link collisions and conflicting NOP generators. Use
+`python3 tools/verify.py --only pipeline-calls --only closed-call --jobs 2`.

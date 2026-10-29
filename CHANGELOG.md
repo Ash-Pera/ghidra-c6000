@@ -4,6 +4,11 @@
 
 ### Fixed
 
+* Decode `ABSDP`, `RCPDP` and `RSQRDP` as TI `cl6x` and GNU `as` encode them:
+  `src2` the pair's odd register and `src1` its low register. Only the opcode
+  diagram's even-`src2`, `src1` = 0 form decoded before; it is kept for
+  compatibility, but no longer with `x` = 1, which decoded as the other register
+  file although both halves are read in E1 (SPRUFE8B 2.4, 3.12 ABSDP, RCPDP, RSQRDP).
 * Decode `DPINT`, `DPTRUNC` and `DPSP` only as TI `cl6x` and GNU `as` encode them:
   `src2` the pair's odd register and `src1` its even/low register. Any `src1` was
   decoded as the `src2` pair although the low word is read through `src1`

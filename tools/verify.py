@@ -54,6 +54,7 @@ CORE = [
     case("pipeline-float", "PipelineFloat", "C6000_PIPELINE_FLOAT_OK"),
     case("pipeline-dp", "PipelineDp", "C6000_PIPELINE_DP_OK", "json", ["cases.json", "decompile"]),
     case("pipeline-dp-arithmetic", "PipelineDp", "C6000_PIPELINE_DP_OK", "json"),
+    case("pipeline-dp-read-timing", "PipelineDp", "C6000_PIPELINE_DP_OK", "json", ["cases.json", "decompile"]),
     case("pipeline-loop", "PipelineDp", "C6000_PIPELINE_DP_OK", "json", ["cases.json", "decompile"]),
     case("loop-counter-proof", "LoopCounterProof", "C6000_LOOP_COUNTER_PROOF_OK", "json"),
     case("pipeline-counter-branch", "PipelineCounterBranch", "C6000_PIPELINE_COUNTER_BRANCH_OK", "json"),

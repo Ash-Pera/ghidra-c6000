@@ -38,8 +38,8 @@ imports without an address or an address outside loaded memory. Compact packets 
 only after the packet analyzer has primed the decode context, which auto-analysis does
 before disassembly.
 
-When upgrading an existing program for v1.1, keep a packed backup first. The language
-version is now 1.1: Ghidra's native language migration rebuilds instruction prototypes
+When upgrading an existing program for v1.1.1, keep a packed backup first. The language
+version is now 1.2: Ghidra's native language migration rebuilds instruction prototypes
 after compact operand corrections. See the
 [migration notes](docs/internals.md#language-prototype-migration), including annotation
 and existing error-bookmark handling.

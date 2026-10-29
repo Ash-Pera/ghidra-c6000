@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.1.1 - 2026-10-28
+
+### Upgrade notes
+
+* All four language definitions are version 1.2 so Ghidra rebuilds persisted
+  prototypes after the compact predicate and memory corrections. Keep a packed
+  backup and annotation inventory before the native language upgrade.
+
 ### Added
 
 * Support `ANDN` on `.L`, `.S` and `.D` in exact packet schedules, with
@@ -15,6 +23,9 @@
 
 ### Fixed
 
+* Capture both ADDDP/SUBDP upper source words in E2, preserving E1 lower
+  words and issue predicates, including reversed operands and cross-path
+  stalls (SPRUFE8B Table 4-16; SPRU733A Table 4-12; issue #20).
 * Read the implicit five NOPs of compact `BNOP` Sbu8/Sbu8c from their
   encoding when no scalar operand exists (SPRUFE8B Figures F-18/F-21).
   Share the count reader across exact schedules, caller-entry evidence and

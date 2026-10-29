@@ -333,3 +333,17 @@ unconditional opcode and executes five polynomial/field-size examples.
 `word-shifts` executes register counts 0, 1, 31, 32, 63, 64, 65 and
 `0xffffffc1`, plus immediate controls, for SHL/SHR/SHRU. `dp-int` includes
 DPSP INEX on rounding. All run in both byte orders.
+
+## ADDDP/SUBDP upper-word read timing (issue #20)
+
+Both lower source words are sampled in E1 and both upper words in E2, before
+that cycle's writes (SPRUFE8B Table 4-16; SPRU733A Table 4-12). This applies
+to both displayed source operands, including reversed .S SUBDP encodings.
+The correction leaves result write phases and raw arithmetic unchanged.
+
+`pipeline-dp-read-timing.py` supplies independent cases for parallel E1 writers,
+preceding E2 multiply writeback, preceding E5 load writeback, writes after the
+read boundary, low-word snapshots, destination aliases, captured predicates,
+and cross-path read stalls in both endian modes. `C6000PipelineDpTest.java`
+executes the schedules, checks bit-exact arithmetic/status results and stall
+counts, and decompiles selected reviewed schedules through the native engine.

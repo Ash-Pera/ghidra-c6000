@@ -1,17 +1,17 @@
 # Release guidance
 
-Release `v1.1` adds exact packet schedules, normal software-loop timing,
-source-bound caller traces, conservative execute-packet completion and decoder
-repairs. See the [changelog](../CHANGELOG.md#11---2026-10-28) for the release
-notes and [verification](verification.md) for the test workflow.
+Release `v1.1.1` corrects compact predication and memory addressing, delayed-call
+path proofs and ADDDP/SUBDP source-read timing, and adds ANDN and fixed-count
+compact BNOP schedules. See the [changelog](../CHANGELOG.md#111---2026-10-28)
+and [verification](verification.md).
 
 ## Compatibility and migration
 
 | Item | Value |
 |---|---|
-| Repository release | `v1.1` |
+| Repository release | `v1.1.1` |
 | Ghidra compatibility matrix | 12.1.3 / JDK 21; 12.1.4 / JDK 21; 12.2 / JDK 25 |
-| Language version | 1.1 for all four variants |
+| Language version | 1.2 for all four variants |
 | Archive naming | `ghidra_<Ghidra version>_PUBLIC_<build date>_C6000.zip` |
 | Extension-property version | Ghidra compatibility version, substituted from `@extversion@` during build |
 
@@ -33,8 +33,8 @@ python3 -m unittest discover -s tests -p 'test_*.py'
 python3 tools/verify.py --ghidra /path/to/ghidra --with-ti --jobs 2
 ```
 
-The runner checks 43 core fixture imports and three TI-assembled fixture
-imports per endian: 92 per Ghidra version, or 276 across the matrix. Native
+The runner checks 48 core fixture imports and four TI-assembled fixture
+imports per endian: 104 per Ghidra version, or 312 across the matrix. Native
 decompiler checks retain their 15/30-second limits. CI runs the core suite
 without the proprietary TI assembler.
 
@@ -42,12 +42,11 @@ Also run the focused checks for features outside the runner's registry:
 
 | Feature | Fixture | Ghidra test |
 |---|---|---|
-| Strict caller/store tails | `caller-tail.py` | `C6000CallerTailTest.java` |
 | Reviewed parallel-peer recovery | `parallel-peers.py` | `C6000ParallelPeersTest.java` |
 | Ordinary execute-packet completion | `parallel-peers.py` | `C6000ParallelPeerAnalyzerTest.java` |
 
 Run each on a fresh import in both endian modes. The complete release check
-therefore adds six focused imports per matrix row. Contracts and invocation
+therefore adds four focused imports per matrix row. Contracts and invocation
 arguments are documented in [caller-tail traces](caller-tail-traces.md),
 [reviewed peer recovery](recover-parallel-peers.md) and
 [execute-packet completion](execute-packet-recovery.md).

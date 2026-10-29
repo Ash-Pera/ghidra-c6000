@@ -25,7 +25,7 @@ The phase contracts currently implemented are:
 | DPSP / DPINT / DPTRUNC / INTSP / SPINT / SPTRUNC / MVD | E1 | E4 result and applicable status events |
 | INTDP / INTDPU / MPYSP2DP | E1 | Low word and status E4; high word E5 |
 | DP comparisons | Low words E1, upper words E2 | Result and FAUCR E2 |
-| ADDDP / SUBDP | src1 and src2 low E1; src2 high E2 | Low word and FADCR E6; high word E7 |
+| ADDDP / SUBDP | Both low words E1; both high words E2 | Low word and FADCR E6; high word E7 |
 | MPYSPDP | SP source E1/E2, DP low E1/high E2 | Low word and FMCR E6; high word E7 |
 | MPYDP | src1 low E1/E2, high E3/E4; src2 low E1/E3, high E2/E4 | Low word and FMCR E9; high word E10 |
 | MVC ILC/RILC | E1 | Named register E1; loop-counter interface E4 |

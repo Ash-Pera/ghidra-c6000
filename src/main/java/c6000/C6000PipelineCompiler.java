@@ -482,12 +482,16 @@ public final class C6000PipelineCompiler {
         List<Read> reads=new ArrayList<>();int ready=1;
         if(Set.of("ADDDP","SUBDP","CMPEQDP","CMPLTDP","CMPGTDP","MPYSPDP").contains(name)){
             ready=2;
-            if(name.endsWith("DP")&&name.startsWith("CMP"))addRead(reads,ins.getRegister(0),true,2,2);
-            // The reversed .S SUBDP spelling swaps displayed operands, not the
-            // encoded source ports (SPRUFE8B SUBDP opcode maps; 4.2.8).
-            boolean reversed=name.equals("SUBDP")&&ins.getMnemonicString().contains(".S")&&(program.getMemory().getInt(at)&0x80)!=0;
-            addRead(reads,ins.getRegister(reversed?0:1),true,2,2);
-            if(name.equals("MPYSPDP"))addRead(reads,ins.getRegister(0),false,1,2);
+            if(name.equals("MPYSPDP")){
+                addRead(reads,ins.getRegister(0),false,1,2);
+                addRead(reads,ins.getRegister(1),true,2,2);
+            }else{
+                // SPRUFE8B Table 4-16 / SPRU733A Table 4-12: ADDDP,
+                // SUBDP and DP compares sample BOTH upper words in E2.
+                // Reversed SUBDP spelling changes operand order, not phases.
+                addRead(reads,ins.getRegister(0),true,2,2);
+                addRead(reads,ins.getRegister(1),true,2,2);
+            }
         }
         if(name.equals("MPYDP")){
             ready=4;

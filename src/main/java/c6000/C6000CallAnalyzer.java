@@ -512,7 +512,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			return null;
 		}
 
-		/** Follow a captured predicate forward; never infer its pre-write value backwards. */
+		/** Follow a captured predicate forward; backwards only past writes that would have falsified it. */
 		private boolean stable(List<Instruction> path, int query, int anchor, String predicate, boolean taken) {
 			if (predicate == null) return false;
 			Register register = program.getRegister(predicate.replace("!", ""));
@@ -526,10 +526,9 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 					(p.startsWith("!") ? !nonzero : nonzero) == false) continue;
 				// A constant replacement can preserve the predicate's truth value,
 				// even when the instruction's own predicate is not known.
-				String name = baseName(instruction);
-				if (query >= anchor && (name.startsWith("MVK.") || name.startsWith("MVKL.")) &&
-					register.equals(instruction.getRegister(1)) && instruction.getScalar(0) != null &&
-					(instruction.getScalar(0).getValue() != 0) == nonzero) continue;
+				// Backwards, one that would falsify the fact cannot have run (SPRUFE8B 3.12 MVK, 4.2.1).
+				Long value = constantWrite(instruction, register);
+				if (value != null && ((value != 0) == nonzero) == (query >= anchor)) continue;
 				// B's native delay carrier reports its followers' writes too;
 				// the physical followers are present separately in this path.
 				String op = baseName(instruction);
@@ -541,6 +540,17 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				}
 			}
 			return true;
+		}
+
+		/** The constant an MVK/MVKL or a self-subtracting SUB writes to register, else null. */
+		private static Long constantWrite(Instruction insn, Register register) {
+			String name = baseName(insn);
+			if ((name.startsWith("MVK.") || name.startsWith("MVKL.")) &&
+				register.equals(insn.getRegister(1)) && insn.getScalar(0) != null) return insn.getScalar(0).getValue();
+			// SUB x,x,dst writes 0, the form dis6x lists as ZERO (SPRUFE8B 3.12 SUB, ZERO).
+			if (name.startsWith("SUB.") && insn.getNumOperands() == 3 && register.equals(insn.getRegister(2)) &&
+				insn.getRegister(0) != null && insn.getRegister(0).equals(insn.getRegister(1))) return 0L;
+			return null;
 		}
 
 		private boolean samePacket(List<Instruction> path, int first, int last) {
@@ -690,7 +700,14 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	}
 
 	private static String predicate(Instruction insn) {
-		String name = insn.getMnemonicString();
+		return predicate(insn.getMnemonicString());
+	}
+
+	private static String predicate(String name) {
+		// Native delay-slot followers carry "_" before their predicate. Every
+		// path proof must read the E1 guard, including constant tracking, not
+		// just stability checks (SPRUFE8B 3.5, 3.6 and 4.2.6).
+		if (name.startsWith("_")) name = name.substring(1);
 		int end = name.indexOf(']');
 		return name.startsWith("[") && end > 0 ? name.substring(1, end) : null;
 	}

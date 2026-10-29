@@ -327,6 +327,54 @@ Regenerate `c6000_flow_delay.sinc` with `python3 tools/gen_flow_delay.py`;
 generated delay choices cover at most 254 bytes. Longer or unsupported windows remain
 outside native delay recovery.
 
+## Delayed-call predicate facts
+
+`delayed-call.py IMAGE [be]` and `C6000DelayedCallTest.java` (with
+`C6000SetEntry.java 1000`) check ten sites in nine routines at 0x1d00-0x2100 for the compiler's
+if/else-call predicate rewrite. `cl6x` 8.3.15 (`-mv6740 --abi=eabi -O2`) emits this
+for one of our own tests (unrelated parallel instructions omitted):
+
+```
+   [!A0]   B       .S2     $C$L31
+||         MV      .L1     A0,A1             ; guard predicate rewrite
+   [ A0]   CALL    .S1     f1
+|| [!A0]   CMPGT   .L1     A10,10,A0
+   [ A1]   MVK     .L1     1,A0              ; nullify predicate
+   [!A0]   BNOP            $C$L32,2
+           ADDKPC  .S2     $C$RL134,B3,0
+```
+
+On the call path A0 is nonzero. The parallel `[!A0] CMPGT` reads its guard at E1 with
+the call and does not run, and `[A1] MVK 1,A0` writes 1 or nothing, so A0 stays nonzero
+whatever A1 holds. The `[!A0] BNOP` is never taken and `ADDKPC` sets B3 in the call's
+last delay slot (SPRUFE8B 3.5, 3.6, 3.12 MVK/BNOP/ADDKPC, 4.2.6). Ghidra marks a
+branch's parallel followers with the `_` delay-slot prefix; the predicate proof must
+read their guard through it. 1d08 is this routine, 1f08 the same with the write under
+A2, and 1d88 the `[!A0]` form, where `[!A1] ZERO A0` keeps A0 zero. 1e14 is the
+opposite case: `[!A0] CALL || [A0] ZERO A0`, then `[!A1] ZERO A0` and `[A0] B`. Either
+`ZERO` would clear A0, so on the `B`'s taken path neither ran and the `CALL` was not
+taken; the two form an if/else pair and the near arm, 1e14, is the jump, not a call at
+the `CALL`'s return. The controls 1e88 and 1f88 put `[A1] ZERO A0` and `[A2] ZERO A0`
+under an `[A0]` call. Either can clear A0 on the call path, so the `BNOP` may be taken
+and neither is a call.
+
+`dis6x` also lists `SUB A0,A0,A0` as `ZERO A0` (SPRUFE8B 3.12 SUB, ZERO): 2008 is 1d88
+with that form, a call, and 2088 the control with `SUB A0,A2,A0`, which can set A0 on
+the call path. 210c checks the backward step: B3 is set under `[A0]` before an
+unconditional `MVK 1,A0`, and A0 being true at the call says nothing about its value
+when B3 was written, so 210c is not a call.
+
+The independent `delayed-call-safety.py` / `C6000DelayedCallSafetyTest.java` fixture
+also checks native `_[predicate]` followers through both the read-only recognizer
+and the analyzer. Thirty-six cases vary all six predicate registers, both senses,
+and matching/skipped/unknown guards on a parallel B3 low-half writer. Nine more
+cover guarded ADDKPC links, high-half replacements and register-copy clobbers.
+A skipped or unknown write cannot supply a return link; a skipped copy must retain
+an already known link. Each case requires the actual native delay-slot prefix so a
+plain instruction cannot accidentally stand in for the regression. Together with
+its existing controls, this fixture checks 72 cases per endian (24 accepted and
+48 refused). These follow SPRUFE8B 3.5, 3.6 and 4.2.6.
+
 ## Encoding identity and updating-load phases
 
 `tests/fixtures/full32-encoding-info.py <image.bin> <cases.tsv> [be]` and

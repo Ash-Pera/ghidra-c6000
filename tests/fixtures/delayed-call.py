@@ -137,13 +137,45 @@ bytes past the earlier arm's (1c00, 1c08 calls):
   1c08  [!A1]B.S1 0x1100 (call)  1c18  NOP
   1c0c  NOP                      1c1c  B.S2 B3 ; NOP 5
 
-The same with register arms in a same-predicate BNOP's window, B3 by MVK/MVKH (1c4c, 1c58 calls):
+Register arms in a same-predicate BNOP's window (1c4c, 1c58 calls). The BNOP lands
+in 1c4c's slot 4, so 1c4c's slots 4-5 run at 0x1c80, which sets its B3 (1c88):
 
-  1c40  MVK.S2  0x1100,B4        1c58  [A1]B.S2  B4   (call)
-  1c44  MVKH.S2 0x0,B4           1c5c  MVK.S2  0x1c68,B3
-  1c48  [!A1]BNOP.S1 0x1c80,1    1c60  MVKH.S2 0x0,B3
-  1c4c  [!A1]B.S2 B4  (call)     1c64  NOP     3
-  1c50  NOP ; 1c54  NOP          1c68, 1c80  B.S2 B3 ; NOP 5
+  1c40  MVK.S2  0x1100,B4        1c5c  MVK.S2  0x1c68,B3
+  1c44  MVKH.S2 0x0,B4           1c60  MVKH.S2 0x0,B3
+  1c48  [!A1]BNOP.S1 0x1c80,1    1c64  NOP     3
+  1c4c  [!A1]B.S2 B4  (call)     1c68  B.S2 B3 ; NOP 5
+  1c50  NOP ; 1c54  NOP          1c80  MVK.S2  0x1c88,B3 ; 1c84  MVKH.S2 0x0,B3
+  1c58  [A1]B.S2  B4   (call)    1c88  B.S2 B3 ; NOP 5
+
+The compiler's predicate-nullify idiom: A1 copies the call's predicate A0, a write under
+the copy keeps A0's truth, and a branch under A0's opposite is never taken on the call
+path (1d08, 1d88 calls; returns 1d1c, 1d9c):
+
+  1d00  [!A0]B.S1 0x1d40 || MV.L1 A0,A1     1d80  [A0]B.S1 0x1dc0 || MV.L1 A0,A1
+  1d08  [A0]B.S1  0x1100 (call)             1d88  [!A0]B.S1 0x1100 (call)
+        || [!A0]CMPGT.L1 A10,10,A0                || [A0]SUB.L1 A10,1,A0
+  1d10  [A1]MVK.L1 1,A0                     1d90  [!A1]ZERO.L1 A0
+  1d14  [!A0]BNOP.S1 0x1d60,2               1d94  [A0]BNOP.S1 0x1de0,2
+  1d18  ADDKPC.S2 0x1d1c,B3,0               1d98  ADDKPC.S2 0x1d9c,B3,0
+
+A nullified jump one packet after a call returns at that call's B3, not its own (1e14 jump):
+
+  1e00  MV.L1 A0,A1 || [A0]B.S1 0x1e40      1e14  [A0]B.S1  0x1e60 (jump)
+  1e08  [!A0]B.S1 0x1100 || [A0]ZERO.L1 A0  1e18  NOP ; 1e1c  NOP
+  1e10  [!A1]ZERO.L1 A0                     1e20  ADDKPC.S2 0x1e24,B3,0
+
+1f08 is 1d08 with the write under A2: A0 becomes 1 or stays nonzero, so it is a call too.
+Controls that are not calls: 1e88 is 1d08 with [A1]ZERO.L1 A0 and 1f88 with [A2]ZERO.L1 A0;
+either write can clear A0, so the BNOP may run on the call path.
+2008 is 1d88 with ZERO in its SUB A0,A0,A0 form, a call; the control 2088 writes
+SUB A0,A2,A0, which can set A0 on the call path, so it is not a call.
+210c is not a call either: MVK 1,A0 makes A0 true whatever it held, so B3, set under A0
+before it, is not known on the call path:
+
+  2100  [A0]MVK.S2  0x2114,B3          210c  [A0]B.S1 0x1100 (not a call)
+  2104  [A0]MVKH.S2 0x0,B3             2110  NOP 5
+  2108  MVK.L1 1,A0                    2114  B.S2 B3 ; NOP 5
+Every return point and jump target in these routines is B.S2 B3 ; NOP 5.
 
 C6000DelayedCallTest.java checks every B form becomes a call that falls
 through into its delay slots and that 0x1100 becomes a function.
@@ -168,6 +200,22 @@ def nop(count):
 
 B_B3 = 0x362 | (3 << 18)
 A1, NOT_A1, A2 = 0x80000000, 0x90000000, 0xA0000000
+A0, NOT_A0, PAR = 0xC0000000, 0xD0000000, 1
+MV_A0_A1 = 0x00800FD8  # MV.L1 A0,A1
+CMPGT_A10_10_A0 = 0x00294AD8  # CMPGT.L1 A10,10,A0
+SUB_A10_1_A0 = 0x002BE058  # SUB.L1 A10,1,A0
+SUB_A0_A0_A0 = 0x000000F8  # SUB.L1 A0,A0,A0 (dis6x: ZERO.L1 A0)
+SUB_A0_A2_A0 = 0x000800F8  # SUB.L1 A0,A2,A0
+
+
+def mvk_l1(cst, reg):
+    """MVK.L1 cst,reg (5-bit constant); cst 0 is ZERO.L1 reg."""
+    return 0xA358 | ((cst & 0x1F) << 18) | (reg << 23)
+
+
+def addkpc(at, ret, count):
+    """ADDKPC.S2 ret,B3,count, relative to the fetch packet holding at."""
+    return 0x162 | (((ret - (at & ~31)) >> 2) << 16) | (count << 13) | (3 << 23)
 
 
 def b_s1(at, target):
@@ -182,6 +230,28 @@ def bnop_s1(at, target, count):
 CALLEE = 0x1100
 B_B4 = 0x362 | (4 << 18)
 MV_B13_B3 = 0x01B401A2  # MV.S2 B13,B3
+
+
+def nullify(base, guard):
+    """[A0] call with A1 = A0; guard is the word written after the call packet."""
+    return {
+        base: NOT_A0 | b_s1(base, base + 0x40) | PAR, base + 0x4: MV_A0_A1,
+        base + 0x8: A0 | b_s1(base + 0x8, CALLEE) | PAR, base + 0xC: NOT_A0 | CMPGT_A10_10_A0,
+        base + 0x10: guard, base + 0x14: NOT_A0 | bnop_s1(base + 0x14, base + 0x60, 2),
+        base + 0x18: addkpc(base + 0x18, base + 0x1C, 0), base + 0x1C: B_B3, base + 0x20: nop(5),
+        base + 0x40: B_B3, base + 0x44: nop(5), base + 0x60: B_B3, base + 0x64: nop(5),
+    }
+
+
+def nullify_zero(base, guard):
+    """[!A0] call with A1 = A0; guard is the word written after the call packet."""
+    return {
+        base: A0 | b_s1(base, base + 0x40) | PAR, base + 0x4: MV_A0_A1,
+        base + 0x8: NOT_A0 | b_s1(base + 0x8, CALLEE) | PAR, base + 0xC: A0 | SUB_A10_1_A0,
+        base + 0x10: guard, base + 0x14: A0 | bnop_s1(base + 0x14, base + 0x60, 2),
+        base + 0x18: addkpc(base + 0x18, base + 0x1C, 0), base + 0x1C: B_B3, base + 0x20: nop(5),
+        base + 0x40: B_B3, base + 0x44: nop(5), base + 0x60: B_B3, base + 0x64: nop(5),
+    }
 
 
 def taken_only(base, predicate):
@@ -254,7 +324,28 @@ CASES = {
     0x1C40: mvk(CALLEE, 4), 0x1C44: mvkh(0, 4), 0x1C48: NOT_A1 | bnop_s1(0x1C48, 0x1C80, 1),
     0x1C4C: NOT_A1 | B_B4, 0x1C50: nop(1), 0x1C54: nop(1), 0x1C58: A1 | B_B4,
     0x1C5C: mvk(0x1C68, 3), 0x1C60: mvkh(0, 3), 0x1C64: nop(3), 0x1C68: B_B3, 0x1C6C: nop(5),
-    0x1C80: B_B3, 0x1C84: nop(5),
+    0x1C80: mvk(0x1C88, 3), 0x1C84: mvkh(0, 3), 0x1C88: B_B3, 0x1C8C: nop(5),
+
+    **nullify(0x1D00, A1 | mvk_l1(1, 0)),
+    0x1D80: A0 | b_s1(0x1D80, 0x1DC0) | PAR, 0x1D84: MV_A0_A1,
+    0x1D88: NOT_A0 | b_s1(0x1D88, CALLEE) | PAR, 0x1D8C: A0 | SUB_A10_1_A0,
+    0x1D90: NOT_A1 | mvk_l1(0, 0), 0x1D94: A0 | bnop_s1(0x1D94, 0x1DE0, 2),
+    0x1D98: addkpc(0x1D98, 0x1D9C, 0), 0x1D9C: B_B3, 0x1DA0: nop(5),
+    0x1DC0: B_B3, 0x1DC4: nop(5), 0x1DE0: B_B3, 0x1DE4: nop(5),
+
+    0x1E00: MV_A0_A1 | PAR, 0x1E04: A0 | b_s1(0x1E04, 0x1E40),
+    0x1E08: NOT_A0 | b_s1(0x1E08, CALLEE) | PAR, 0x1E0C: A0 | mvk_l1(0, 0),
+    0x1E10: NOT_A1 | mvk_l1(0, 0), 0x1E14: A0 | b_s1(0x1E14, 0x1E60), 0x1E18: nop(1), 0x1E1C: nop(1),
+    0x1E20: addkpc(0x1E20, 0x1E24, 0), 0x1E24: B_B3, 0x1E28: nop(5),
+    0x1E40: B_B3, 0x1E44: nop(5), 0x1E60: B_B3, 0x1E64: nop(5),
+
+    **nullify(0x1E80, A1 | mvk_l1(0, 0)),
+    **nullify(0x1F00, A2 | mvk_l1(1, 0)),
+    **nullify(0x1F80, A2 | mvk_l1(0, 0)),
+    **nullify_zero(0x2000, NOT_A1 | SUB_A0_A0_A0),
+    **nullify_zero(0x2080, NOT_A1 | SUB_A0_A2_A0),
+    0x2100: A0 | mvk(0x2114, 3), 0x2104: A0 | mvkh(0, 3), 0x2108: mvk_l1(1, 0),
+    0x210C: A0 | b_s1(0x210C, CALLEE), 0x2110: nop(5), 0x2114: B_B3, 0x2118: nop(5),
 }
 
 WORDS = {
@@ -343,7 +434,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0xC90)
+    image = bytearray(0x1120)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

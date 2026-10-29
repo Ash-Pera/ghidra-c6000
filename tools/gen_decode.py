@@ -789,8 +789,8 @@ def main():
                         continue  # B IRP / B NRP (Figure F-8): hand-written in c6000.sinc
                     elif mnem == "B" and ops and ops[0] != "BranchTarget":
                         # Keep indirect B conservative during code discovery,
-                        # then switch unpredicated branches to terminal p-code
-                        # in C6000RegisterBranchAnalyzer. Both variants must
+                        # then select terminal p-code in the branch analyzer
+                        # or exact scheduler. Both predicate polarities must
                         # be generated here; editing the .sinc alone is lost
                         # the next time this generator runs.
                         terminal_pat = [term for term in pat
@@ -799,6 +799,16 @@ def main():
                         terminal_disp = "B." + variant_ul + suffix[1:] + " " + ops[0]
                         w(":%s is %s { local target:4 = %s; build CFlowDelay; goto [target]; }" %
                           (terminal_disp, " & ".join(terminal_pat), ops[0]))
+                        n += 1
+                        # SPRUFE8B B (register), pp.153-154, and 4.2.6:
+                        # sample both predicate and target before delay work.
+                        # Discovery remains conservative at terminal=0; the
+                        # scheduler explicitly requests terminal=1 even for
+                        # predicated returns. The patterns must be disjoint.
+                        pred_terminal_pat = [term for term in pat]
+                        pred_terminal_pat += ["creg!=0", "c_branch_terminal=1", "CFlowDelay"]
+                        w(":%s is %s { local take:1 = Cond; local target:4 = %s; build CFlowDelay; if (take == 0) goto inst_next; goto [target]; }" %
+                          (disp, " & ".join(pred_terminal_pat), ops[0]))
                         n += 1
                         pat.append("c_branch_terminal=0")
                     # SPRUFE8B 3.5 / 4.2.6 and CALLP execution: sample the

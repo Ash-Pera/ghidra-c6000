@@ -44,6 +44,15 @@ branch landing can interrupt a multi-cycle NOP. Up to six transfers can remain p
 E1 X-path hazards insert a stall without advancing any pending pipeline phase (SPRUFE8B
 3.5, 3.8.3–3.8.4, 3.10.2.2 and 4.2).
 
+Full32 predicated register `B.S2` supports the scheduler's terminal decode
+context for both predicate polarities. The predicate and target are captured
+before delay-slot work, including parallel writes to the predicate or B3.
+The decoder's discovery form is unchanged; exact scheduling still refuses
+unresolved register targets other than B3. `pipeline-predicated-return.py`
+checks all six predicates, taken/skipped returns, same-packet predicate and
+target writes, store tails and fallthrough behavior in both endian modes
+(SPRUFE8B pp.153-154, section 4.2.6).
+
 BDEC and BPOS use the raw instruction's actual transfer decision, including its signed
 counter test, rather than treating an enabled predicate as a taken branch. Zero
 satisfies both instructions' `counter >= 0` condition; BDEC's existing raw subtraction

@@ -21,6 +21,11 @@
 
 ### Fixed
 
+* Decode predicated full32 register `B.S2` in the exact scheduler's terminal
+  context. Capture the predicate and target before delay work while retaining
+  the existing discovery form and unresolved-target refusals. Cover both
+  predicate polarities and all six predicate registers in both endian modes
+  (SPRUFE8B pp. 153-154, section 4.2.6).
 * Read the implicit five NOPs of compact `BNOP` Sbu8/Sbu8c from their
   encoding when no scalar operand exists (SPRUFE8B Figures F-18/F-21).
   Share the count reader across exact schedules, caller-entry evidence and

@@ -2,50 +2,16 @@
 
 ## Unreleased
 
-### Added
-
-* Integrate explicitly reviewed, complete closed-call traces into normal decompilation
-  through `enableClosedCalls`, persisted plans and the existing source-bound injection
-  library. Preserve separate callee owners; reject stale plans, interior entries and
-  bounded-only traces. Cover native decompilation and pending stores in both endians.
-* Schedule sequential leaf calls, including repeated callees, with invocation-specific
-  continuations and live pipeline effects. Accept proved early MVK/MVKH/ADDKPC links.
-* Schedule full32/compact CALLP on both S units: E1 A3/B3 link, next execute-packet
-  return address and five implicit NOP advances. Track saved return-link provenance
-  for returns through registers such as A0, while rejecting unknown/clobbered links
-  (SPRUFE8B 3.5, 3.7, 3.8.10, 4.2.6, CALLP p.172).
-* Prove closed-call register destinations and MVK/MVKH return links from packet-old
-  raw p-code; expose the captured call destination and ordered link writers. Permit
-  validated direct branches and ordinary counter loops within the callee while
-  retaining separate owners and pending effects across call/return boundaries.
-  Cover target overwrites, cross-path/B3 calls, split-link refusals and internal
-  branches in both endians (SPRUFE8B 3.5, 3.7, 3.12, 4.2.6).
-
-### Validation
-
-* Rerun bitstream_flush through stock `DecompInterface` without a custom export
-  payload: normal recovered C compiled with TI matches all 1,056 cases. Retain
-  pre-activation C and an output mutant as failing controls.
-* Rerun bitstream_flush through the production call model: unchanged bytes and
-  trace-derived TI C match all 1,056 cases. The ordinary-C binary now executes and
-  exposes its memory mismatches. Add CALLP, repeated-callee and saved-link execution
-  regressions in both endians; correct an older CALLP fixture's illegal NOP 2 peer.
-
-### Fixed
-
-* Decode predicated full32 register `B.S2` in the exact scheduler's terminal
-  context. Capture the predicate and target before delay work while retaining
-  the existing discovery form and unresolved-target refusals. Cover both
-  predicate polarities and all six predicate registers in both endian modes
-  (SPRUFE8B pp. 153-154, section 4.2.6).
-
-## 1.1.1 - 2026-10-28
+## 1.1.1 - 2026-10-29
 
 ### Upgrade notes
 
 * All four language definitions are version 1.2 so Ghidra rebuilds persisted
   prototypes after the compact predicate and memory corrections. Keep a packed
   backup and annotation inventory before the native language upgrade.
+* Native migration can clear existing Bad Instruction error bookmarks while rebuilding
+  prototypes. Record them in the backup inventory and restore them when preservation
+  is required; migration does not enable exact schedules automatically.
 
 ### Added
 
@@ -63,6 +29,22 @@
   tooling, a contract-gated analyzer, and source-bound decompiler injection.
   Refuse stale bytes, context, ownership, entry assumptions and alternate entries
   instead of silently using sequential effects (SPRUFE8B 3.5, 3.8.3 and 4.2).
+* Integrate explicitly reviewed, complete closed-call traces into normal decompilation
+  through `enableClosedCalls`, persisted plans and the existing source-bound injection
+  library. Preserve separate callee owners; reject stale plans, interior entries and
+  bounded-only traces. Cover native decompilation and pending stores in both endians.
+* Schedule sequential leaf calls, including repeated callees, with invocation-specific
+  continuations and live pipeline effects. Accept proved early MVK/MVKH/ADDKPC links.
+* Schedule full32/compact CALLP on both S units: E1 A3/B3 link, next execute-packet
+  return address and five implicit NOP advances. Track saved return-link provenance
+  for returns through registers such as A0, while rejecting unknown/clobbered links
+  (SPRUFE8B 3.5, 3.7, 3.8.10, 4.2.6, CALLP p.172).
+* Prove closed-call register destinations and MVK/MVKH return links from packet-old
+  raw p-code; expose the captured call destination and ordered link writers. Permit
+  validated direct branches and ordinary counter loops within the callee while
+  retaining separate owners and pending effects across call/return boundaries.
+  Cover target overwrites, cross-path/B3 calls, split-link refusals and internal
+  branches in both endians (SPRUFE8B 3.5, 3.7, 3.12, 4.2.6).
 
 ### Fixed
 
@@ -95,6 +77,38 @@
   (SPRUFE8B 3.12 SHL/SHR/SHRU).
 * Correct the `DPSP` fixture's INEX expectation when rounding, update compact
   unit expectations, and run the added accuracy regressions in both byte orders.
+* Decode predicated full32 register `B.S2` in the exact scheduler's terminal
+  context. Capture the predicate and target before delay work while retaining
+  the existing discovery form and unresolved-target refusals. Cover both
+  predicate polarities and all six predicate registers in both endian modes
+  (SPRUFE8B pp. 153-154, section 4.2.6).
+
+### Validation
+
+* `bitstream_flush` recovered through stock `DecompInterface`, compiled with TI CGT
+  C6000 8.3.15 and compression enabled, matches the original production schedule
+  and independent oracle in all 1,056 boundary/random/AMR cases. No custom export
+  payload is needed. Pre-activation C and an output mutant remain failing controls.
+* Add CALLP, repeated-callee, saved-link and native decompiler execution regressions
+  in both endians, including stale-contract and unsafe-entry refusals. Correct an
+  older CALLP fixture's illegal NOP 2 peer.
+* Release verification covers Ghidra 12.1.3, 12.1.4 and 12.2 in both byte orders,
+  including TI-assisted checks and the additional parallel-peer recovery fixtures.
+  See [release guidance](docs/release.md) for commands and coverage counts.
+
+### Limitations
+
+* Exact packet timing requires explicit reviewed entry assumptions and source-bound
+  activation. Default instruction lifting still handles parallel instructions
+  separately; installing or migrating does not make every function timing-correct.
+* Closed-call schedules permit up to sixteen sequential nonrecursive leaf calls.
+  Nested calls, arbitrary indirect targets, memory-restored return links and more
+  general caller control flow remain unsupported. Recovered helper effects may be
+  inlined rather than emitted as separate C calls.
+* Round-trip results establish behavior on the tested corpus, not byte-identical
+  recompilation, exhaustive correctness, portable-C overflow safety or silicon
+  equivalence. Floating-point status, reciprocal estimates, interrupts and exceptional
+  software-loop behavior retain the [documented limitations](docs/limitations.md).
 
 ## 1.1 - 2026-10-28
 

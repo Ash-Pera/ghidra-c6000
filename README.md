@@ -53,7 +53,7 @@ and existing error-bookmark handling.
 | Branches and calls | PCE1-relative targets; delayed `B` + `ADDKPC` calls and `B3` returns recovered by analyzers |
 | P-code | integer ALU, multiplies, saturating and packed arithmetic, bit fields, linear and AMR circular addressing, loads/stores, single- and selected double-precision FP, compares, shifts, branches, `MVC`; no unimplemented-instruction placeholders remain |
 | Software loops (`SPLOOP` family) | decoded and annotated with bookmarks; a separate cycle scheduler replays loop buffers (`C6000LoopReplay.java`) |
-| Exact packet timing (explicit opt-in) | bounded per-function schedules for supported instruction phases, overlapping branches and normal software loops; unsupported contracts are refused |
+| Exact packet timing (explicit opt-in) | bounded per-function schedules for supported instruction phases, overlapping branches and normal software loops; complete reviewed traces with sequential leaf calls use normal decompiler injection; unsupported contracts are refused |
 | Calling convention | TI C6000 C ABI (A4/B4/A6/B6… arguments, A4 return, B3 return address, B15 stack) |
 | Function ID | `tools/gen_fid.py` generator only; no database shipped (TI licence) |
 
@@ -64,6 +64,9 @@ Main limitations:
   [exact packet schedule](docs/pipeline-schedules.md) with a proved entry contract.
   Proven unconditional B/BNOP windows and CALLP packet companions use native
   delay p-code; see the documented mixed-width emulator limitation.
+- Closed-call decompilation requires explicit plans and reviewed entry assumptions.
+  It supports sequential leaf calls; nested calls and arbitrary indirect targets
+  remain unsupported, and recovered C may inline helper effects.
 - Constant propagation is bounded to 512-byte windows to avoid heap
   exhaustion on large images.
 - Floating-point status flags are incomplete for some instructions, and

@@ -59,6 +59,7 @@ CORE = [
     case("loop-counter-proof", "LoopCounterProof", "C6000_LOOP_COUNTER_PROOF_OK", "json"),
     case("pipeline-counter-branch", "PipelineCounterBranch", "C6000_PIPELINE_COUNTER_BRANCH_OK", "json"),
     case("pipeline-bnop", "PipelineBnop", "C6000_PIPELINE_BNOP_OK", "json"),
+    case("pipeline-predicated-return", "PipelinePredicatedReturn", "C6000_PIPELINE_PREDICATED_RETURN_OK", "json"),
     case("pipeline-andn", "PipelineAndn", "C6000_PIPELINE_ANDN_OK", "json"),
     case("pipeline-pack", "PipelinePack", "C6000_PIPELINE_PACK_OK", "json"),
     case("pipeline-rotl", "PipelineRotl", "C6000_PIPELINE_ROTL_OK", "json"),

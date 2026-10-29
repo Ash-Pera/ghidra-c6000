@@ -14,7 +14,7 @@ public class C6000DelayedCallTest extends GhidraScript {
 		// The if/else pair is its own routine; the entry never reaches it.
 		for (long entry : new long[] { 0x1040L, 0x1060L, 0x10a0L, 0x1140L, 0x1200L, 0x1280L,
 			0x1300L, 0x1380L, 0x1400L, 0x1480L, 0x1500L, 0x1580L, 0x1600L, 0x1680L, 0x1700L,
-			0x1780L, 0x1800L, 0x1880L, 0x1c00L, 0x1c40L }) {
+			0x1780L, 0x1800L, 0x1880L, 0x1c00L, 0x1c40L, 0x1d00L, 0x1d80L, 0x1e00L, 0x1e80L, 0x1f00L, 0x1f80L }) {
 			disassemble(toAddr(entry));
 			createFunction(toAddr(entry), null);
 		}
@@ -133,6 +133,25 @@ public class C6000DelayedCallTest extends GhidraScript {
 				!calls(arm, 0x1100L)) {
 				throw new AssertionError("pair arm at " + toAddr(site) + ": " + arm +
 					(arm == null ? "" : " flow=" + arm.getFlowType() + " fallthrough=" + arm.getFallThrough()));
+			}
+		}
+		// A write that keeps the call's predicate true leaves its slots straight-line.
+		for (long site : new long[] { 0x1d08L, 0x1d88L, 0x1e08L, 0x1f08L }) {
+			Instruction call = getInstructionAt(toAddr(site));
+			// Falls through to its parallel follower or to the next execute packet.
+			if (call == null || !call.getFlowType().isCall() || call.getFlowType().isTerminal() ||
+				!(toAddr(site + 4).equals(call.getFallThrough()) || toAddr(site + 8).equals(call.getFallThrough())) ||
+				!calls(call, 0x1100L)) {
+				throw new AssertionError("nullify call at " + toAddr(site) + ": " + call +
+					(call == null ? "" : " flow=" + call.getFlowType() + " fallthrough=" + call.getFallThrough()));
+			}
+		}
+		// Not calls: a nullified jump at another call's return, writes that may clear the call's predicate.
+		for (long site : new long[] { 0x1e14L, 0x1e88L, 0x1f88L }) {
+			Instruction b = getInstructionAt(toAddr(site));
+			if (b == null || b.getFlowOverride() == FlowOverride.CALL) {
+				throw new AssertionError("not a call at " + toAddr(site) + ": " + b +
+					(b == null ? "" : " flow=" + b.getFlowType() + " fallthrough=" + b.getFallThrough()));
 			}
 		}
 		if (getFunctionAt(toAddr(0x1100L)) == null) {

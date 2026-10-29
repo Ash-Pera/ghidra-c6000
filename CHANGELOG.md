@@ -162,6 +162,11 @@
   `.TI.section.flags`; rounding a fetch packet out of the overlay threw and left all
   compact code undecoded (issue #33). Overlays over OTHER, which hold no code, are
   no longer primed.
+* Tail calls that Shared Return Calls marked `CALL_RETURN` kept their delay slots
+  undecoded, so the epilogue and outgoing arguments were missing from the caller.
+  Their windows are now recovered unless the packet or window writes B3 other than
+  by a load, or B3 holds the window's return address: such a `B` is a call
+  (SPRUFE8B 4.2.6, B, ADDKPC).
 * A returning `B` call with a parallel companion (`B f || STW`) left its delay
   slots and everything after its return point undecoded; decoding now resumes
   after the branch's execute packet (SPRUFE8B 3.5, 4.2.6).

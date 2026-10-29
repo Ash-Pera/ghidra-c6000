@@ -42,7 +42,7 @@ public final class C6000ExecutionPackets {
     /** SPRUFE8B 3.8.10: only one such generator may occupy an execute packet. */
     static boolean startsMulticycleNop(Instruction instruction) {
         String name = C6000CallAnalyzer.baseName(instruction);
-        if (name.equals("IDLE") || name.startsWith("BNOP") || name.startsWith("ADDKPC")) return true;
+        if (name.equals("IDLE") || name.startsWith("CALLP") || name.startsWith("BNOP") || name.startsWith("ADDKPC")) return true;
         if (!name.equals("NOP")) return false;
         var count = instruction.getScalar(0);
         return count != null && count.getUnsignedValue() > 1;
@@ -115,6 +115,7 @@ public final class C6000ExecutionPackets {
                 int count=((word >>> 13) & 15)+1;
                 return count>1?count:0;
             }
+            if ((word & 0xf000007c) == 0x10000010) return -1; // CALLP, SPRUFE8B p.172
             if ((word & 0x1ffc) == 0x120 || // displacement BNOP
                 (word & 0x0f830ffe) == 0x00800362 || // register BNOP
                 (word & 0x1ffe) == 0x162) return -1; // ADDKPC
@@ -128,7 +129,7 @@ public final class C6000ExecutionPackets {
         long base=instruction.at().getOffset() & ~31L;
         int header=program.getMemory().getInt(instruction.at().getNewAddress(base+28));
         if ((header & (1<<15)) != 0 &&
-            ((word & 0x3e)==0xa || (word & 0x2e)==0x2a)) return -1;
+            ((word & 0x3e)==0xa || (word & 0x2e)==0x2a || (word & 0x3e)==0x1a)) return -1;
         return 0;
     }
 

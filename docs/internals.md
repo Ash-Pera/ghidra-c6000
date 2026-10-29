@@ -282,7 +282,7 @@ assume every bit 12 is a cross selector.
 
 ### Language prototype migration
 
-The 1.1 language minor version forces Ghidra's native re-disassembly upgrade. This is
+The 1.2 language minor version forces Ghidra's native re-disassembly upgrade. This is
 necessary when a corrected compact operand partition distinguishes bits that an older
 shared persisted prototype ignored. Updating the extension alone can leave old programs
 with stale operand text and p-code. Preserve a packed backup and annotation inventory

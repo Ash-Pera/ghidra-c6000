@@ -37,6 +37,12 @@ public final class C6000LoopCounterProof {
         return value==null?null:proof.arithmetic.toLong(value,PcodeArithmetic.Purpose.INSPECT);
     }
 
+    /** Value visible to the next packet, before any of its E1 writes. */
+    public Long registerValue(long offset,int size) {
+        var value=read(registers,offset,size);
+        return value==null?null:arithmetic.toLong(value,PcodeArithmetic.Purpose.INSPECT);
+    }
+
     private byte[] read(Map<Long,Byte> bytes, long at, int size) {
         var result = new byte[size];
         for (int k=0;k<size;k++) {
@@ -92,7 +98,8 @@ public final class C6000LoopCounterProof {
                 if (next<0 || next>operation.code().length) return null;
                 index=next;continue;
             }
-            if (opcode==PcodeOp.BRANCHIND || opcode==PcodeOp.CALL ||
+            if (opcode==PcodeOp.CALL) return image; // CALLP has already written its E1 link.
+            if (opcode==PcodeOp.BRANCHIND ||
                 opcode==PcodeOp.CALLIND || opcode==PcodeOp.RETURN ||
                 opcode==PcodeOp.CALLOTHER || opcode==PcodeOp.UNIMPLEMENTED) return null;
             var output=op.getOutput();
@@ -121,6 +128,17 @@ public final class C6000LoopCounterProof {
     /** Forget incoming register knowledge without discarding writes captured in
      * this proof's own packets. Used while unknown predecessor effects drain. */
     public void forgetRegisters(){registers.clear();}
+
+    public record UnknownWrite(long offset,int size,int advances) {}
+    /** A leaf call may change any of its outputs. Retain only unaffected constants.
+     * Late callee/caller writes remain unknown hazards after the return; no drain
+     * or ABI-preservation assumption is introduced into the constant proof. */
+    public List<UnknownWrite> returnFromCall(List<Output> outputs) {
+        var unknown=new ArrayList<UnknownWrite>();
+        for(var out:outputs){write(registers,out.offset(),out.size(),null);if(out.phase()>1)unknown.add(new UnknownWrite(out.offset(),out.size(),out.phase()-1));}
+        for(var event:pending){write(registers,event.offset(),event.size(),null);unknown.add(new UnknownWrite(event.offset(),event.size(),Math.max(1,event.cycle()-cycle+1)));}
+        pending.clear();return List.copyOf(unknown);
+    }
 
     /** Capture all sources before applying any writeback in this cycle. */
     public void packet(List<Operation> operations) {

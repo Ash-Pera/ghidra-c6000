@@ -9,11 +9,40 @@ measurement.
 
 For packet timing, see [exact schedules](pipeline-schedules.md),
 [post-loop dispatch](post-loop-dispatch.md),
-[closed direct-call traces](closed-call-traces.md) and
+[closed-call traces](closed-call-traces.md) and
 [caller continuations](caller-continuation-traces.md). Their refusal checks are part of
 the contract.
 
 ## Flow references and ownership
+
+`tests/fixtures/closed-call.py IMAGE CASES.json [be]` and
+`C6000ClosedCallTraceTest.java CASES.json RESULTS.json` cover 48 contracts per endian
+(14 executed schedules and 34 refusals). Split MVK/MVKH targets and links,
+B5/B3/cross-path calls, target overwrites, callee branches and an internal counter loop
+are checked alongside ownership, physical layout and late effects. Early correct links
+now execute, including ADDKPC with four inserted NOPs; wrong link identities still
+refuse.
+
+`tests/fixtures/pipeline-calls.py IMAGE CASES.json [be]` and
+`C6000PipelineCallsTest.java CASES.json RESULTS.json` cover 55 checks per endian
+(35 executed schedules and 20 refusals). Execution covers full32/compact CALLP on both
+S units, both RS settings, peers before/after CALLP, next-packet links across headers,
+repeated and distinct callees, and saved return links in A0. Store observations check
+captured pending effects and maturity before a second callee can mask the first store.
+Unsafe unknown/conditional/late/clobbered links, nonlocal returns, simultaneous link
+writers, pending branches and conflicting NOP generators remain refusals. The four
+previously documented capability gaps now have execution checks. See the
+[production round-trip](multi-call-roundtrip.md).
+
+`tests/fixtures/pipeline-call-contracts.py IMAGE CASES.json [be]` and
+`C6000PipelineCallContractTest.java CASES.json RESULTS.json` check six normal
+closed-call activations and fourteen refusals per endian. The installed injection
+library and stock native decompiler receive pending-store traces for both S units,
+compact/header forms and repeated/distinct helpers. The fixture executes the injected
+p-code, checks the returned C, preserves separate owners/references/comments, and
+checks idempotence, persisted plan/hazard round trips and review/record/analyzer
+activation. Stale source/plan/ownership/selector changes and alternate interior entries
+refuse; incomplete, cancelled and unsafe activations leave no options or binding.
 
 `C6000SwitchOwnershipTest.java` runs after `C6000JumpTableTest.java` on the existing
 `tests/fixtures/jump-table.py` image. Run both with little- and big-endian languages.
@@ -333,3 +362,17 @@ unconditional opcode and executes five polynomial/field-size examples.
 `word-shifts` executes register counts 0, 1, 31, 32, 63, 64, 65 and
 `0xffffffc1`, plus immediate controls, for SHL/SHR/SHRU. `dp-int` includes
 DPSP INEX on rounding. All run in both byte orders.
+
+## ADDDP/SUBDP upper-word read timing (issue #20)
+
+Both lower source words are sampled in E1 and both upper words in E2, before
+that cycle's writes (SPRUFE8B Table 4-16; SPRU733A Table 4-12). This applies
+to both displayed source operands, including reversed .S SUBDP encodings.
+The correction leaves result write phases and raw arithmetic unchanged.
+
+`pipeline-dp-read-timing.py` supplies independent cases for parallel E1 writers,
+preceding E2 multiply writeback, preceding E5 load writeback, writes after the
+read boundary, low-word snapshots, destination aliases, captured predicates,
+and cross-path read stalls in both endian modes. `C6000PipelineDpTest.java`
+executes the schedules, checks bit-exact arithmetic/status results and stall
+counts, and decompiles selected reviewed schedules through the native engine.

@@ -1,7 +1,7 @@
-# Read-only closed direct-call traces
+# Read-only closed-call traces
 
 `C6000PipelineCompiler.compileClosedCallTrace(program, caller, plan)` compiles one
-explicit direct call, its callee return, and the caller continuation into one read-only
+explicit proved call, its callee return, and the caller continuation into one read-only
 schedule. It preserves the raw instruction p-code and existing pipeline state through
 both ownership boundaries. The returned result is not a function schedule and cannot be
 installed with `C6000PipelineSchedules.enable`. Ordinary compilation continues to refuse
@@ -10,7 +10,7 @@ unplanned transfers to another owner.
 ## Plan and scope
 
 The immutable `ClosedCallPlan` specifies the language, caller and callee code windows
-and owner entry points, trace start, direct call, link instruction, continuation, callee
+and owner entry points, trace start, call instruction, final link instruction, continuation, callee
 return, drained entry and preceding E1 hazards, and evidence. A bounded plan supplies
 `stopPc` equal to the caller window's exclusive end. A complete caller plan instead
 supplies `callerReturnPc`; the actual captured B3 value at that final return determines
@@ -31,17 +31,32 @@ function or change an annotation.
 
 ## Call and link proof
 
-The supported contract includes straight-line windows with one unconditional direct `B`
-call, an unconditional `B` /`BNOP B3` callee return and an optional final caller B3
-return. Branch-target execute packets crossing fetch packets are refused: their fetch
-stall or compact target restriction is not approximated. Eight-instruction packets
-involving a compact header are also refused (SPRUFE8B 3.10.4, 4.2.6). Other control
-edges, software loops, missing ownership, conflicting defined data and incomplete
-endpoints are refused. The final delay cycle must contain an unconditional E1 `ADDKPC`
-writing B3. The existing constant proof evaluator must derive exactly the continuation
-from that instruction's raw p-code with all architectural inputs unknown. Competing link
-writers, any callee B3 writer and pre-link late B3 writers are refused. This is a proof
-of the actual return target, independent of an ABI guess or a caller-supplied B3 value.
+The contract includes one unconditional `B` call, an unconditional `B` / `BNOP B3`
+callee return and an optional final caller B3 return. The call and continuation must be execute-packet starts. The call can use a direct address
+or a register, including B3 and cross-path operands. A conservative constant evaluator
+executes the straight-line caller prefix's raw p-code with all architectural inputs
+unknown. It must prove the destination equals the declared callee entry **before** the
+call packet's E1 writes. Memory-derived, unknown, conflicting or incorrectly assembled
+targets cannot establish that proof. The schedule captures the actual E1 destination;
+a same-packet or delay-slot overwrite cannot redirect the call.
+
+The same evaluator follows the six call/delay advances and must derive B3 equal to the
+continuation. Unconditional exact E1 `MVK` / `MVKL`, `MVKH` and `ADDKPC` link writes are
+supported. The last link writer must be the declared `linkPc` in the final delay cycle.
+MVK sign extension, MVKH preservation of the low half, old packet reads, collisions
+and late effects use the existing raw-p-code/phase model. Missing or wrong halves,
+conditional link writers, pre-link late B3 writers and any callee B3 writer are refused.
+No caller-supplied register value or ABI convention substitutes for these proofs
+(SPRUFE8B 3.5, 3.7, 3.12, 4.2.6 and the B/MVK/MVKH/ADDKPC instruction descriptions).
+
+Inside the callee, direct `B`, `BNOP`, `BDEC` and `BPOS` edges may be conditional,
+forward or backward. Every target must be a validated execute-packet start inside the
+callee's hashed ownership window. Their existing predicates, delay work and pipeline
+state are retained; internal redirects do not generate call-boundary markers. Additional
+calls, indirect callee jumps, undeclared returns, caller control edges, software loops
+and IDLE remain refused. Branch-target packets crossing fetch packets are refused:
+their fetch stall or compact target restriction is not approximated. Eight-instruction
+packets involving a compact header are also refused (SPRUFE8B 3.10.4, 4.2.6).
 
 ## Pending effects and boundaries
 
@@ -62,7 +77,14 @@ captured address, value and inputs using the continuation trace API's `PendingSt
 record. Boundary hazards expose their actual enable varnodes; they are not replaced by
 an unconditional union.
 
-The focused fixture exercises a late E4 MPYLI pair result and an E3 store across the
+`ClosedCallTraceResult.proof()` supplies the call PC, source register (null for a direct
+call), expected destination, continuation, ordered delay-window link-writer PCs and a
+live E1-captured destination varnode. Inspect that varnode at `CALL_ENTER`. Existing
+`ClosedCallBoundary.capturedTarget` semantics remain unchanged.
+
+The focused fixture exercises split links, B5/B3/cross-path calls, target overwrites,
+constant-proof refusals, conditional forward paths, an internal counter loop and a
+late E4 MPYLI pair result and an E3 store across the
 return, the final-delay B3 cross-path stall at callee entry, saving/restoring the
 caller's entry B3, both endians, byte/hash/link/control refusals and exact unowned-span
 ownership. The timing rules follow TI SPRUFE8B 3.5, 3.7, 3.10.2 and 4.2. A bounded trace

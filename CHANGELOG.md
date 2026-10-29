@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+* Prove closed-call register destinations and MVK/MVKH return links from packet-old
+  raw p-code; expose the captured call destination and ordered link writers. Permit
+  validated direct branches and ordinary counter loops within the callee while
+  retaining separate owners and pending effects across call/return boundaries.
+  Cover target overwrites, cross-path/B3 calls, split-link refusals and internal
+  branches in both endians (SPRUFE8B 3.5, 3.7, 3.12, 4.2.6).
+
 ### Fixed
 
 * Decode predicated full32 register `B.S2` in the exact scheduler's terminal

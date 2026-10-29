@@ -9,11 +9,21 @@ measurement.
 
 For packet timing, see [exact schedules](pipeline-schedules.md),
 [post-loop dispatch](post-loop-dispatch.md),
-[closed direct-call traces](closed-call-traces.md) and
+[closed-call traces](closed-call-traces.md) and
 [caller continuations](caller-continuation-traces.md). Their refusal checks are part of
 the contract.
 
 ## Flow references and ownership
+
+`tests/fixtures/closed-call.py IMAGE CASES.json [be]` and
+`C6000ClosedCallTraceTest.java CASES.json RESULTS.json` cover 46 contracts per endian
+(12 executed schedules and 34 refusals). New cases prove split MVK/MVKH targets and
+links, B5/B3/cross-path calls, E1 target capture across register overwrites, conditional
+forward edges and an internal counted loop. Invalid halves/order, unknown or memory
+targets, competing/conditional writers, wrong link timing and out-of-window, indirect
+or mid-packet callee edges must refuse. Existing late MPYLI/store return effects,
+hashes, ownership, compact context and annotation checks remain in the same fixture.
+
 
 `C6000SwitchOwnershipTest.java` runs after `C6000JumpTableTest.java` on the existing
 `tests/fixtures/jump-table.py` image. Run both with little- and big-endian languages.

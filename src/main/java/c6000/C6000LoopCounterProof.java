@@ -37,6 +37,12 @@ public final class C6000LoopCounterProof {
         return value==null?null:proof.arithmetic.toLong(value,PcodeArithmetic.Purpose.INSPECT);
     }
 
+    /** Value visible to the next packet, before any of its E1 writes. */
+    public Long registerValue(long offset,int size) {
+        var value=read(registers,offset,size);
+        return value==null?null:arithmetic.toLong(value,PcodeArithmetic.Purpose.INSPECT);
+    }
+
     private byte[] read(Map<Long,Byte> bytes, long at, int size) {
         var result = new byte[size];
         for (int k=0;k<size;k++) {

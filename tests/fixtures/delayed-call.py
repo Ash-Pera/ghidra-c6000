@@ -137,13 +137,15 @@ bytes past the earlier arm's (1c00, 1c08 calls):
   1c08  [!A1]B.S1 0x1100 (call)  1c18  NOP
   1c0c  NOP                      1c1c  B.S2 B3 ; NOP 5
 
-The same with register arms in a same-predicate BNOP's window, B3 by MVK/MVKH (1c4c, 1c58 calls):
+Register arms in a same-predicate BNOP's window (1c4c, 1c58 calls). The BNOP lands
+in 1c4c's slot 4, so 1c4c's slots 4-5 run at 0x1c80, which sets its B3 (1c88):
 
-  1c40  MVK.S2  0x1100,B4        1c58  [A1]B.S2  B4   (call)
-  1c44  MVKH.S2 0x0,B4           1c5c  MVK.S2  0x1c68,B3
-  1c48  [!A1]BNOP.S1 0x1c80,1    1c60  MVKH.S2 0x0,B3
-  1c4c  [!A1]B.S2 B4  (call)     1c64  NOP     3
-  1c50  NOP ; 1c54  NOP          1c68, 1c80  B.S2 B3 ; NOP 5
+  1c40  MVK.S2  0x1100,B4        1c5c  MVK.S2  0x1c68,B3
+  1c44  MVKH.S2 0x0,B4           1c60  MVKH.S2 0x0,B3
+  1c48  [!A1]BNOP.S1 0x1c80,1    1c64  NOP     3
+  1c4c  [!A1]B.S2 B4  (call)     1c68  B.S2 B3 ; NOP 5
+  1c50  NOP ; 1c54  NOP          1c80  MVK.S2  0x1c88,B3 ; 1c84  MVKH.S2 0x0,B3
+  1c58  [A1]B.S2  B4   (call)    1c88  B.S2 B3 ; NOP 5
 
 C6000DelayedCallTest.java checks every B form becomes a call that falls
 through into its delay slots and that 0x1100 becomes a function.
@@ -254,7 +256,7 @@ CASES = {
     0x1C40: mvk(CALLEE, 4), 0x1C44: mvkh(0, 4), 0x1C48: NOT_A1 | bnop_s1(0x1C48, 0x1C80, 1),
     0x1C4C: NOT_A1 | B_B4, 0x1C50: nop(1), 0x1C54: nop(1), 0x1C58: A1 | B_B4,
     0x1C5C: mvk(0x1C68, 3), 0x1C60: mvkh(0, 3), 0x1C64: nop(3), 0x1C68: B_B3, 0x1C6C: nop(5),
-    0x1C80: B_B3, 0x1C84: nop(5),
+    0x1C80: mvk(0x1C88, 3), 0x1C84: mvkh(0, 3), 0x1C88: B_B3, 0x1C8C: nop(5),
 }
 
 WORDS = {

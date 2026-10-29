@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+* Keep a delayed call's predicate fact across a parallel follower's guard and
+  across constant writes (`MVK`, `MVKL`, `SUB x,x,dst`) that cannot change it on
+  the call path, so compiler predicate-nullify calls stay calls and a never-taken
+  jump at another call's return is not one (SPRUFE8B 3.5, 3.6, 3.12 MVK/SUB/ZERO,
+  4.2.6).
+
 ## 1.1.1 - 2026-10-29
 
 ### Upgrade notes

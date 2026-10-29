@@ -11,6 +11,13 @@
   Cover target overwrites, cross-path/B3 calls, split-link refusals and internal
   branches in both endians (SPRUFE8B 3.5, 3.7, 3.12, 4.2.6).
 
+### Validation
+
+* Exercise a two-call integer state update through TI recompilation: the diagnostic
+  trace and rebuilt C match 1,056 bounded cases on unchanged firmware. Document and
+  regress the current multiple-call, early-link, CALLP and saved-register-return
+  capability refusals in both endians; production support is unchanged.
+
 ### Fixed
 
 * Decode predicated full32 register `B.S2` in the exact scheduler's terminal

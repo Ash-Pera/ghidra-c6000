@@ -4,6 +4,8 @@ import java.math.BigInteger;
 import java.util.EnumMap;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Objects;
+import com.google.gson.Gson;
 import ghidra.app.cmd.disassemble.DisassembleCommand;
 import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.listing.*;
@@ -22,6 +24,55 @@ public final class C6000PipelineSchedules {
     public static String hazardsKey(Function function) {
         return "Previous E1 writes " + function.getEntryPoint();
     }
+
+    public static String storeTailKey(Function function) {
+        return "Post-return store tail " + function.getEntryPoint();
+    }
+
+    public static C6000PipelineCompiler.StoreTailContract storeTailContract(Program program, Function function) {
+        var options = program.getOptions(OPTIONS);
+        if (!options.contains(storeTailKey(function))) return null;
+        try {
+            var contract = new Gson().fromJson(options.getString(storeTailKey(function), ""),
+                C6000PipelineCompiler.StoreTailContract.class);
+            return new C6000PipelineCompiler.StoreTailContract(contract.idleAdvances(), contract.evidence());
+        }
+        catch (RuntimeException error) {
+            throw new IllegalArgumentException("Invalid post-return store-tail contract", error);
+        }
+    }
+
+    static C6000PipelineCompiler.Result compileConfigured(Program program, Function function,
+            Set<String> writes) throws Exception {
+        var compiler = new C6000PipelineCompiler(program, function, writes);
+        var tail = storeTailContract(program, function);
+        return tail == null ? compiler.compile() : compiler.compileStoreTail(tail).schedule();
+    }
+
+    /** Explicitly install an observation contract, atomically with reviewed activation.
+     * Ordinary compile() still refuses pending returns. See SPRUFE8B 4.2.3/4.2.6.
+     */
+    public static C6000PipelineCompiler.Result enableStoreTail(Program program, Function function,
+            String drainedEntryContract, Set<String> previousE1Writes,
+            C6000PipelineCompiler.StoreTailContract tail, TaskMonitor monitor) throws Exception {
+        Objects.requireNonNull(tail);
+        var old = storeTailContract(program, function);
+        if (C6000PipelineContracts.isRecorded(program, function) && !tail.equals(old))
+            throw new IllegalArgumentException("Entry already reviewed with a different store-tail contract");
+        if (drainedEntryContract == null || drainedEntryContract.isBlank())
+            throw new IllegalArgumentException("Evidence for a drained entry pipeline is required");
+        // Expected semantic refusals must not even create a program option.
+        new C6000PipelineCompiler(program, function, previousE1Writes).compileStoreTail(tail);
+        int transaction = program.startTransaction("Enable contracted post-return stores");
+        boolean commit = false;
+        try {
+            program.getOptions(OPTIONS).setString(storeTailKey(function), new Gson().toJson(tail));
+            var result = enable(program, function, drainedEntryContract, previousE1Writes, monitor);
+            commit = true;
+            return result;
+        }
+        finally { program.endTransaction(transaction, commit); }
+    }
     /**
     * Compile before changing the listing. The caller must establish that there
     * are no pending writes or transfers at function entry,
@@ -35,7 +86,7 @@ public final class C6000PipelineSchedules {
             throw new IllegalArgumentException("Evidence for a drained entry pipeline is required");
         }
         monitor.checkCancelled();
-        var result = new C6000PipelineCompiler(program, function, previousE1Writes).compile();
+        var result = compileConfigured(program, function, previousE1Writes);
         var at = function.getEntryPoint();
         var context = program.getProgramContext();
         var enabled = context.getValue(program.getRegister("c_schedule_entry"), at, false);

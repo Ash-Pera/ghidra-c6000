@@ -23,6 +23,79 @@ public final class C6000PipelineCompiler {
     public record Result(PcodeOp[] code,int states,int packets,AddressSet covered,Map<Integer,Long> cycleStarts,Map<Integer,Integer> stallTargets){
     }
 
+    /** Explicit observation after return, not an inferred C ABI or caller trace.
+     * SPRUFE8B 4.2.3/4.2.6: an E3 store can outlive the five branch delay slots.
+     * The reviewer guarantees no caller issue, interrupt or memory observation
+     * during these idle advances. Loads, arithmetic and control tails refuse.
+     */
+    public record StoreTailContract(int idleAdvances,String evidence) {
+        public StoreTailContract {
+            if(idleAdvances<1||idleAdvances>2||evidence==null||evidence.isBlank())
+                throw new IllegalArgumentException("store-tail contract requires one or two idle advances and explicit observation evidence");
+        }
+    }
+    public record StoreTailWrite(int rawIndex,Varnode address,Varnode value,Varnode enabled) {}
+    public record PendingStoreTail(long pc,int age,int remainingAdvances,Varnode predicate,List<StoreTailWrite> writes,String instructionHex) {
+        public PendingStoreTail { writes=List.copyOf(writes); }
+    }
+    public record StoreTailBoundary(int pcodeIndex,long returnBranchPc,List<PendingStoreTail> stores) {
+        public StoreTailBoundary { stores=List.copyOf(stores); }
+    }
+    public record StoreTailResult(Result schedule,StoreTailContract contract,List<StoreTailBoundary> boundaries) {
+        public StoreTailResult { boundaries=List.copyOf(boundaries); }
+    }
+    /** cycleStarts marker for a contracted idle advance; never a memory address. */
+    public static final long POST_RETURN_IDLE_PC=-2L;
+    private StoreTailContract storeTailContract;
+    private final List<StoreTailBoundary> storeTailBoundaries=new ArrayList<>();
+
+    public StoreTailResult compileStoreTail(StoreTailContract contract)throws Exception {
+        if(!states.isEmpty()||!instructions.isEmpty()||!b.code.isEmpty()||traceContract!=null||closedCall!=null||callerTail!=null||storeTailContract!=null)
+            throw fail("store-tail compiler instance already used");
+        storeTailContract=Objects.requireNonNull(contract);
+        return new StoreTailResult(compileInternal(),contract,storeTailBoundaries);
+    }
+
+    private List<StoreTailWrite> storeTailWrites(Insn instruction,int age) {
+        var writes=new ArrayList<StoreTailWrite>();long pc=instruction.instruction().getAddress().getOffset();
+        for(int n=0;n<instruction.raw().length;n++){
+            var op=instruction.raw()[n];if(op.getOpcode()!=PcodeOp.STORE)continue;
+            if(op.getInput(1).getSize()!=4||op.getInput(2).getSize()>8)throw fail("unsupported store-tail memory effect");
+            writes.add(new StoreTailWrite(n,slot("tail_address",pc,age,n,4),
+                slot("tail_value",pc,age,n,op.getInput(2).getSize()),slot("tail_enabled",pc,age,n,1)));
+        }
+        if(writes.isEmpty())throw fail("store-tail instruction has no memory effects");
+        return writes;
+    }
+
+    private void moveStoreTail(List<Runnable> moves,Insn instruction,int from,int to) {
+        var before=storeTailWrites(instruction,from);var after=storeTailWrites(instruction,to);
+        for(int k=0;k<before.size();k++){
+            copy(moves,after.get(k).address(),before.get(k).address());
+            copy(moves,after.get(k).value(),before.get(k).value());
+            copy(moves,after.get(k).enabled(),before.get(k).enabled());
+        }
+    }
+
+    private void storeTailReturn(State source,Branch landing,List<Flight> flights,List<Branch> branches,Insn issued,LoopPlan loop,List<Hazard> hazards)throws Exception {
+        if(loop!=null||!branches.isEmpty()||issued!=null)throw fail("store-tail return has unresolved control effects");
+        var stores=new ArrayList<PendingStoreTail>();
+        for(var flight:flights){
+            var instruction=decode(flight.pc());
+            if(!instruction.store()||instruction.latency()!=3||flight.age()<1||flight.age()>2||
+                instruction.outputs().stream().anyMatch(d->d.phase()>flight.age()))
+                throw fail("store-tail return supports only pending E3 stores");
+            if(3-flight.age()>storeTailContract.idleAdvances())throw fail("store-tail idle budget is too short");
+            stores.add(new PendingStoreTail(flight.pc(),flight.age(),3-flight.age(),
+                slot("predicate",flight.pc(),flight.age(),0,1),storeTailWrites(instruction,flight.age()),
+                java.util.HexFormat.of().formatHex(instruction.instruction().getBytes())));
+        }
+        int marker=b.code.size();b.op(PcodeOp.COPY,temp(1),c(0,1));
+        storeTailBoundaries.add(new StoreTailBoundary(marker,landing.pc(),stores));
+        b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),slot("target",landing.pc(),landing.age(),0,4));
+        b.jump(PcodeOp.BRANCH,"node"+state(new State(POST_RETURN_IDLE_PC,storeTailContract.idleAdvances(),flights,List.of(),hazards,null,source.facts())),null);
+    }
+
     /** Explicit read-only trace boundary, never an enable()/function contract. */
     public record TraceEntry(boolean drained,Set<String> previousE1Writes) {
         public TraceEntry {previousE1Writes=Set.copyOf(previousE1Writes);}
@@ -328,7 +401,8 @@ public final class C6000PipelineCompiler {
     private final Map<Integer,Long> cycleStarts=new LinkedHashMap<>();
     private final Map<Integer,String> stallLabels=new LinkedHashMap<>();
     // SPRUFE8B ANDN pp.145-146: .L/.S/.D read both inputs and write dst in E1.
-    private static final Set<String> SINGLE=Set.of("ADD","ADDK","ADDAW","ADDAD","ADDAH","ADDAB","SUBAW","SUBAH","SUBAB","SUB","AND","ANDN","OR","XOR","NOT","MV","MVK","MVKH","MVKL","MVKLH","SHL","SHR","SHRU","EXT","EXTU","SET","CLR","CMPEQ","CMPGT","CMPLT","CMPEQSP","CMPGTSP","CMPLTSP","CMPGTU","CMPLTU","ZERO","NEG","ABS","NORM","LMBD","ABSSP","DINT","RINT");
+    // SPRUFE8B PACK2 pp.397-398 / PACKL4 pp.407-408: E1 source reads and dst write.
+    private static final Set<String> SINGLE=Set.of("ADD","ADDK","ADDAW","ADDAD","ADDAH","ADDAB","SUBAW","SUBAH","SUBAB","SUB","AND","ANDN","OR","XOR","NOT","MV","MVK","MVKH","MVKL","MVKLH","SHL","SHR","SHRU","EXT","EXTU","SET","CLR","CMPEQ","CMPGT","CMPLT","CMPEQSP","CMPGTSP","CMPLTSP","CMPGTU","CMPLTU","ZERO","NEG","ABS","NORM","LMBD","ABSSP","DINT","RINT","PACK2","PACKL4");
 
     public C6000PipelineCompiler(Program p,Function f){
         this(p,f,Set.of());
@@ -669,6 +743,13 @@ public final class C6000PipelineCompiler {
             var address=temp(4);var value=temp(4);b.op(PcodeOp.COPY,address,c(0,4));b.op(PcodeOp.COPY,value,c(0,4));traceStore=new StoreCapture(address,value);traceEvaluatedStores.put(pc,traceStore);
         }
         int traceStoreCount=0;
+        Map<Integer,StoreTailWrite> tailCaptures=new HashMap<>();
+        if(storeTailContract!=null&&i.store()&&!actualMemory)for(var capture:storeTailWrites(i,0)){
+            tailCaptures.put(capture.rawIndex(),capture);
+            b.op(PcodeOp.COPY,capture.address(),c(0,4));
+            b.op(PcodeOp.COPY,capture.value(),c(0,capture.value().getSize()));
+            b.op(PcodeOp.COPY,capture.enabled(),c(0,1));
+        }
         for(int n=0;n<raw.length;n++){
             b.label(prefix+n);
             var op=raw[n];
@@ -681,6 +762,8 @@ public final class C6000PipelineCompiler {
                 captureWrite(i,n,img,writes,written);continue;
             }
             if(opcode==PcodeOp.STORE&&!actualMemory){
+                var tail=tailCaptures.get(n);
+                if(tail!=null){b.op(PcodeOp.COPY,tail.address(),mapper.apply(op.getInput(1)));b.op(PcodeOp.COPY,tail.value(),mapper.apply(op.getInput(2)));b.op(PcodeOp.COPY,tail.enabled(),c(1,1));}
                 if(traceStore!=null){if(++traceStoreCount!=1||op.getInput(1).getSize()!=4||op.getInput(2).getSize()!=4)throw fail("trace STW is not one scalar memory effect");b.op(PcodeOp.COPY,traceStore.address(),mapper.apply(op.getInput(1)));b.op(PcodeOp.COPY,traceStore.value(),mapper.apply(op.getInput(2)));}
                 continue;
             }
@@ -797,7 +880,7 @@ public final class C6000PipelineCompiler {
     }
 
     public Result compile()throws Exception{
-        if(traceContract!=null||closedCall!=null||callerTail!=null)throw fail("trace compiler is not an ordinary function schedule");
+        if(traceContract!=null||closedCall!=null||callerTail!=null||storeTailContract!=null)throw fail("trace compiler is not an ordinary function schedule");
         return compileInternal();
     }
     private Result compileInternal()throws Exception{
@@ -820,6 +903,10 @@ public final class C6000PipelineCompiler {
             int id=selected.getValue();
             b.label("node"+id);
             processed++;
+            if(storeTailContract!=null&&s.pc()==POST_RETURN_IDLE_PC&&s.idle()==0){
+                if(!s.flights().isEmpty()||!s.branches().isEmpty()||s.loop()!=null)throw fail("store-tail endpoint still has pending effects");
+                b.jump(PcodeOp.BRANCH,"exit",null);continue;
+            }
             if(closedCall!=null&&closedCall.stopPc()!=null&&s.pc()==closedCall.stopPc()&&s.idle()==0){closeClosedTrace(s);continue;}
             if(closedCall!=null&&s.idle()==0&&!closedPackets.contains(s.pc()))throw fail("closed-call entered undeclared packet");
             if(traceContract!=null&&s.pc()==traceContract.stopPc()&&s.idle()==0){closeTrace(s);continue;}
@@ -966,6 +1053,7 @@ public final class C6000PipelineCompiler {
                 nextFlights.add(new Flight(f.pc(),age,f.predicateTruth()));
                 copy(moves,slot("predicate",f.pc(),age,0,1),slot("predicate",f.pc(),f.age(),0,1));
                 if(observesStores()&&i.name().equals("STW")){copy(moves,slot("store_address",f.pc(),age,0,4),slot("store_address",f.pc(),f.age(),0,4));copy(moves,slot("store_value",f.pc(),age,0,4),slot("store_value",f.pc(),f.age(),0,4));}
+                if(storeTailContract!=null&&i.store())moveStoreTail(moves,i,f.age(),age);
                 for(long off:i.regs())copy(moves,slot("input",f.pc(),age,off,4),lateInputs.get(f).getOrDefault(off,slot("input",f.pc(),f.age(),off,4)));
                 for(var d:i.outputs())if(d.phase()>age&&!i.store()&&f.age()>=(i.load()?3:i.ready())-1){
                     var e=mature.get(f);
@@ -993,6 +1081,7 @@ public final class C6000PipelineCompiler {
                     nextFlights.add(new Flight(pc,1,-1));
                     copy(moves,slot("predicate",pc,1,0,1),e.predicate());
                     if(observesStores()&&i.name().equals("STW")){var store=traceEvaluatedStores.get(pc);if(store==null)throw fail("trace STW capture missing");copy(moves,slot("store_address",pc,1,0,4),store.address());copy(moves,slot("store_value",pc,1,0,4),store.value());}
+                    if(storeTailContract!=null&&i.store())moveStoreTail(moves,i,0,1);
                     for(var v:captured.get(pc).entrySet())copy(moves,slot("input",pc,1,v.getKey(),4),v.getValue());
                     if(!i.load()&&!i.store()&&i.ready()==1)for(var d:i.outputs())if(d.phase()>1)copy(moves,outputSlot(pc,1,d),outputValue(e,d));
                 }
@@ -1020,6 +1109,7 @@ public final class C6000PipelineCompiler {
                         closedBoundary("CALL_RETURN",landing,nextFlights,hazards);nextPc=closedCall.continuation();
                     }
                     else if(traceContract!=null)nextPc=continueReturn(landing,nextFlights,nextBranches,issueBranch,loop);
+                    else if(storeTailContract!=null){storeTailReturn(s,landing,nextFlights,nextBranches,issueBranch,loop,hazards);continue;}
                     else {
                         if(!nextFlights.isEmpty()||!nextBranches.isEmpty()||issueBranch!=null)throw fail("return leaves architectural pipeline effects pending; source="+s+"; next="+nextFlights);
                         if(closedCall!=null){if(!Objects.equals(landing.pc(),closedCall.callerReturnPc()))throw fail("closed-call undeclared return");closedBoundary("CALLER_RETURN",landing,nextFlights,hazards);var writes=closedHazards(hazards);if(closedExitWrites!=null&&!closedExitWrites.equals(writes))throw fail("closed-call incompatible return hazards");closedExitWrites=writes;}

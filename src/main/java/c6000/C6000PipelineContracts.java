@@ -218,6 +218,10 @@ public final class C6000PipelineContracts {
         }
         StringBuilder text = new StringBuilder(program.getLanguageID().getIdAsString());
         text.append('|').append(entry).append('|').append(function.getBody()).append('\n');
+        // The observation boundary is part of the reviewed source identity.
+        // Keep legacy hashes unchanged when no post-return contract was recorded.
+        var tail = C6000PipelineSchedules.storeTailContract(program, function);
+        if (tail != null) text.append("store-tail:").append(JSON.toJson(tail)).append('\n');
         var context = program.getProgramContext();
         var base = program.getLanguage().getContextBaseRegister();
         for (AddressRange range : fetch) {
@@ -311,7 +315,7 @@ public final class C6000PipelineContracts {
         if (entrySources == null || entrySources.isEmpty()) {
             throw new IllegalArgumentException("pin the source supporting the reviewed entry contract");
         }
-        var schedule = new C6000PipelineCompiler(program, function, previousE1Writes).compile();
+        var schedule = C6000PipelineSchedules.compileConfigured(program, function, previousE1Writes);
         if (!new AddressSet(schedule.covered()).subtract(function.getBody()).isEmpty()) {
             throw new IllegalArgumentException("reviewed activation requires complete function ownership of the scheduled code");
         }
@@ -344,7 +348,7 @@ public final class C6000PipelineContracts {
     /** Record only; the contract-gated analyzer may activate this approved plan later. */
     public static void record(Program program, Function function, Review review,
             TaskMonitor monitor) throws Exception {
-        var schedule = new C6000PipelineCompiler(program, function, Set.copyOf(review.previousE1Writes())).compile();
+        var schedule = C6000PipelineSchedules.compileConfigured(program, function, Set.copyOf(review.previousE1Writes()));
         check(program, function, review, review.sourceSha256(), schedule, monitor);
         program.getOptions(C6000PipelineSchedules.OPTIONS).setString(key(function),
             JSON.toJson(new Binding(review, "")));
@@ -355,7 +359,7 @@ public final class C6000PipelineContracts {
             C6000PipelineCompiler.Result schedule, TaskMonitor monitor) throws Exception {
         Binding pending = isRecorded(program, function) ? binding(program, function) : null;
         List<SourceWindow> sources = pending == null ? List.of() : pending.review().entrySources();
-        var expanded = new C6000PipelineCompiler(program, function, writes).compile();
+        var expanded = C6000PipelineSchedules.compileConfigured(program, function, writes);
         if (!scheduleHash(schedule, monitor).equals(scheduleHash(expanded, monitor))) {
             throw new IllegalArgumentException("body expansion changes the reviewed schedule; review the complete scope first");
         }
@@ -374,7 +378,7 @@ public final class C6000PipelineContracts {
             throw new IllegalArgumentException("active entry selector changed; review the contract again");
         }
         var writes = Set.copyOf(review.previousE1Writes());
-        var schedule = new C6000PipelineCompiler(program, function, writes).compile();
+        var schedule = C6000PipelineSchedules.compileConfigured(program, function, writes);
         check(program, function, review, binding.activeSourceSha256().isEmpty() ?
             review.sourceSha256() : binding.activeSourceSha256(), schedule, monitor);
         // Expected refusals are read-only. enable() owns the write transaction

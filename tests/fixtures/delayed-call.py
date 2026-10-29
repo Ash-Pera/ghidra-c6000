@@ -167,6 +167,14 @@ A nullified jump one packet after a call returns at that call's B3, not its own 
 1f08 is 1d08 with the write under A2: A0 becomes 1 or stays nonzero, so it is a call too.
 Controls that are not calls: 1e88 is 1d08 with [A1]ZERO.L1 A0 and 1f88 with [A2]ZERO.L1 A0;
 either write can clear A0, so the BNOP may run on the call path.
+2008 is 1d88 with ZERO in its SUB A0,A0,A0 form, a call; the control 2088 writes
+SUB A0,A2,A0, which can set A0 on the call path, so it is not a call.
+210c is not a call either: MVK 1,A0 makes A0 true whatever it held, so B3, set under A0
+before it, is not known on the call path:
+
+  2100  [A0]MVK.S2  0x2114,B3          210c  [A0]B.S1 0x1100 (not a call)
+  2104  [A0]MVKH.S2 0x0,B3             2110  NOP 5
+  2108  MVK.L1 1,A0                    2114  B.S2 B3 ; NOP 5
 Every return point and jump target in these routines is B.S2 B3 ; NOP 5.
 
 C6000DelayedCallTest.java checks every B form becomes a call that falls
@@ -196,6 +204,8 @@ A0, NOT_A0, PAR = 0xC0000000, 0xD0000000, 1
 MV_A0_A1 = 0x00800FD8  # MV.L1 A0,A1
 CMPGT_A10_10_A0 = 0x00294AD8  # CMPGT.L1 A10,10,A0
 SUB_A10_1_A0 = 0x002BE058  # SUB.L1 A10,1,A0
+SUB_A0_A0_A0 = 0x000000F8  # SUB.L1 A0,A0,A0 (dis6x: ZERO.L1 A0)
+SUB_A0_A2_A0 = 0x000800F8  # SUB.L1 A0,A2,A0
 
 
 def mvk_l1(cst, reg):
@@ -228,6 +238,17 @@ def nullify(base, guard):
         base: NOT_A0 | b_s1(base, base + 0x40) | PAR, base + 0x4: MV_A0_A1,
         base + 0x8: A0 | b_s1(base + 0x8, CALLEE) | PAR, base + 0xC: NOT_A0 | CMPGT_A10_10_A0,
         base + 0x10: guard, base + 0x14: NOT_A0 | bnop_s1(base + 0x14, base + 0x60, 2),
+        base + 0x18: addkpc(base + 0x18, base + 0x1C, 0), base + 0x1C: B_B3, base + 0x20: nop(5),
+        base + 0x40: B_B3, base + 0x44: nop(5), base + 0x60: B_B3, base + 0x64: nop(5),
+    }
+
+
+def nullify_zero(base, guard):
+    """[!A0] call with A1 = A0; guard is the word written after the call packet."""
+    return {
+        base: A0 | b_s1(base, base + 0x40) | PAR, base + 0x4: MV_A0_A1,
+        base + 0x8: NOT_A0 | b_s1(base + 0x8, CALLEE) | PAR, base + 0xC: A0 | SUB_A10_1_A0,
+        base + 0x10: guard, base + 0x14: A0 | bnop_s1(base + 0x14, base + 0x60, 2),
         base + 0x18: addkpc(base + 0x18, base + 0x1C, 0), base + 0x1C: B_B3, base + 0x20: nop(5),
         base + 0x40: B_B3, base + 0x44: nop(5), base + 0x60: B_B3, base + 0x64: nop(5),
     }
@@ -321,6 +342,10 @@ CASES = {
     **nullify(0x1E80, A1 | mvk_l1(0, 0)),
     **nullify(0x1F00, A2 | mvk_l1(1, 0)),
     **nullify(0x1F80, A2 | mvk_l1(0, 0)),
+    **nullify_zero(0x2000, NOT_A1 | SUB_A0_A0_A0),
+    **nullify_zero(0x2080, NOT_A1 | SUB_A0_A2_A0),
+    0x2100: A0 | mvk(0x2114, 3), 0x2104: A0 | mvkh(0, 3), 0x2108: mvk_l1(1, 0),
+    0x210C: A0 | b_s1(0x210C, CALLEE), 0x2110: nop(5), 0x2114: B_B3, 0x2118: nop(5),
 }
 
 WORDS = {
@@ -409,7 +434,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0xFF0)
+    image = bytearray(0x1120)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

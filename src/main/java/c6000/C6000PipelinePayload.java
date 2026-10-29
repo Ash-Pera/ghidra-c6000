@@ -20,7 +20,7 @@ public class C6000PipelinePayload extends InjectPayloadCallother {
         var hazards=program.getOptions(C6000PipelineSchedules.OPTIONS).getString(C6000PipelineSchedules.hazardsKey(f), "");
         var writes=hazards.isEmpty()?java.util.Set.<String>of():java.util.Set.of(hazards.split(","));
         try{
-            var result=new C6000PipelineCompiler(program,f,writes).compile();
+            var result=C6000PipelineSchedules.compileConfigured(program,f,writes);
             C6000PipelineContracts.validate(program,f,result,ghidra.util.task.TaskMonitor.DUMMY);
             var ops=Arrays.copyOf(result.code(),result.code().length);
             var ret=program.getRegister("C6000_PIPE_RET");

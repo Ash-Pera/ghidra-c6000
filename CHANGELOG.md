@@ -12,6 +12,12 @@
 
 ### Added
 
+* Schedule `PACK2` (`.L`/`.S`) and `PACKL4` (`.L`) with E1 input capture and
+  writeback (SPRUFE8B pp. 397-398, 407-408).
+* Add an explicit, source-bound post-return store-tail observation contract.
+  Capture individual byte/word/pair effects and mature only pending E3 stores
+  during one or two declared idle advances. Keep ordinary pending-return
+  refusals and real caller traces unchanged (SPRUFE8B 3.5, 4.2.3, 4.2.6).
 * Support `ANDN` on `.L`, `.S` and `.D` in exact packet schedules, with
   E1 source capture and writeback, predication and register aliases
   (SPRUFE8B pp. 145-146).

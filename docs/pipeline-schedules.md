@@ -18,6 +18,7 @@ The phase contracts currently implemented are:
 | Family | Operand capture | Architectural effect |
 | --- | --- | --- |
 | Supported scalar operations | E1 | E1 register write |
+| PACK2 (.L/.S), PACKL4 (.L) | E1 | E1 register write (SPRUFE8B pp.397-398,407-408) |
 | MPY / MPYSU / MPYU / MPYUS | E1 | E2 register write |
 | MPYLI | E1 | Simultaneous E4 register-pair write; .M occupancy only in E1 |
 | ADDSP / SUBSP / MPYSP | E1 | E4 result and sticky event flags |
@@ -114,6 +115,48 @@ Use an empty set only when there are no incoming E1 hazards. Conditional incomin
 hazards must be resolved for the selected entry contract; they are not guessed from a
 prototype. A return with pending effects is refused rather than dropping effects that
 belong in the caller.
+
+### Post-return store observation
+
+`compileStoreTail(StoreTailContract)` is a separate, explicit observation contract
+for memory-writing routines. The contract supplies one or two idle advances after
+the B3 branch lands and evidence establishing that no caller instructions issue,
+interrupts occur, or memory observations intervene during that interval. Entry
+drainage and previous-E1 hazards still require their own evidence. This is a
+quiescent observation of the function, not a model of an arbitrary firmware caller.
+
+Only pending E3 stores at ages one/two are allowed. A short idle budget, pending
+loads, arithmetic writeback, live loop control or another transfer refuses. Store
+addresses, values, predicates and base updates retain their E1 snapshots; individual
+nonaligned byte writes and aligned pair writes commit at E3. A store-tail boundary
+exports every pending instruction and its raw memory effects, including each
+effect's enabled flag. No caller memory is read or instruction fetched during the
+idle interval. `cycleStarts()` uses `POST_RETURN_IDLE_PC` for these advances; that
+negative marker is not a physical address. Ordinary `compile()` retains its
+pending-return refusal (SPRUFE8B 3.5, 3.9.2, 4.2.3, 4.2.6).
+
+For reviewed decompiler injection, explicitly activate the same contract:
+
+```java
+var tail = new C6000PipelineCompiler.StoreTailContract(2,
+    "Describe the reviewed two-idle-advance observation and exclusion of interrupts/observers");
+C6000PipelineSchedules.enableStoreTail(program, function,
+    "Describe the independent drained-entry proof", Set.of(), tail, monitor);
+```
+
+Activation is transactional and binds the tail budget and evidence along with the
+existing source, ownership, decode context, entry assumptions and p-code hashes.
+Injection and analyzer reactivation recompile that exact contract. Changing or
+removing it invalidates activation; an existing reviewed contract cannot silently
+be replaced. This Java API is separate from the ordinary manifest workflow below.
+Use the [strict caller-tail API](caller-tail-traces.md) when real caller instructions
+must execute while stores mature; its existing STW-only scope remains unchanged.
+
+`pipeline-store-tail.py` checks full32/compact byte, halfword, word, doubleword and
+nonaligned stores in both byte orders, ages one/two, predicates, source/base aliases,
+AMR wrapping, captured memory effects, exact idle counts, no early writes, refusal
+paths and source-bound injection. `pipeline-pack.py` checks both banks, cross paths,
+aliases, predication, parallel source writers and same/next-packet consumers.
 
 Compilation completes before the listing changes. Enabling is transactional, retains the
 entry's comments, references and explicit flow overrides, expands the body to scheduled

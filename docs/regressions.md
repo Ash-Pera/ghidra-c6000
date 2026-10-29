@@ -475,6 +475,17 @@ auto-analysis fixtures require `C6000SetEntry.java 1000` as a pre-script.
 with a parallel companion (`B f || STW`, `B f || MV`) decodes its delay slots and return
 point, and that the caller owns them (GNU-assembled, checked against TI dis6x). v1.1.1
 leaves 0x1020 onward undecoded.
+`tail-call-slots.py IMAGE [be]` and `C6000TailCallSlotsTest.java` (pre-script `prepare`,
+which marks 0x11c0 no-return as an ELF `exit` would be) check that `CALL_RETURN` tail
+calls keep their delay slots in the caller, including an epilogue `LDW ...,B3`, and that
+a `B` whose B3 is set stays a call: register calls to the no-return callee with ADDKPC in
+the window or MVK/MVKH before the packet (the shape of TI RTS `_c_int00` calling `exit`),
+and a call at 0x1244 whose ADDKPC returns past its window. v1.1.1 leaves 0x1104
+undecoded. Admitting every `CALL_RETURN` window turns 0x1038 into a tail call; dropping
+the load exception leaves 0x1104 undecoded; dropping the delayed-call proof turns 0x1054
+into a tail call; dropping the B3-write test makes 0x1248 a tail-call slot. The 0x1244
+branch sits after an `MV` so that Shared Return Calls, which skips jumps at a function
+entry, marks it `CALL_RETURN`.
 
 Regenerate `c6000_flow_delay.sinc` with `python3 tools/gen_flow_delay.py`;
 `gen_decode.py` and `gen_compact.py` own their corresponding branch constructors. The

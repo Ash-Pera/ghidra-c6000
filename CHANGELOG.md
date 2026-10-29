@@ -162,6 +162,9 @@
   `.TI.section.flags`; rounding a fetch packet out of the overlay threw and left all
   compact code undecoded (issue #33). Overlays over OTHER, which hold no code, are
   no longer primed.
+* A returning `B` call with a parallel companion (`B f || STW`) left its delay
+  slots and everything after its return point undecoded; decoding now resumes
+  after the branch's execute packet (SPRUFE8B 3.5, 4.2.6).
 * Correct delayed-call recovery for E5 load writes and E1 packet snapshots
   (issues #23 and #24). A pending load can invalidate B3 after ADDKPC; a
   parallel target-register writer cannot change the branch's captured target.

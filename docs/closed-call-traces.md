@@ -1,11 +1,12 @@
-# Read-only closed-call traces
+# Closed-call traces and normal decompilation
 
 `C6000PipelineCompiler.compileClosedCallTrace(program, caller, plan)` compiles one
 explicit proved call, its callee return, and the caller continuation into one read-only
 schedule. It preserves the raw instruction p-code and existing pipeline state through
-both ownership boundaries. The returned result is not a function schedule and cannot be
-installed with `C6000PipelineSchedules.enable`. Ordinary compilation continues to refuse
-unplanned transfers to another owner.
+both ownership boundaries. Compiling a trace is read-only. To install a complete
+caller trace for normal decompilation, explicitly opt in with
+`C6000PipelineSchedules.enableClosedCalls(program, caller, plans, monitor)`. Ordinary
+compilation continues to refuse unplanned transfers to another owner.
 
 ## Plan and scope
 
@@ -19,7 +20,8 @@ selects the correct invocation's continuation. Nested calls remain refused.
 
 The single-call API delegates to the same implementation and retains its result type.
 The plural result provides `contracts()`, `proofs()` and the existing boundary metadata.
-Neither result is an installable multi-owner function contract.
+The compiler results alone do not install or authorize decompiler injection. The
+activation API below records the explicit scope and entry assertion.
 
 A bounded plan supplies `stopPc` equal to the caller window's exclusive end. A complete
 caller plan supplies `callerReturnPc`; its E1-captured register target determines the
@@ -41,6 +43,32 @@ code with no database owner; they require evidence and share the window's byte h
 span is refused if an owner exists. Their endpoints must be instruction boundaries;
 partial instructions, owner overlap and data overlap are refused. They do not expand any
 function or change an annotation.
+
+## Normal decompiler activation
+
+After reviewing the caller's drained entry and its incoming E1 hazards, pass the same
+plans to `C6000PipelineSchedules.enableClosedCalls`. Activation requires the actual
+caller entry, a complete caller return, no unowned spans, and an existing caller body
+exactly equal to the declared caller window. A bounded trace remains read-only.
+The call compiler first validates the full schedule, then the source binder checks its
+scope before recording any options or enabling the entry. Cancellation or a failed
+preflight leaves the entry unconfigured.
+
+The plans persist in the program's `C6000 pipeline schedules` options. The existing
+`C6000PipelinePayload` and analyzer recompile this configuration and validate the
+normal source binding. A fresh stock `DecompInterface` receives the complete scheduled
+CFG; no replacement payload or custom exporter is needed. The resulting C can inline
+the declared helpers' effects. It does not reconstruct separate high-level calls.
+
+Caller and callee bodies, bytes and annotations retain their original owners.
+Shared helpers may have external references and external entry symbols at their
+**declared owner entries**. Outside entries into covered interiors remain refused.
+The source binding includes the stored plan text, fetch bytes, physical context,
+ownership, data, references, flow overrides, entry evidence and compiled p-code.
+Changing any bound source invalidates injection. Independently enabled schedule
+entries inside a helper are also refused. Closed-call and post-return store-tail
+contracts cannot be combined, and a reviewed contract cannot be silently replaced.
+Repeating unchanged activation or analysis is read-only.
 
 ## Call and link proof
 
@@ -129,3 +157,12 @@ distinct callees, pending return stores and saved-link returns. Refusal cases co
 unknown or clobbered saved links, nonlocal returns, late CALLP-link corruption, pending
 branches, link collisions and conflicting NOP generators. Use
 `python3 tools/verify.py --only pipeline-calls --only closed-call --jobs 2`.
+
+`pipeline-call-contracts.py` / `C6000PipelineCallContractTest.java` exercise normal
+activation, the installed payload, p-code execution and stock native decompilation.
+Six schedules per endian cover both S units, compact/header forms and repeated or
+distinct helpers with pending return stores. Fourteen refusals cover incomplete or
+cancelled activation, interior entries and stale plan/source/ownership/selector state.
+They also check preserved annotations and owners, persisted hazard/plan round trips,
+read-only reactivation and the existing review/record/analyzer activation path. Use
+`python3 tools/verify.py --only pipeline-call-contracts --jobs 2`.

@@ -4,6 +4,10 @@
 
 ### Added
 
+* Integrate explicitly reviewed, complete closed-call traces into normal decompilation
+  through `enableClosedCalls`, persisted plans and the existing source-bound injection
+  library. Preserve separate callee owners; reject stale plans, interior entries and
+  bounded-only traces. Cover native decompilation and pending stores in both endians.
 * Schedule sequential leaf calls, including repeated callees, with invocation-specific
   continuations and live pipeline effects. Accept proved early MVK/MVKH/ADDKPC links.
 * Schedule full32/compact CALLP on both S units: E1 A3/B3 link, next execute-packet
@@ -19,6 +23,9 @@
 
 ### Validation
 
+* Rerun bitstream_flush through stock `DecompInterface` without a custom export
+  payload: normal recovered C compiled with TI matches all 1,056 cases. Retain
+  pre-activation C and an output mutant as failing controls.
 * Rerun bitstream_flush through the production call model: unchanged bytes and
   trace-derived TI C match all 1,056 cases. The ordinary-C binary now executes and
   exposes its memory mismatches. Add CALLP, repeated-callee and saved-link execution

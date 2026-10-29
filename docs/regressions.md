@@ -34,6 +34,16 @@ writers, pending branches and conflicting NOP generators remain refusals. The fo
 previously documented capability gaps now have execution checks. See the
 [production round-trip](multi-call-roundtrip.md).
 
+`tests/fixtures/pipeline-call-contracts.py IMAGE CASES.json [be]` and
+`C6000PipelineCallContractTest.java CASES.json RESULTS.json` check six normal
+closed-call activations and fourteen refusals per endian. The installed injection
+library and stock native decompiler receive pending-store traces for both S units,
+compact/header forms and repeated/distinct helpers. The fixture executes the injected
+p-code, checks the returned C, preserves separate owners/references/comments, and
+checks idempotence, persisted plan/hazard round trips and review/record/analyzer
+activation. Stale source/plan/ownership/selector changes and alternate interior entries
+refuse; incomplete, cancelled and unsafe activations leave no options or binding.
+
 `C6000SwitchOwnershipTest.java` runs after `C6000JumpTableTest.java` on the existing
 `tests/fixtures/jump-table.py` image. Run both with little- and big-endian languages.
 Six checks cover stable override label IDs on repeat analysis, lossless rehoming,

@@ -169,7 +169,20 @@ public final class C6000PipelineContracts {
     private static String sourceHash(Program program, Function function,
             C6000PipelineCompiler.Result schedule, List<SourceWindow> windows,
             TaskMonitor monitor) throws Exception {
+        var calls = C6000PipelineSchedules.closedCalls(program, function);
+        String configuration = calls.isEmpty() ? "" : program.getOptions(C6000PipelineSchedules.OPTIONS)
+            .getString(C6000PipelineSchedules.closedCallsKey(function), "");
+        return sourceHash(program, function, schedule, windows, monitor, calls, configuration);
+    }
+
+    private static String sourceHash(Program program, Function function,
+            C6000PipelineCompiler.Result schedule, List<SourceWindow> windows,
+            TaskMonitor monitor, List<C6000PipelineCompiler.ClosedCallPlan> calls,
+            String configuration) throws Exception {
         Address entry = function.getEntryPoint();
+        C6000PipelineSchedules.validateClosedCallScope(program, function, calls);
+        Set<Address> declaredEntries = new HashSet<>();declaredEntries.add(entry);
+        for (var call : calls) declaredEntries.add(address(program, call.callee().ownerEntry()));
         if (entry.getAddressSpace() != program.getAddressFactory().getDefaultAddressSpace() ||
             entry.getAddressSpace().isOverlaySpace() ||
             !C6000ExecutionPackets.issuePrefix(program, entry).isEmpty()) {
@@ -222,6 +235,9 @@ public final class C6000PipelineContracts {
         // Keep legacy hashes unchanged when no post-return contract was recorded.
         var tail = C6000PipelineSchedules.storeTailContract(program, function);
         if (tail != null) text.append("store-tail:").append(JSON.toJson(tail)).append('\n');
+        // Bind the stored serialization verbatim: Set iteration order after reopening
+        // must not change a contract hash. Any plan edit invalidates the binding.
+        if (!calls.isEmpty()) text.append("closed-calls:").append(configuration).append('\n');
         var context = program.getProgramContext();
         var base = program.getLanguage().getContextBaseRegister();
         for (AddressRange range : fetch) {
@@ -267,7 +283,7 @@ public final class C6000PipelineContracts {
         var functions = program.getFunctionManager().getFunctions(fetch, true);
         while (functions.hasNext()) {
             var owner = functions.next();
-            if (!owner.equals(function) && schedule.covered().contains(owner.getEntryPoint())) {
+            if (!declaredEntries.contains(owner.getEntryPoint()) && schedule.covered().contains(owner.getEntryPoint())) {
                 throw new IllegalArgumentException("another function enters scheduled code at " + owner.getEntryPoint());
             }
             text.append("function:").append(owner.getEntryPoint()).append(':').append(owner.getBody()).append('\n');
@@ -284,7 +300,7 @@ public final class C6000PipelineContracts {
             monitor.checkCancelled();
             for (var ref : manager.getReferencesTo(destinations.next())) {
                 if (schedule.covered().contains(ref.getToAddress()) &&
-                    !ref.getToAddress().equals(entry) &&
+                    !declaredEntries.contains(ref.getToAddress()) &&
                     !schedule.covered().contains(ref.getFromAddress()) &&
                     (ref.getReferenceType().isFlow() || ref.getReferenceType().isData())) {
                     throw new IllegalArgumentException("alternate entry into scheduled code at " + ref.getToAddress());
@@ -297,13 +313,20 @@ public final class C6000PipelineContracts {
         while (entries.hasNext()) {
             Address at = entries.next();
             if (fetch.contains(at)) {
-                if (schedule.covered().contains(at) && !at.equals(entry)) {
+                if (schedule.covered().contains(at) && !declaredEntries.contains(at)) {
                     throw new IllegalArgumentException("external entry inside scheduled code at " + at);
                 }
                 text.append("external:").append(at).append('\n');
             }
         }
         return sha256(text.toString());
+    }
+
+    /** Read-only source preflight for explicitly configured closed-call activation. */
+    static void validateSourceScope(Program program, Function function,
+            C6000PipelineCompiler.Result schedule, List<C6000PipelineCompiler.ClosedCallPlan> calls,
+            TaskMonitor monitor) throws Exception {
+        sourceHash(program, function, schedule, List.of(), monitor, calls, JSON.toJson(calls));
     }
 
     public static Review review(Program program, Function function, String evidence,
@@ -316,7 +339,8 @@ public final class C6000PipelineContracts {
             throw new IllegalArgumentException("pin the source supporting the reviewed entry contract");
         }
         var schedule = C6000PipelineSchedules.compileConfigured(program, function, previousE1Writes);
-        if (!new AddressSet(schedule.covered()).subtract(function.getBody()).isEmpty()) {
+        if (C6000PipelineSchedules.closedCalls(program, function).isEmpty() &&
+                !new AddressSet(schedule.covered()).subtract(function.getBody()).isEmpty()) {
             throw new IllegalArgumentException("reviewed activation requires complete function ownership of the scheduled code");
         }
         return reviewed(program, function, evidence, previousE1Writes, entrySources, schedule, monitor);

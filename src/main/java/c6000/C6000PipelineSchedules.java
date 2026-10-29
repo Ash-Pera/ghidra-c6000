@@ -3,6 +3,8 @@ package c6000;
 import java.math.BigInteger;
 import java.util.EnumMap;
 import java.util.Set;
+import java.util.List;
+import java.util.Arrays;
 import java.util.TreeSet;
 import java.util.Objects;
 import com.google.gson.Gson;
@@ -42,10 +44,87 @@ public final class C6000PipelineSchedules {
         }
     }
 
+    public static String closedCallsKey(Function function) {
+        return "Closed-call trace " + function.getEntryPoint();
+    }
+
+    /** Persisted opt-in only. The ordinary injector never guesses a call scope. */
+    public static List<C6000PipelineCompiler.ClosedCallPlan> closedCalls(Program program, Function function) {
+        var options = program.getOptions(OPTIONS);
+        if (!options.contains(closedCallsKey(function))) return List.of();
+        try {
+            var plans = new Gson().fromJson(options.getString(closedCallsKey(function), ""),
+                C6000PipelineCompiler.ClosedCallPlan[].class);
+            if (plans == null || plans.length == 0 || plans.length > 16)
+                throw new IllegalArgumentException("one to sixteen closed calls required");
+            return List.copyOf(Arrays.asList(plans));
+        }
+        catch (RuntimeException error) {
+            throw new IllegalArgumentException("Invalid closed-call decompiler contract", error);
+        }
+    }
+
+    static void validateClosedCallScope(Program program, Function function,
+            List<C6000PipelineCompiler.ClosedCallPlan> plans) {
+        if (plans.isEmpty()) return;
+        var first = plans.get(0);
+        if (first.startPc() != function.getEntryPoint().getOffset() || first.stopPc() != null ||
+                first.callerReturnPc() == null)
+            throw new IllegalArgumentException("closed-call activation requires entry through complete caller return");
+        var window = first.caller();
+        var body = new AddressSet(function.getEntryPoint().getNewAddress(window.start()),
+            function.getEntryPoint().getNewAddress(window.end() - 1));
+        if (!window.unownedSpans().isEmpty() || !body.equals(function.getBody()) ||
+                plans.stream().anyMatch(p -> !p.callee().unownedSpans().isEmpty()))
+            throw new IllegalArgumentException("closed-call activation requires complete declared ownership; no body adoption");
+    }
+
+    /** Activate a reviewed multi-owner schedule through the normal injection library.
+     * SPRUFE8B 3.5/3.7/4.2: entry drainage remains an explicit assertion; all
+     * callee effects and caller delay packets come from the production call trace.
+     * Call/callee windows, owners and references are source-bound without merging bodies.
+     */
+    public static C6000PipelineCompiler.ClosedCallsTraceResult enableClosedCalls(Program program,
+            Function function, List<C6000PipelineCompiler.ClosedCallPlan> plans,
+            TaskMonitor monitor) throws Exception {
+        plans = List.copyOf(plans);
+        if (plans.isEmpty()) throw new IllegalArgumentException("explicit closed calls required");
+        monitor.checkCancelled();validateClosedCallScope(program, function, plans);
+        var old = closedCalls(program, function);
+        if ((C6000PipelineContracts.isRecorded(program, function) || !old.isEmpty()) && !old.equals(plans))
+            throw new IllegalArgumentException("Entry already reviewed with a different closed-call contract");
+        if (storeTailContract(program, function) != null)
+            throw new IllegalArgumentException("closed-call and post-return store-tail contracts cannot be combined");
+        // Compile all semantic refusals before even recording a program option.
+        var trace = C6000PipelineCompiler.compileClosedCallsTrace(program, function, plans);
+        C6000PipelineContracts.validateSourceScope(program, function, trace.schedule(), plans, monitor);
+        var first = plans.get(0);
+        if (!old.isEmpty()) {
+            enable(program, function, first.evidence(), first.entry().previousE1Writes(), monitor);
+            return trace;
+        }
+        int transaction = program.startTransaction("Enable reviewed closed-call decompilation");
+        boolean commit = false;
+        try {
+            program.getOptions(OPTIONS).setString(closedCallsKey(function), new Gson().toJson(plans));
+            enable(program, function, first.evidence(), first.entry().previousE1Writes(), monitor);
+            monitor.checkCancelled();commit = true;return trace;
+        }
+        finally { program.endTransaction(transaction, commit); }
+    }
+
     static C6000PipelineCompiler.Result compileConfigured(Program program, Function function,
             Set<String> writes) throws Exception {
-        var compiler = new C6000PipelineCompiler(program, function, writes);
+        var calls = closedCalls(program, function);
         var tail = storeTailContract(program, function);
+        if (!calls.isEmpty()) {
+            if (tail != null) throw new IllegalArgumentException("closed-call and post-return store-tail contracts cannot be combined");
+            validateClosedCallScope(program, function, calls);
+            if (!calls.get(0).entry().previousE1Writes().equals(writes))
+                throw new IllegalArgumentException("closed-call entry hazard assumptions changed");
+            return C6000PipelineCompiler.compileClosedCallsTrace(program, function, calls).schedule();
+        }
+        var compiler = new C6000PipelineCompiler(program, function, writes);
         return tail == null ? compiler.compile() : compiler.compileStoreTail(tail).schedule();
     }
 
@@ -97,8 +176,7 @@ public final class C6000PipelineSchedules {
                 try {
                     C6000PipelineContracts.validatePending(program, function,
                         drainedEntryContract, previousE1Writes, result, monitor);
-                    var body = new AddressSet(function.getBody());body.add(result.covered());
-                    function.setBody(body);
+                    includeFunctionScope(program, function, result);
                     program.getOptions(OPTIONS).setString(contractKey(function), drainedEntryContract);
                     program.getOptions(OPTIONS).setString(hazardsKey(function), String.join(",", new TreeSet<>(previousE1Writes)));
                     C6000PipelineContracts.bind(program, function, drainedEntryContract, previousE1Writes, result, monitor);
@@ -156,9 +234,7 @@ public final class C6000PipelineSchedules {
             if (fallThroughOverridden) instruction.setFallThrough(fallThrough);
             for (var item : comments.entrySet()) listing.setComment(at, item.getKey(), item.getValue());
             for (var reference : references) program.getReferenceManager().addReference(reference);
-            var body = new AddressSet(function.getBody());
-            body.add(result.covered());
-            function.setBody(body);
+            includeFunctionScope(program, function, result);
             program.getOptions(OPTIONS).setString(contractKey(function), drainedEntryContract);
             program.getOptions(OPTIONS).setString(hazardsKey(function), String.join(",", new TreeSet<>(previousE1Writes)));
             C6000PipelineContracts.bind(program, function, drainedEntryContract,
@@ -171,4 +247,10 @@ public final class C6000PipelineSchedules {
             program.endTransaction(transaction, commit);
         }
     }
+    private static void includeFunctionScope(Program program, Function function,
+            C6000PipelineCompiler.Result schedule) throws Exception {
+        if (!closedCalls(program, function).isEmpty()) return;
+        var body = new AddressSet(function.getBody());body.add(schedule.covered());function.setBody(body);
+    }
+
 }

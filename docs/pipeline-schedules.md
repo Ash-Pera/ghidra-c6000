@@ -239,12 +239,32 @@ dynamic payload: execute `Result.code()` through a p-code executor for schedule
 validation. `cycleStarts()` and `stallTargets()` provide nonarchitectural trace points,
 which the decompiler can eliminate.
 
+## Complete closed-call decompilation
+
+For an explicitly reviewed caller with one to sixteen sequential leaf calls, use:
+
+```java
+// Each plan pins a call site, hashed owner windows, link/return PCs,
+// and the reviewed drained-entry and previous-E1-write assumptions.
+var trace = C6000PipelineSchedules.enableClosedCalls(program, caller, plans, monitor);
+// Normal DecompInterface decompilation now uses the production scheduled CFG.
+```
+
+Plans persist in program options and participate in the existing source binding.
+The full trace must begin at the real caller entry and finish at its declared return;
+bounded endpoints and unowned spans are not installable. Activation requires the
+existing caller body to equal its declared window and preserves separate helper
+bodies. Entry drainage remains a reviewer assertion. The decompiler can inline
+helper effects while the scheduler carries pending loads/stores through real caller
+packets. See [closed-call contracts](closed-call-traces.md#normal-decompiler-activation)
+for shared-entry rules, stale-source refusals and regression commands.
+
 ## Explicit limits
 
 Unsupported timing contracts fail closed. These include changing repeated DP source
 reads, nested/predicated loop reloads (SPKERNELR/SPMASKR), loop interrupt entry/restart
-in this compiler, calls, unresolved register transfers other than a captured B3 return,
-special control-register side effects, and unproved dynamic control-flow scopes. No
+in this compiler, unplanned or nested calls, unproved register transfers and return
+links, special control-register side effects, and unproved dynamic control-flow scopes. No
 whole-ISA pipeline-completeness claim is made. Raw instruction decode remains available
 for unsupported functions. Other function ownership and defined data are never absorbed
 into a schedule. Schedules beyond 4096 states or one million p-code operations are
@@ -321,9 +341,10 @@ can carry captured STW E3 tails through an explicit immutable caller window. It 
 the endpoint and remaining E1 hazard set. It cannot be enabled as a callee-only
 schedule; the ordinary pending-return refusal remains intact.
 
-The [closed direct-call API](closed-call-traces.md) additionally proves one planned
-call/link/return across explicit caller and callee windows. It carries the existing
-pending effects through each boundary and remains read-only. Run both trace families and
+The [closed-call API](closed-call-traces.md) additionally proves planned
+call/link/return edges across explicit caller and callee windows. Compilation is
+read-only; complete caller traces can be explicitly activated for normal decompilation
+with `enableClosedCalls`. Pending effects cross each boundary. Run both trace families and
 the packet regressions with `python3 tools/verify.py --with-ti --jobs 2`; see
 [verification](verification.md#reproducing-release-verification) for prerequisites.
 

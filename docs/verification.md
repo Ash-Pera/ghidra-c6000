@@ -55,7 +55,7 @@ seconds). Individual native decompiler checks retain their 15- or 30-second limi
 |---|---|
 | Decode and operands | Smoke decode, compact headers and operands, memory forms, comparison destinations and full32 encoding identity. |
 | Native flow | Return delays and refusal safety, CALLP companions, direct and predicated branches, delayed calls, target references and switch ownership. |
-| Exact packet schedules | Parallel input capture, pending branches, SP/DP writeback and flags, software loops, counters, ROTL, MPYLI, load aliases and closed direct calls. |
+| Exact packet schedules | Parallel input capture, pending branches, SP/DP writeback and flags, software loops, counters, ROTL, MPYLI, load aliases, closed calls and source-bound native decompilation across separate owners. |
 | Floating point | Exact SP selection and rational SP/DP arithmetic expectations, including aliases, predication and rounding modes. |
 | Additional TI fixtures | Predicate proofs, caller-continuation contracts, post-loop dispatch and missed-stall refusals. |
 

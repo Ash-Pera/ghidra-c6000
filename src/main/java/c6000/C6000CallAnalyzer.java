@@ -158,6 +158,24 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			}
 			if (!known) recovered++;
 		}
+		// Direct B calls the decoder already classified (not reclassified above):
+		// a returning B call's return point is the instruction after its delay
+		// slots run (SPRUFE8B 3.5, 4.2.6). The decoder records that as the
+		// branch's fall-through but never disassembles it, so the window and
+		// everything past the return stayed undecoded.
+		InstructionIterator directCalls = listing.getInstructions(scan, true);
+		while (directCalls.hasNext()) {
+			monitor.checkCancelled();
+			Instruction branch = directCalls.next();
+			if (!branch.getFlowType().isCall()) continue;
+			String op = baseName(branch);
+			if ((!op.equals("B.S1") && !op.equals("B.S2")) || branch.getRegister(0) != null) continue;
+			Address ret = branch.getFallThrough();
+			if (ret == null || listing.getInstructionAt(ret) != null) continue;
+			disassembler.disassemble(ret, null, true);
+			Function caller = listing.getFunctionContaining(branch.getAddress());
+			if (caller != null) callers.add(caller);
+		}
 		// A body computed while the B was a jump stops at it or swallows the callee.
 		for (Function caller : callers) {
 			monitor.checkCancelled();

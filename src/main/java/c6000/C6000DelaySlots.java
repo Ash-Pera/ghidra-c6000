@@ -73,7 +73,9 @@ public final class C6000DelaySlots {
             // register return gets one only when it preempts a continued jump.
             boolean displacement = ins.getRegister(0) == null;
             boolean tail = override == FlowOverride.CALL_RETURN && !full.startsWith("[") && !name.startsWith("CALLP");
-            if (full.startsWith("[") && !displacement && override != FlowOverride.CALL && !cuts.containsKey(ins.getAddress())) {
+            // Predicated register B: a call, a cut return, or no override (analysis-dev3; gate 0x200).
+            if (full.startsWith("[") && !displacement && override != FlowOverride.CALL &&
+                    override != FlowOverride.NONE && !cuts.containsKey(ins.getAddress())) {
                 // Only a cut gives a predicated return a window: without one this pass, it is stale.
                 if (preemptingTransfer(ins) && ins.getPrototype().getDelaySlotByteCount() > parallelBytes(program, ins.getAddress()))
                     stale.add(ins.getAddress());

@@ -283,6 +283,9 @@ public final class C6000DelaySlots {
                         var other=program.getFunctionManager().getFunctionContaining(next.getAddress());
                         if(other!=null&&!other.equals(owner))return null;
                         if(program.getFunctionManager().getFunctionAt(next.getAddress())!=null)return null;
+                        // A slot that is also a jump target from outside the window cannot be one instruction in both roles.
+                        for(var r:program.getReferenceManager().getReferencesTo(next.getAddress()))
+                            if(r.getReferenceType().isFlow()&&(r.getFromAddress().compareTo(issue.getAddress())<0||r.getFromAddress().compareTo(next.getAddress())>=0))return null;
                         if(C6000ExecutionPackets.startsMulticycleNop(next)) {
                             if(nopGenerator!=null&&!C6000ExecutionPackets.sameMulticycleNop(nopGenerator,next))return null;
                             nopGenerator=next;

@@ -48,6 +48,10 @@ public final class C6000PipelineCompiler {
     /** cycleStarts marker for a contracted idle advance; never a memory address. */
     public static final long POST_RETURN_IDLE_PC=-2L;
     private StoreTailContract storeTailContract;
+    // Local (gate model, exactcheck SPEC.md): a direct call drains in-flight writes, CALLs, and resumes at the proved B3 link.
+    private record OpaqueCall(long site,long target,Long continuation,boolean ret) {} // continuation null: tail call
+    private final Map<Long,OpaqueCall> opaqueCalls=new HashMap<>(); // keyed by an idle marker pc, never a memory address
+    private static final long LINK_CONST=-0x1000L; // ReturnFlow key: B3's exact constant on this path
     private final List<StoreTailBoundary> storeTailBoundaries=new ArrayList<>();
 
     public StoreTailResult compileStoreTail(StoreTailContract contract)throws Exception {
@@ -1001,6 +1005,7 @@ public final class C6000PipelineCompiler {
                 if(!s.flights().isEmpty()||!s.branches().isEmpty()||s.loop()!=null)throw fail("store-tail endpoint still has pending effects");
                 b.jump(PcodeOp.BRANCH,"exit",null);continue;
             }
+            if(s.idle()==0&&opaqueCalls.containsKey(s.pc())){emitOpaqueCall(s,opaqueCalls.get(s.pc()));continue;}
             if(closedCall!=null&&closedCall.stopPc()!=null&&s.pc()==closedCall.stopPc()&&s.idle()==0){closeClosedTrace(s);continue;}
             if(closedCall!=null&&s.idle()==0&&!closedPackets.contains(s.pc()))throw fail("closed-call entered undeclared packet");
             if(traceContract!=null&&s.pc()==traceContract.stopPc()&&s.idle()==0){closeTrace(s);continue;}
@@ -1211,6 +1216,10 @@ public final class C6000PipelineCompiler {
                     }
                     else if(traceContract!=null)nextPc=continueReturn(landing,nextFlights,nextBranches,issueBranch,loop);
                     else if(storeTailContract!=null){storeTailReturn(s,landing,nextFlights,nextBranches,issueBranch,loop,hazards);continue;}
+                    else if(ordinarySchedule()&&!nextFlights.isEmpty()&&nextBranches.isEmpty()&&issueBranch==null&&loop==null){
+                        nextPc=drainedReturn(landing);
+                        for(var flight:nextFlights)idle=Math.max(idle,decode(flight.pc()).latency()-flight.age());
+                    }
                     else {
                         if(!nextFlights.isEmpty()||!nextBranches.isEmpty()||issueBranch!=null)throw fail("return leaves architectural pipeline effects pending; source="+s+"; next="+nextFlights);
                         if(closedCall!=null){if(!Objects.equals(landing.pc(),closedCall.callerReturnPc()))throw fail("closed-call undeclared return");closedBoundary("CALLER_RETURN",landing,nextFlights,hazards,closedCall);var writes=closedHazards(hazards);if(closedExitWrites!=null&&!closedExitWrites.equals(writes))throw fail("closed-call incompatible return hazards");closedExitWrites=writes;}
@@ -1218,6 +1227,9 @@ public final class C6000PipelineCompiler {
                         if(loop!=null){var tsr=program.getRegister("TSR");b.op(PcodeOp.INT_AND,new Varnode(tsr.getAddress(),4),new Varnode(tsr.getAddress(),4),c(0xffffbfffL,4));}
                         b.jump(PcodeOp.BRANCH,"exit",null);continue;
                     }
+                } else if(opaqueLanding(s,landing)){
+                    nextPc=opaqueCall(landing,returnFlow,nextFlights,nextBranches,issueBranch,loop);
+                    for(var flight:nextFlights)idle=Math.max(idle,decode(flight.pc()).latency()-flight.age());
                 } else {
                     var plan=closedCalls.get(landing.pc());boolean call=plan!=null||decode(landing.pc()).name().equals("CALLP");
                     if(call){
@@ -1312,6 +1324,56 @@ public final class C6000PipelineCompiler {
         emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);
     }
 
+    /** Local, opt-in (-Dc6000.opaqueCalls=true): the exactcheck gate's ABI model, not an upstream contract. */
+    private boolean ordinarySchedule(){return Boolean.getBoolean("c6000.opaqueCalls")&&traceContract==null&&closedCall==null&&callerTail==null&&storeTailContract==null;}
+    private long linkOffset(){return program.getRegister("B3").getAddress().getOffset();}
+    private boolean writesLinkAt(Insn instruction,int phase){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()==phase&&d.offset()<b3+4&&b3<d.offset()+d.size());}
+    private boolean writesLink(Insn instruction,int after){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()>after&&d.offset()<b3+4&&b3<d.offset()+d.size());}
+    private boolean opaqueLanding(State s,Branch landing)throws Exception {
+        if(!ordinarySchedule()||s.returns().activeCall()!=NO_CALL||closedCalls.containsKey(landing.pc())||decode(landing.pc()).name().equals("CALLP"))return false;
+        var callee=program.getFunctionManager().getFunctionAt(entry.getNewAddress(landing.target()));
+        return callee!=null&&!callee.equals(function);
+    }
+    /** B3 after an unpredicated E1 constant write; null when not exact. */
+    private Long linkConstant(Insn instruction,Long old){
+        if(!Set.of("MVK","MVKL","MVKH","ADDKPC").contains(instruction.name())||instruction.predicate()!=null)return null;
+        var code=new ArrayList<PcodeOp>();if(old!=null)code.add(new PcodeOp(entry,0,PcodeOp.COPY,new Varnode[]{c(old,4)},arch(linkOffset(),4)));
+        code.addAll(Arrays.asList(instruction.raw()));
+        Long value=C6000LoopCounterProof.constantOutput(program.getLanguage(),code.toArray(PcodeOp[]::new),linkOffset(),4);
+        return value==null?null:value&0xffffffffL;
+    }
+    private long opaqueCall(Branch landing,ReturnFlow flow,List<Flight> flights,List<Branch> branches,Insn issued,LoopPlan loop)throws Exception {
+        if(loop!=null||!branches.isEmpty()||issued!=null)throw fail("opaque call has unresolved control effects");
+        Long link=flow.links().get(LINK_CONST);
+        if(link!=null)for(var flight:flights)if(writesLink(decode(flight.pc()),flight.age()))throw fail("opaque call link has a pending writer");
+        if(link==null){
+            var listed=program.getListing().getInstructionAt(entry.getNewAddress(landing.pc()));
+            boolean tail=(Objects.equals(flow.links().get(linkOffset()),ENTRY_LINK)||listed!=null&&listed.getFlowOverride()==ghidra.program.model.listing.FlowOverride.CALL_RETURN);
+            if(!tail)throw fail("opaque call lacks an exact B3 link proof at "+entry.getNewAddress(landing.pc()));
+        }
+        long marker=-0x100000000L-landing.pc();
+        opaqueCalls.put(marker,new OpaqueCall(landing.pc(),landing.target(),link,false));
+        return marker;
+    }
+    /** Local (gate model): a return lands after its in-flight writes drain. */
+    private long drainedReturn(Branch landing){
+        long marker=-0x100000000L-landing.pc();
+        opaqueCalls.put(marker,new OpaqueCall(landing.pc(),0,null,true));
+        b.op(PcodeOp.COPY,slot("opaque_return",landing.pc(),0,0,4),slot("target",landing.pc(),landing.age(),0,4));
+        return marker;
+    }
+    private void emitOpaqueCall(State s,OpaqueCall call){
+        if(!s.flights().isEmpty()||!s.branches().isEmpty()||s.loop()!=null)throw fail("opaque call still has pending effects");
+        if(call.ret()){b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),slot("opaque_return",call.site(),0,0,4));b.jump(PcodeOp.BRANCH,"exit",null);return;}
+        if(call.continuation()==null)b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),arch(linkOffset(),4));
+        b.op(PcodeOp.CALL,null,new Varnode(entry.getNewAddress(call.target()),4));
+        if(call.continuation()==null){b.jump(PcodeOp.BRANCH,"exit",null);return;}
+        // Callee-saved registers keep their link roles; B3 now holds this continuation.
+        var kept=new HashMap<Long,Long>();
+        for(var link:s.returns().links().entrySet()){if(link.getKey()<0)continue;var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(link.getKey()),4);if(register!=null&&register.getName().matches("[AB]1[0-5]"))kept.put(link.getKey(),link.getValue());}
+        kept.put(LINK_CONST,call.continuation());
+        b.jump(PcodeOp.BRANCH,"node"+state(new State(call.continuation(),0,List.of(),List.of(),List.of(),null,PredicateFacts.unknown().canonical(),new ReturnFlow(NO_CALL,Map.copyOf(kept)))),null);
+    }
     private long callpContinuation(Insn call){
         var link=callLinkRegister(call);Long value=C6000LoopCounterProof.constantOutput(program.getLanguage(),call.raw(),link.getAddress().getOffset(),4);
         if(value==null)throw fail("CALLP lacks exact E1 link proof");return value&0xffffffffL;
@@ -1322,6 +1384,11 @@ public final class C6000PipelineCompiler {
         for(var instruction:pack){int truth=predicateTruth(instruction,source.facts());if(truth==0)continue;var copied=copiedSource(instruction);Long origin=copied==null?null:before.get(copied.getAddress().getOffset());if(instruction.name().equals("CALLP"))origin=instruction.instruction().getAddress().getOffset();
             for(var d:instruction.outputs())if(d.phase()==1){Long value=d.size()==4&&d.mask()==-1&&d.sourceWrite()<0?origin:null;if(truth<0&&!Objects.equals(before.get(d.offset()),value))value=null;forgetReturnOutput(after,written,d,value,true);}
         }
+        // Local: B3's exact constant on this path, for the opaque-call link.
+        Long link=before.get(LINK_CONST);
+        for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesLinkAt(decodeKnown(flight.pc()),flight.age()+1))link=null;
+        for(var instruction:pack){int truth=predicateTruth(instruction,source.facts());if(truth!=0&&writesLinkAt(instruction,1))link=truth<0?null:linkConstant(instruction,link);}
+        if(link==null)after.remove(LINK_CONST);else after.put(LINK_CONST,link);
         return new ReturnFlow(source.returns().activeCall(),Map.copyOf(after));
     }
     private void forgetReturnOutput(Map<Long,Long> links,Set<Long> written,Dest output,Long value,boolean exact){

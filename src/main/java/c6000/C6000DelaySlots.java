@@ -64,7 +64,8 @@ public final class C6000DelaySlots {
             // ponytail: register forms stay unpredicated, non-call only until tested.
             boolean displacement = ins.getRegister(0) == null;
             boolean tail = override == FlowOverride.CALL_RETURN && !full.startsWith("[") && !name.startsWith("CALLP");
-            if (full.startsWith("[") && !displacement) continue;
+            // Predicated register B with no override keeps its window, as on analysis-dev3 (local; gate 0x200).
+            if (full.startsWith("[") && !displacement && override != FlowOverride.NONE) continue;
             if (override != FlowOverride.NONE && override != FlowOverride.RETURN &&
                     !(override == FlowOverride.CALL && displacement) && !tail) continue;
             candidates.add(ins.getAddress());

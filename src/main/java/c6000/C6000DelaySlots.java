@@ -68,7 +68,9 @@ public final class C6000DelaySlots {
             // register call gets its window too (SPRUFE8B 4.2.6, B).
             boolean displacement = ins.getRegister(0) == null;
             boolean tail = override == FlowOverride.CALL_RETURN && !full.startsWith("[") && !name.startsWith("CALLP");
-            if (full.startsWith("[") && !displacement && override != FlowOverride.CALL) continue;
+            // Predicated register B: no override (analysis-dev3; gate 0x200) or a call.
+            if (full.startsWith("[") && !displacement && override != FlowOverride.NONE &&
+                    override != FlowOverride.CALL) continue;
             if (override != FlowOverride.NONE && override != FlowOverride.RETURN &&
                     override != FlowOverride.CALL && !tail) continue;
             candidates.add(ins.getAddress());

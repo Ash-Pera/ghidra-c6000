@@ -52,6 +52,7 @@ CORE = [
     case("link-copy-return", "LinkCopyReturn", "C6000_LINK_COPY_RETURN_OK", None, analysis=True),
     case("wide-call-window", "WideCallWindow", "C6000_WIDE_CALL_WINDOW_OK", None, analysis=True),
     case("b3-call", "B3Call", "C6000_B3_CALL_OK", None, analysis=True),
+    case("preempted-jump", "PreemptedJump", "C6000_PREEMPTED_JUMP_OK", None, analysis=True),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
     ("jump-table", [], [("JumpTable", [], "C6000_JUMP_TABLE_OK"),
                         ("SwitchOwnership", [], "C6000_SWITCH_OWNERSHIP_OK")], True),
@@ -296,6 +297,8 @@ def main():
                     command += ["-preScript", "C6000WideCallWindowTest.java", "prepare"]
                 elif fixture == "b3-call":
                     command += ["-preScript", "C6000B3CallTest.java", "prepare"]
+                elif fixture == "preempted-jump":
+                    command += ["-preScript", "C6000PreemptedJumpTest.java", "prepare"]
                 elif fixture not in ELF:
                     command += ["-preScript", "C6000SetEntry.java", "1000"]
                 for script, script_args, _ in scripts:

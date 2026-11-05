@@ -222,6 +222,21 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	}
 
 	/**
+	 * A jump whose target only idles until a return or call issued in its
+	 * delay window lands: the compiler's jump into a shared epilogue's NOP tail
+	 * (SPRUFE8B 3.5, 4.2.6 B; 3.12 NOP: a landing branch ends a multicycle NOP).
+	 * Taken, the jump changes nothing but which NOPs fill the transfer's last
+	 * {@code cycle} delay cycles. {@code windowEnd} is the jump's last delay
+	 * byte, {@code landing} the address just past those NOPs at the target, and
+	 * {@code exact} whether a transfer window cut at {@code windowEnd} is its
+	 * window on every path: the transfer is taken only with the jump, or the
+	 * straight-line code it would otherwise run is NOPs too.
+	 */
+	record Preemption(Instruction jump, Instruction transfer, int cycle, Address windowEnd,
+			Address landing, boolean exact) {
+	}
+
+	/**
 	 * Walks the instructions around a branch, decoding bytes that the
 	 * listing does not yet hold, and tracks MVK/MVKH/ADDKPC constants.
 	 */
@@ -250,6 +265,11 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			if (via != null) path = via;
 			List<Instruction> slots = window(branch);
 			if (slots == null) return null;
+			// Issued in a jump's window whose target only idles: its window ends where the jump lands.
+			// Unconditional only: one fall-through cannot also hold a predicated call's not-taken path.
+			Preemption preempts = branch.getLength() == 4 && predicate(branch) == null ? preempting(branch) : null;
+			if (preempts != null && !preempts.exact()) preempts = null;
+			int delay = preempts == null ? DELAY_CYCLES : DELAY_CYCLES - preempts.cycle();
 			List<Instruction> execution = new ArrayList<>(path);
 			int branchIndex = execution.size();
 			execution.add(branch);
@@ -304,7 +324,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			boolean compact = branch.getLength() != 4;
 			boolean branchPacket = true;
 			try {
-				window: while (cycles < DELAY_CYCLES) {
+				window: while (branchPacket || cycles < delay) {
 					int packetCycles = 1;
 					do {
 						if (branchPacket && !parallelWithNext(current)) break;
@@ -341,15 +361,20 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			// (MPYI lands in E9), supersedes an earlier E1 link even after the
 			// callee is entered.
 			trace.before(Integer.MAX_VALUE);
-			if (partner != null && jumpArm(branch, partner)) return null;
 			long[] ret = regs.get(b3);
+			Address callee = target == null ? null :
+				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
+			if (callee != null && !program.getMemory().contains(callee)) callee = null;
+			if (preempts != null) {
+				// A link just past the landing NOPs is this arm's own: a call whatever the other arm is.
+				return ret != null && ret[1] == FULL && ret[0] == preempts.landing().getOffset() &&
+					current.getMaxAddress().equals(preempts.windowEnd()) ? new Call(callee, preempts.landing()) : null;
+			}
+			if (partner != null && jumpArm(branch, partner)) return null;
 			// B3 may also be set on the look-back path.
 			if (ret == null || ret[1] != FULL) return null;
 			long branchAt = branch.getMinAddress().getOffset();
 			long windowEnd = current.getMaxAddress().getOffset() + 1;
-			Address callee = target == null ? null :
-				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
-			if (callee != null && !program.getMemory().contains(callee)) callee = null;
 			if (ret[0] < branchAt) {
 				// One fall-through cannot hold a predicated call's not-taken path.
 				Address loop = partner == null && predicate(branch) == null &&
@@ -362,6 +387,131 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			if (ret[0] != windowEnd && !(compact && ret[0] <= windowEnd + 8) &&
 				!(headerAtEnd && ret[0] == windowEnd + 4) && ret[0] != partnerEnd) return null;
 			return new Call(callee, null);
+		}
+
+		/** A displacement B that Ghidra types as a jump; its target is the encoded one. */
+		static boolean displacementJump(Instruction insn) {
+			String op = baseName(insn);
+			var flow = insn.getFlowType();
+			return (op.equals("B.S1") || op.equals("B.S2")) && insn.getLength() == 4 &&
+				insn.getRegister(0) == null && !insn.isInDelaySlot() &&
+				insn.getFlowOverride() == FlowOverride.NONE && flow.isJump() && !flow.isCall() &&
+				!flow.isTerminal() && insn.getDefaultFlows().length == 1;
+		}
+
+		/** Any branch: a transfer in flight decides where execution continues. */
+		private static boolean transfer(Instruction insn) {
+			String op = baseName(insn);
+			return isFlow(insn) || op.startsWith("B.") || op.startsWith("BNOP.") || op.startsWith("CALLP.");
+		}
+
+		/**
+		 * The transfer that preempts {@code jump}, or null. Every other transfer
+		 * in the window must be the opposite arm, not taken with the jump.
+		 */
+		Preemption preemption(Instruction jump) {
+			if (!displacementJump(jump)) return null;
+			Address target = jump.getDefaultFlows()[0];
+			try {
+				for (Address at : C6000ExecutionPackets.issuePrefix(program, jump.getMinAddress())) {
+					Instruction prior = decode(at);
+					if (prior == null || prior.getLength() != 4 || transfer(prior)) return null;
+				}
+			}
+			catch (MemoryAccessException e) {
+				return null;
+			}
+			List<Instruction> slots = window(jump);
+			if (slots == null || slots.isEmpty()) return null;
+			for (Instruction slot : slots) if (slot.getLength() != 4) return null;
+			List<Instruction> execution = new ArrayList<>(lookBack(jump));
+			int at = execution.size();
+			execution.add(jump);
+			execution.addAll(slots);
+			int[] issue = issueCycles(execution);
+			String guard = predicate(jump);
+			int found = -1;
+			for (int i = at + 1; i < execution.size(); i++) {
+				Instruction slot = execution.get(i);
+				// A NOP generator in the jump's own packet already spends delay cycles.
+				if (issue[i] == issue[at] && extraCycles(program, slot) > 0) return null;
+				if (!transfer(slot)) continue;
+				if (issue[i] == issue[at]) return null;
+				if (complementary(jump, slot) && stable(execution, i, at, guard, true)) continue;
+				if (found >= 0) return null;
+				found = i;
+			}
+			if (found < 0) return null;
+			Instruction transfer = execution.get(found);
+			String op = baseName(transfer);
+			if (!op.equals("B.S1") && !op.equals("B.S2")) return null;
+			int cycle = issue[found] - issue[at];
+			if (cycle < 1 || cycle > DELAY_CYCLES) return null;
+			// Taken with the jump: unconditional, or under the jump's own stable predicate.
+			String own = predicate(transfer);
+			boolean exclusive;
+			if (own == null) exclusive = guard == null;
+			else if (own.equals(guard) && stable(execution, found, at, guard, true)) exclusive = true;
+			else return null;
+			int end = execution.size() - 1;
+			Address windowEnd = execution.get(end).getMaxAddress();
+			if (target.compareTo(jump.getMinAddress()) >= 0 && target.compareTo(windowEnd) <= 0) return null;
+			Address landing = idle(decode(target), cycle);
+			if (landing == null) return null;
+			// Not taken, the transfer's last cycles run straight on: the rest
+			// of a multicycle NOP that outlasts the jump's window, then what follows.
+			int span = 1;
+			for (int i = end; i > at && issue[i] == issue[end]; i--) {
+				span = Math.max(span, 1 + extraCycles(program, execution.get(i)));
+			}
+			int beyond = issue[end] + span - 1 - (issue[at] + DELAY_CYCLES);
+			boolean idleAfter = beyond >= cycle || idle(next(execution.get(end)), cycle - Math.max(0, beyond)) != null;
+			return new Preemption(jump, transfer, cycle, windowEnd, landing, exclusive || idleAfter);
+		}
+
+		/** The address after {@code cycles} cycles of NOP-only execute packets from {@code start}, else null. */
+		private Address idle(Instruction start, int cycles) {
+			Instruction current = start;
+			try {
+				while (current != null) {
+					int span = 1;
+					while (true) {
+						if (current.getLength() != 4 || !baseName(current).equals("NOP")) return null;
+						span = Math.max(span, 1 + extraCycles(program, current));
+						if (!parallelWithNext(current)) break;
+						current = next(current);
+						if (current == null) return null;
+					}
+					cycles -= span;
+					if (cycles <= 0) return current.getMaxAddress().next();
+					current = next(current);
+				}
+			}
+			catch (MemoryAccessException e) {
+				return null;
+			}
+			return null;
+		}
+
+		/**
+		 * The preemption whose transfer is {@code transfer}, from a decoded jump
+		 * before it; the code between may still be undecoded.
+		 */
+		Preemption preempting(Instruction transfer) {
+			Address at = transfer.getMinAddress();
+			for (int i = 1; i <= MAX_WINDOW && at.getOffset() >= 4L * i; i++) {
+				Instruction jump = listing.getInstructionAt(at.subtract(4L * i));
+				if (jump == null || !displacementJump(jump)) continue;
+				Preemption found = preemption(jump);
+				if (found != null && found.transfer().getMinAddress().equals(at)) return found;
+			}
+			return null;
+		}
+
+		/** Whether {@code transfer} is a call whose link is just past the landing NOPs. */
+		boolean callsPastLanding(Instruction transfer, Preemption preemption) {
+			Call call = recognize(transfer);
+			return call != null && preemption.landing().equals(call.returnTo());
 		}
 
 		/**

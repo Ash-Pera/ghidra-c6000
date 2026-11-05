@@ -236,6 +236,9 @@ not prove entry drainage. Reviewed activation also requires function ownership o
 covered code. Covered code outside the body is accepted only when no function owns it
 and it continues the body straight-line: the delay slots of a nested or entered window
 that native recovery refused. The source hash pins it as unowned and enable absorbs it.
+Absorbing changes the ownership and body that every other binding over the same fetch
+packets pins, so it is refused when a recorded schedule reads those packets, and the
+report refuses it when another schedule in the same batch does.
 Repair/review other incomplete bodies separately.
 
 After reviewing the report, pass its SHA-256 with an explicit action:

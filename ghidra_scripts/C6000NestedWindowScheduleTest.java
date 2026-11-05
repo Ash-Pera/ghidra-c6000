@@ -14,8 +14,8 @@ import java.util.List;
 import java.util.Set;
 
 public class C6000NestedWindowScheduleTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x10c0L, 0x1000L, 0x1040L, 0x1080L, 0x10e0L };
-	private static final String[] NAMES = { "callee", "retjump", "ifcall", "ifcall2", "ifcall3" };
+	private static final long[] ENTRIES = { 0x10c0L, 0x1000L, 0x1040L, 0x1080L, 0x10e0L, 0x1120L, 0x112cL };
+	private static final String[] NAMES = { "callee", "retjump", "ifcall", "ifcall2", "ifcall3", "neighbour", "absorber" };
 	private int checks;
 
 	interface Action { void run() throws Exception; }

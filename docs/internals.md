@@ -105,7 +105,13 @@ explicit fallthrough overrides. Nested transfers, defined data and conflicting f
 ownership prevent recovery. Predicated displacement `B`/`BNOP` and displacement and register `B`
 calls, predicated or not, are recovered, and so is a `CALL_RETURN` tail call when nothing in
 its packet or window writes B3 except a load and the delayed-call proof finds no return
-address in B3; a call's fallthrough moves to the next execute packet after its window. Register-target predicated branches that are not calls, and
+address in B3; a call's fallthrough moves to the next execute packet after its window.
+A jump whose target is only NOPs that fill the remaining delay cycles of a return (or an unconditional call returning just past them)
+issued in the jump's window, taken whenever the jump is, is continued: a
+`JUMP_OVERRIDE_UNCONDITIONAL` reference sends its branch to its own fall-through and the
+edge to the NOPs is dropped, so no jump enters the delay slots of the return that owns them.
+The preempting transfer's window ends where the jump lands when that holds on every path.
+Register-target predicated branches that are not calls, and
 BDEC/BPOS, retain conservative native treatment. Exact scheduling handles its own
 supported branch phases.
 

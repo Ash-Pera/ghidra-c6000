@@ -427,7 +427,12 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			}
 			List<Instruction> slots = window(jump);
 			if (slots == null || slots.isEmpty()) return null;
-			for (Instruction slot : slots) if (slot.getLength() != 4) return null;
+			for (Instruction slot : slots) {
+				String name = baseName(slot);
+				// Unbounded or loop-buffer timing: no cycle count to compare.
+				if (slot.getLength() != 4 || name.equals("IDLE") || name.startsWith("SPLOOP") || name.startsWith("SPKERNEL") ||
+					name.startsWith("SPMASK") || name.equals("SWE") || name.equals("SWENR")) return null;
+			}
 			List<Instruction> execution = new ArrayList<>(lookBack(jump));
 			int at = execution.size();
 			execution.add(jump);

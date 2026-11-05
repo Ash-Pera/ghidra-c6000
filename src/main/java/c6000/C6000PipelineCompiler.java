@@ -1288,7 +1288,7 @@ public final class C6000PipelineCompiler {
         if(issueBranch==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,source.facts());return;}
         var instruction=issueBranch.instruction();long at=instruction.getAddress().getOffset();var register=instruction.getRegister(0);var plan=closedCalls.get(at);boolean call=plan!=null||issueBranch.name().equals("CALLP");
         Long origin=register==null?null:source.returns().links().get(register.getAddress().getOffset());
-        boolean returns=!call&&register!=null&&(source.returns().activeCall()!=NO_CALL?origin!=null&&origin==source.returns().activeCall():origin!=null&&origin==ENTRY_LINK||register.getName().equals("B3"));
+        boolean returns=!call&&register!=null&&(source.returns().activeCall()!=NO_CALL?origin!=null&&origin==source.returns().activeCall():origin!=null&&origin==ENTRY_LINK||register.getName().equals("B3")&&!nativeCall(instruction));
         if(closedCall!=null&&!call&&register!=null){var active=closedCalls.get(source.returns().activeCall());if(active!=null&&at!=active.calleeReturnPc()||active==null&&!Objects.equals(at,closedCall.callerReturnPc()))throw fail("closed-call undeclared register edge");}
         if(register!=null&&!returns&&!call)throw fail("unresolved register branch "+instruction);
         long target=plan!=null?plan.callee().start():returns?0:instruction.getAddress(0).getOffset();
@@ -1321,6 +1321,9 @@ public final class C6000PipelineCompiler {
     /** Local, opt-in (-Dc6000.opaqueCalls=true): the exactcheck gate's ABI model, not an upstream contract. */
     private boolean ordinarySchedule(){return Boolean.getBoolean("c6000.opaqueCalls")&&traceContract==null&&closedCall==null&&callerTail==null&&storeTailContract==null;}
     private long linkOffset(){return program.getRegister("B3").getAddress().getOffset();}
+
+    /** A B B3 the native analysis made a call (B3 set to its return point in the slots, upstream #39). */
+    private boolean nativeCall(Instruction instruction){var listed=program.getListing().getInstructionAt(instruction.getAddress());return listed!=null&&listed.getFlowOverride()==FlowOverride.CALL;}
     private boolean writesLinkAt(Insn instruction,int phase){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()==phase&&d.offset()<b3+4&&b3<d.offset()+d.size());}
     private boolean writesLink(Insn instruction,int after){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()>after&&d.offset()<b3+4&&b3<d.offset()+d.size());}
     private boolean opaqueLanding(State s,Branch landing)throws Exception {

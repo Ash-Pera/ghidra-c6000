@@ -102,9 +102,9 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			monitor.checkCancelled();
 			Instruction branch = instructions.next();
 			String op = baseName(branch);
+			// B B3 too: its slots can set B3 to the return point, a call (upstream #39).
 			if ((op.equals("B.S1") || op.equals("B.S2")) &&
-				(reclassifiable(program, branch) || missingTarget(branch)) &&
-				!"B3".equals(branch.getDefaultOperandRepresentation(0))) {
+				(reclassifiable(program, branch) || missingTarget(branch))) {
 				branches.add(branch.getAddress());
 			}
 		}

@@ -1334,10 +1334,12 @@ public final class C6000PipelineCompiler {
         var callee=program.getFunctionManager().getFunctionAt(entry.getNewAddress(landing.target()));
         return callee!=null&&!callee.equals(function);
     }
-    /** B3 after an unpredicated E1 constant write; null when not exact. */
-    private Long linkConstant(Insn instruction,Long old){
-        if(!Set.of("MVK","MVKL","MVKH","ADDKPC").contains(instruction.name())||instruction.predicate()!=null)return null;
+    /** B3 after an E1 constant write whose predicate is true on this path (truth 1); null when not exact. */
+    private Long linkConstant(Insn instruction,Long old,int truth){
+        if(!Set.of("MVK","MVKL","MVKH","ADDKPC").contains(instruction.name())||instruction.predicate()!=null&&truth!=1)return null;
         var code=new ArrayList<PcodeOp>();if(old!=null)code.add(new PcodeOp(entry,0,PcodeOp.COPY,new Varnode[]{c(old,4)},arch(linkOffset(),4)));
+        // Local: a predicated MVK/MVKH on its taken fork (the if/else call pair) gets the proven predicate value.
+        if(instruction.predicate()!=null)code.add(new PcodeOp(entry,0,PcodeOp.COPY,new Varnode[]{c(instruction.inverted()?0:1,4)},arch(instruction.predicate().getAddress().getOffset(),4)));
         code.addAll(Arrays.asList(instruction.raw()));
         Long value=C6000LoopCounterProof.constantOutput(program.getLanguage(),code.toArray(PcodeOp[]::new),linkOffset(),4);
         return value==null?null:value&0xffffffffL;
@@ -1384,12 +1386,15 @@ public final class C6000PipelineCompiler {
         for(var instruction:pack){int truth=predicateTruth(instruction,source.facts());if(truth==0)continue;var copied=copiedSource(instruction);Long origin=copied==null?null:before.get(copied.getAddress().getOffset());if(instruction.name().equals("CALLP"))origin=instruction.instruction().getAddress().getOffset();
             for(var d:instruction.outputs())if(d.phase()==1){Long value=d.size()==4&&d.mask()==-1&&d.sourceWrite()<0?origin:null;if(truth<0&&!Objects.equals(before.get(d.offset()),value))value=null;forgetReturnOutput(after,written,d,value,true);}
         }
-        // Local: B3's exact constant on this path, for the opaque-call link.
-        Long link=before.get(LINK_CONST);
+        return withLink(source,pack,source.facts(),new ReturnFlow(source.returns().activeCall(),Map.copyOf(after)));
+    }
+    /** Local: B3's exact constant on this path, for the opaque-call link; facts are one fork's predicate facts. */
+    private ReturnFlow withLink(State source,List<Insn> pack,PredicateFacts facts,ReturnFlow flow){
+        Long link=source.returns().links().get(LINK_CONST);
         for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesLinkAt(decodeKnown(flight.pc()),flight.age()+1))link=null;
-        for(var instruction:pack){int truth=predicateTruth(instruction,source.facts());if(truth!=0&&writesLinkAt(instruction,1))link=truth<0?null:linkConstant(instruction,link);}
-        if(link==null)after.remove(LINK_CONST);else after.put(LINK_CONST,link);
-        return new ReturnFlow(source.returns().activeCall(),Map.copyOf(after));
+        for(var instruction:pack){int truth=predicateTruth(instruction,facts);if(truth!=0&&writesLinkAt(instruction,1))link=truth<0?null:linkConstant(instruction,link,truth);}
+        var after=new HashMap<>(flow.links());if(link==null)after.remove(LINK_CONST);else after.put(LINK_CONST,link);
+        return new ReturnFlow(flow.activeCall(),Map.copyOf(after));
     }
     private void forgetReturnOutput(Map<Long,Long> links,Set<Long> written,Dest output,Long value,boolean exact){
         for(String bank:List.of("A","B"))for(int k=0;k<32;k++){long offset=program.getRegister(bank+k).getAddress().getOffset();if(output.offset()>=offset+4||offset>=output.offset()+output.size())continue;
@@ -1439,6 +1444,7 @@ public final class C6000PipelineCompiler {
     }
     private void emitFactTransfer(State source,ReturnFlow returnFlow,List<Insn> pack,long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,PredicateFacts before){
         var facts=advanceFacts(source,pack,before);
+        if(before!=source.facts())returnFlow=withLink(source,pack,before,returnFlow); // the issue packet's B3 writes on this fork
         List<Flight> captured=new ArrayList<>();for(var flight:flights){var instruction=instructions.get(flight.pc());boolean fresh=flight.age()==1&&pack.contains(instruction);captured.add(new Flight(flight.pc(),flight.age(),fresh?predicateTruth(instruction,before):flight.predicateTruth()));}
         // A backward redirect or buffered time wrap must not turn an entry fact
         // into a loop invariant. Widen to independent unknown values there.

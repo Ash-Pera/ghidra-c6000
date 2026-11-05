@@ -61,13 +61,15 @@ public final class C6000DelaySlots {
             // Issue #34: the SLEIGH captures a predicate and target before the
             // slots, so predicated and delayed-call displacement branches are
             // lifted correctly once their window is proven.
-            // ponytail: register forms stay unpredicated, non-call only until tested.
+            // The register form also captures predicate and target first, so a
+            // register call gets its window too (SPRUFE8B 4.2.6, B).
             boolean displacement = ins.getRegister(0) == null;
             boolean tail = override == FlowOverride.CALL_RETURN && !full.startsWith("[") && !name.startsWith("CALLP");
-            // Predicated register B with no override keeps its window, as on analysis-dev3 (local; gate 0x200).
-            if (full.startsWith("[") && !displacement && override != FlowOverride.NONE) continue;
+            // Predicated register B: no override (analysis-dev3; gate 0x200) or a call.
+            if (full.startsWith("[") && !displacement && override != FlowOverride.NONE &&
+                    override != FlowOverride.CALL) continue;
             if (override != FlowOverride.NONE && override != FlowOverride.RETURN &&
-                    !(override == FlowOverride.CALL && displacement) && !tail) continue;
+                    override != FlowOverride.CALL && !tail) continue;
             candidates.add(ins.getAddress());
         }
         List<Repair> result = new ArrayList<>();
@@ -113,14 +115,25 @@ public final class C6000DelaySlots {
             // proven next execute-packet address.
             Instruction now = program.getListing().getInstructionAt(at);
             boolean generic = now.getFlowType().hasFallthrough() && !now.isFallThroughOverridden();
-            if ((delayedCall || generic) && !window.end().next().equals(now.getFallThrough())) {
-                now.setFallThrough(window.end().next());
+            Address resume = resume(program, window.end());
+            if ((delayedCall || generic) && !resume.equals(now.getFallThrough())) {
+                now.setFallThrough(resume);
                 if(nativeReady)result.add(new Repair(at.toString(),window.end().toString(),bytes,
                     branch.getDelaySlotDepth(),branch.getDelaySlotDepth(),0));
             }
         }
         if (!result.isEmpty()) log.appendMsg("C6000 Delay Slots", "recovered " + result.size() + " proven window(s)");
         return result;
+    }
+
+    /** The next execute packet after a window ending at end: past a fetch-packet header (SPRUFE8B 3.10.2). */
+    private static Address resume(Program program, Address end) {
+        Address next = end.next();
+        try {
+            if ((next.getOffset() & 31) == 28 && (program.getMemory().getInt(next) >>> 28) == 0xe) return next.add(4);
+        }
+        catch (MemoryAccessException | AddressOutOfBoundsException e) { }
+        return next;
     }
 
     /** Last byte of a branch's proven delay window, or null when it is not proven. */

@@ -48,6 +48,7 @@ CORE = [
     case("call-packet-slots", "CallPacketSlots", "C6000_CALL_PACKET_SLOTS_OK", None, analysis=True),
     case("tail-call-slots", "TailCallSlots", "C6000_TAIL_CALL_SLOTS_OK", None, analysis=True),
     case("idle-call", "IdleCall", "C6000_IDLE_CALL_OK", None, analysis=True),
+    case("register-call", "RegisterCall", "C6000_REGISTER_CALL_OK", None, analysis=True),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
     ("jump-table", [], [("JumpTable", [], "C6000_JUMP_TABLE_OK"),
                         ("SwitchOwnership", [], "C6000_SWITCH_OWNERSHIP_OK")], True),
@@ -279,6 +280,8 @@ def main():
                     command += ["-preScript", "C6000TailCallSlotsTest.java", "prepare"]
                 elif fixture == "idle-call":
                     command += ["-preScript", "C6000IdleCallTest.java", "prepare"]
+                elif fixture == "register-call":
+                    command += ["-preScript", "C6000RegisterCallTest.java", "prepare"]
                 elif fixture not in ELF:
                     command += ["-preScript", "C6000SetEntry.java", "1000"]
                 for script, script_args, _ in scripts:

@@ -3,7 +3,6 @@ package c6000;
 
 import java.math.BigInteger;
 import java.util.*;
-import ghidra.app.cmd.function.CreateFunctionCmd;
 import ghidra.app.util.PseudoDisassembler;
 import ghidra.app.util.importer.MessageLog;
 import ghidra.program.disassemble.Disassembler;
@@ -175,7 +174,6 @@ public final class C6000DelaySlots {
             if (C6000CallAnalyzer.Walker.displacementJump(ins)) jumps.add(ins);
         }
         Disassembler disassembler = null;
-        Set<Function> owners = new HashSet<>();
         int count = 0;
         for (Instruction jump : jumps) {
             monitor.checkCancelled();
@@ -211,10 +209,20 @@ public final class C6000DelaySlots {
             }
             if (!changed) continue;
             count++;
+            // The window runs after the jump on every path: the jump's function owns it.
+            // Extend the body only; recomputing it from flow could absorb a later entry.
             Function owner = program.getFunctionManager().getFunctionContaining(at);
-            if (owner != null) owners.add(owner);
+            var window = new AddressSet(next, preemption.windowEnd());
+            if (owner != null && !owner.getBody().contains(window)) {
+                boolean free = true;
+                for (var it = program.getFunctionManager().getFunctionsOverlapping(window); it.hasNext();)
+                    if (!it.next().equals(owner)) free = false;
+                if (free) {
+                    try { owner.setBody(new AddressSet(owner.getBody()).union(window)); }
+                    catch (ghidra.program.database.function.OverlappingFunctionException e) { }
+                }
+            }
         }
-        for (Function owner : owners) CreateFunctionCmd.fixupFunctionBody(program, owner, monitor);
         return count;
     }
 

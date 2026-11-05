@@ -210,8 +210,8 @@ public final class C6000DelaySlots {
             String[] comments=new String[5];for(int i=0;i<5;i++)comments[i]=listing.getComment(i,cursor);
             saved.add(new SavedInstruction(cursor,ins==null?FlowOverride.NONE:ins.getFlowOverride(),comments,refs,ins!=null&&ins.isFallThroughOverridden(),ins==null?null:ins.getFallThrough()));
         }
-        boolean isReturn = override == FlowOverride.RETURN ||
-            (original.getNumOperands()>0 && "B3".equals(original.getDefaultOperandRepresentation(0)) &&
+        boolean isReturn = override == FlowOverride.RETURN || (override != FlowOverride.CALL &&
+            original.getNumOperands()>0 && "B3".equals(original.getDefaultOperandRepresentation(0)) &&
                 !original.getMnemonicString().startsWith("CALLP"));
         if(isReturn)override=FlowOverride.RETURN;
         listing.clearCodeUnits(at,window.end(),false);

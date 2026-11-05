@@ -48,6 +48,7 @@ public class C6000ReturnAnalyzer extends AbstractAnalyzer {
 			MessageLog log) throws CancelledException {
 		int recovered = 0;
 		InstructionIterator instructions = program.getListing().getInstructions(set, true);
+		C6000CallAnalyzer.Walker walker = new C6000CallAnalyzer.Walker(program);
 		while (instructions.hasNext()) {
 			monitor.checkCancelled();
 			Instruction instruction = instructions.next();
@@ -58,6 +59,8 @@ public class C6000ReturnAnalyzer extends AbstractAnalyzer {
 				!instruction.getFlowType().isComputed() || instruction.getNumOperands() == 0 ||
 				!("B3".equals(instruction.getDefaultOperandRepresentation(0)) ||
 					entryLinkCopy(program, instruction))) continue;
+			// A B B3 whose slots set B3 to its return point is a call (upstream #39).
+			if (walker.recognize(instruction) != null) continue;
 			instruction.setFlowOverride(FlowOverride.RETURN);
 			recovered++;
 		}

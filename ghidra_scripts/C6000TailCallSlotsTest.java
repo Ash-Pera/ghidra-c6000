@@ -17,18 +17,25 @@ public class C6000TailCallSlotsTest extends GhidraScript {
 			disassemble(toAddr(0x11c0L));
 			// A known no-return callee, as an ELF exit() is.
 			createFunction(toAddr(0x11c0L), "exit").setNoReturn(true);
+			// Code past the call to exit, reached only as an ELF symbol would make it.
+			disassemble(toAddr(0x1040L));
 			return;
 		}
 		// Tail calls: the delay slots run before the callee and belong to the caller.
 		slots(0x1100L, new long[] { 0x1104L, 0x1108L, 0x110cL });
 		slots(0x1140L, new long[] { 0x1144L });
-		// Register calls whose window or packet path sets B3 stay returning calls.
-		long[][] calls = { { 0x1024L, 0x102cL }, { 0x1038L, 0x1040L }, { 0x1054L, 0x105cL } };
-		for (long[] c : calls) {
-			Instruction call = getInstructionAt(toAddr(c[0]));
-			if (call == null || !call.getFlowType().isCall() || call.getFlowType().isTerminal() ||
-				call.getFallThrough() == null || getInstructionAt(toAddr(c[1])) == null) {
-				throw new AssertionError("call at " + toAddr(c[0]) + ": " + describe(call));
+		// A register call whose window sets B3 stays a returning call, after its window.
+		Instruction returning = getInstructionAt(toAddr(0x1024L));
+		if (returning == null || !returning.getFlowType().isCall() || returning.getFlowType().isTerminal() ||
+			!toAddr(0x102cL).equals(returning.getFallThrough()) || !inSlot(0x1028L)) {
+			throw new AssertionError("call at 0x1024: " + describe(returning));
+		}
+		// Calls to the no-return exit, link set in the window or before the packet, are calls
+		// with their window; Ghidra ends them as it does a displacement call to exit.
+		for (long site : new long[] { 0x1038L, 0x1054L }) {
+			Instruction call = getInstructionAt(toAddr(site));
+			if (call == null || !call.getFlowType().isCall() || !inSlot(site + 4)) {
+				throw new AssertionError("call at " + toAddr(site) + ": " + describe(call));
 			}
 		}
 		// A B whose window sets B3, even past the window end, is a call, not a tail call.
@@ -37,6 +44,11 @@ public class C6000TailCallSlotsTest extends GhidraScript {
 			throw new AssertionError("0x1248 recovered as a tail-call slot of " + describe(getInstructionAt(toAddr(0x1244L))));
 		}
 		println("C6000_TAIL_CALL_SLOTS_OK");
+	}
+
+	private boolean inSlot(long at) {
+		Instruction i = getInstructionAt(toAddr(at));
+		return i != null && i.isInDelaySlot();
 	}
 
 	private void slots(long entry, long[] slots) {

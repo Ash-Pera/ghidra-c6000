@@ -52,6 +52,7 @@ CORE = [
     case("call-packet-slots", "CallPacketSlots", "C6000_CALL_PACKET_SLOTS_OK", None, analysis=True),
     case("tail-call-slots", "TailCallSlots", "C6000_TAIL_CALL_SLOTS_OK", None, analysis=True),
     case("packet-window-fallthrough", "PacketWindowFallthrough", "C6000_PACKET_WINDOW_FALLTHROUGH_OK", None, analysis=True),
+    case("link-copy-return", "LinkCopyReturn", "C6000_LINK_COPY_RETURN_OK", None, analysis=True),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
     case("abi-pairs", "AbiPairs", "C6000_ABI_PAIRS_OK", None, analysis=True),
     ("jump-table", [], [("JumpTable", [], "C6000_JUMP_TABLE_OK"),
@@ -335,6 +336,8 @@ def main():
                     command += ["-preScript", "C6000PredicatedRegisterJumpTest.java", "prepare", directory / "cases.json"]
                 elif fixture == "same-packet-hazard":
                     command += ["-preScript", "C6000SamePacketHazardTest.java", "prepare", directory / "cases.json"]
+                elif fixture == "link-copy-return":
+                    command += ["-preScript", "C6000LinkCopyReturnTest.java", "prepare"]
                 elif fixture not in ELF:
                     command += ["-preScript", "C6000SetEntry.java", "1000"]
                 for script, script_args, _ in scripts:

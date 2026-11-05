@@ -345,10 +345,26 @@ public final class C6000PipelineContracts {
         }
         var schedule = C6000PipelineSchedules.compileConfigured(program, function, previousE1Writes, monitor);
         if (C6000PipelineSchedules.closedCalls(program, function).isEmpty() &&
-                !new AddressSet(schedule.covered()).subtract(function.getBody()).isEmpty()) {
+                !ownedOrWindowTail(program, function, schedule.covered())) {
             throw new IllegalArgumentException("reviewed activation requires complete function ownership of the scheduled code");
         }
         return reviewed(program, function, evidence, previousE1Writes, entrySources, schedule, monitor);
+    }
+
+    /**
+     * Covered code outside the body must be owned by no function and continue
+     * the body straight-line: the delay slots of a nested or entered window the
+     * native analysis refused (SPRUFE8B 4.2.6). The source hash pins it unowned;
+     * enable absorbs it.
+     */
+    private static boolean ownedOrWindowTail(Program program, Function function, AddressSetView covered) {
+        var outside = new AddressSet(covered).subtract(function.getBody());
+        if (program.getFunctionManager().getFunctionsOverlapping(outside).hasNext()) return false;
+        for (AddressRange range : outside) {
+            Address before = range.getMinAddress().previous();
+            if (before == null || !function.getBody().contains(before)) return false;
+        }
+        return true;
     }
 
     private static Review reviewed(Program program, Function function, String evidence,

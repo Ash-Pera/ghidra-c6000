@@ -18,9 +18,83 @@
     <register name="c_flow_delay" hidden="true"/>
     <register name="c_schedule_entry" hidden="true"/>
     <register name="c_hdrpkt" hidden="true"/>
+    <register name="c_pkt_active" hidden="true"/>
+    <register name="c_pkt_start" hidden="true"/>
+    <register name="c_pkt_end" hidden="true"/>
+    <register name="c_pkt_branch_end" hidden="true"/>
+    <register name="c_pkt_pred" hidden="true"/>
+    <register name="c_pkt_write0" hidden="true"/>
+    <register name="c_pkt_write1" hidden="true"/>
     <register name="C6000_PIPE_RET" hidden="true"/>
     <register name="C6000_PIPE_ILC" hidden="true"/>
     <register name="C6000_PIPE_RILC" hidden="true"/>
+    <register name="C6000_PKT_A0" hidden="true"/>
+    <register name="C6000_PKT_A1" hidden="true"/>
+    <register name="C6000_PKT_A2" hidden="true"/>
+    <register name="C6000_PKT_A3" hidden="true"/>
+    <register name="C6000_PKT_A4" hidden="true"/>
+    <register name="C6000_PKT_A5" hidden="true"/>
+    <register name="C6000_PKT_A6" hidden="true"/>
+    <register name="C6000_PKT_A7" hidden="true"/>
+    <register name="C6000_PKT_A8" hidden="true"/>
+    <register name="C6000_PKT_A9" hidden="true"/>
+    <register name="C6000_PKT_A10" hidden="true"/>
+    <register name="C6000_PKT_A11" hidden="true"/>
+    <register name="C6000_PKT_A12" hidden="true"/>
+    <register name="C6000_PKT_A13" hidden="true"/>
+    <register name="C6000_PKT_A14" hidden="true"/>
+    <register name="C6000_PKT_A15" hidden="true"/>
+    <register name="C6000_PKT_A16" hidden="true"/>
+    <register name="C6000_PKT_A17" hidden="true"/>
+    <register name="C6000_PKT_A18" hidden="true"/>
+    <register name="C6000_PKT_A19" hidden="true"/>
+    <register name="C6000_PKT_A20" hidden="true"/>
+    <register name="C6000_PKT_A21" hidden="true"/>
+    <register name="C6000_PKT_A22" hidden="true"/>
+    <register name="C6000_PKT_A23" hidden="true"/>
+    <register name="C6000_PKT_A24" hidden="true"/>
+    <register name="C6000_PKT_A25" hidden="true"/>
+    <register name="C6000_PKT_A26" hidden="true"/>
+    <register name="C6000_PKT_A27" hidden="true"/>
+    <register name="C6000_PKT_A28" hidden="true"/>
+    <register name="C6000_PKT_A29" hidden="true"/>
+    <register name="C6000_PKT_A30" hidden="true"/>
+    <register name="C6000_PKT_A31" hidden="true"/>
+    <register name="C6000_PKT_B0" hidden="true"/>
+    <register name="C6000_PKT_B1" hidden="true"/>
+    <register name="C6000_PKT_B2" hidden="true"/>
+    <register name="C6000_PKT_B3" hidden="true"/>
+    <register name="C6000_PKT_B4" hidden="true"/>
+    <register name="C6000_PKT_B5" hidden="true"/>
+    <register name="C6000_PKT_B6" hidden="true"/>
+    <register name="C6000_PKT_B7" hidden="true"/>
+    <register name="C6000_PKT_B8" hidden="true"/>
+    <register name="C6000_PKT_B9" hidden="true"/>
+    <register name="C6000_PKT_B10" hidden="true"/>
+    <register name="C6000_PKT_B11" hidden="true"/>
+    <register name="C6000_PKT_B12" hidden="true"/>
+    <register name="C6000_PKT_B13" hidden="true"/>
+    <register name="C6000_PKT_B14" hidden="true"/>
+    <register name="C6000_PKT_B15" hidden="true"/>
+    <register name="C6000_PKT_B16" hidden="true"/>
+    <register name="C6000_PKT_B17" hidden="true"/>
+    <register name="C6000_PKT_B18" hidden="true"/>
+    <register name="C6000_PKT_B19" hidden="true"/>
+    <register name="C6000_PKT_B20" hidden="true"/>
+    <register name="C6000_PKT_B21" hidden="true"/>
+    <register name="C6000_PKT_B22" hidden="true"/>
+    <register name="C6000_PKT_B23" hidden="true"/>
+    <register name="C6000_PKT_B24" hidden="true"/>
+    <register name="C6000_PKT_B25" hidden="true"/>
+    <register name="C6000_PKT_B26" hidden="true"/>
+    <register name="C6000_PKT_B27" hidden="true"/>
+    <register name="C6000_PKT_B28" hidden="true"/>
+    <register name="C6000_PKT_B29" hidden="true"/>
+    <register name="C6000_PKT_B30" hidden="true"/>
+    <register name="C6000_PKT_B31" hidden="true"/>
+    <register name="C6000_PKT_MASK" hidden="true"/>
+    <register name="C6000_PKT_DUMMY" hidden="true"/>
+    <register name="C6000_PKT_TAKE" hidden="true"/>
   </register_data>
   <properties>
     <property key="pcodeInjectLibraryClass" value="c6000.C6000PipelineInjectLibrary"/>

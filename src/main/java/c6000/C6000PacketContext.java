@@ -16,13 +16,19 @@
 package c6000;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Map;
 
+import ghidra.app.util.PseudoInstruction;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
+import ghidra.program.model.lang.ProcessorContextImpl;
 import ghidra.program.model.lang.Register;
+import ghidra.program.model.lang.RegisterValue;
+import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.Program;
+import ghidra.program.model.mem.DumbMemBufferImpl;
 import ghidra.program.model.mem.Memory;
 import ghidra.util.task.TaskMonitor;
 
@@ -64,8 +70,41 @@ public final class C6000PacketContext {
 	private static final int BR_SHIFT = 15;
 	private static final int SAT_SHIFT = 14;
 
+	public record PrimeResult(int compactPackets, int deferredPackets, int refusedPackets) {}
+
 	private C6000PacketContext() {
 		// static utility
+	}
+
+	/** Decode result metadata without the native packet wrapper's union of possible writes. */
+	static Object[] architecturalResults(Program program, Instruction instruction) {
+		Address at = instruction.getAddress();
+		try {
+			var context = new ProcessorContextImpl(program.getLanguage());
+			var base = program.getLanguage().getContextBaseRegister();
+			var stored = program.getProgramContext().getRegisterValue(base, at);
+			if (stored != null) context.setRegisterValue(stored);
+			for (var field : physicalDecodeFields(program, at).entrySet()) {
+				context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),
+					BigInteger.valueOf(field.getValue())));
+			}
+			context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),
+				BigInteger.ZERO));
+			for (String name : List.of("c_pkt_active", "c_pkt_start", "c_pkt_end",
+					"c_pkt_branch_end", "c_pkt_pred", "c_pkt_write0", "c_pkt_write1")) {
+				context.setRegisterValue(new RegisterValue(program.getRegister(name), BigInteger.ZERO));
+			}
+			var memory = new DumbMemBufferImpl(program.getMemory(), at);
+			var prototype = program.getLanguage().parse(memory, context, false);
+			var raw = new PseudoInstruction(program, at, prototype, memory, context);
+			if (raw.getLength() != instruction.getLength()) {
+				throw new IllegalStateException("physical decode width changed at " + at);
+			}
+			return raw.getResultObjects();
+		}
+		catch (Exception error) {
+			throw new IllegalStateException("Could not decode architectural results at " + at, error);
+		}
 	}
 
 	/**
@@ -93,8 +132,13 @@ public final class C6000PacketContext {
 
 	/** Prime whole fetch packets overlapping a native analyzer's changed byte set. */
 	public static int prime(Program program, AddressSetView changed, TaskMonitor monitor) throws Exception {
+		return primeDetailed(program, changed, monitor).compactPackets();
+	}
+
+	static PrimeResult primeDetailed(Program program, AddressSetView changed, TaskMonitor monitor)
+			throws Exception {
 		if (!isC6000(program)) {
-			return 0;
+			return new PrimeResult(0, 0, 0);
 		}
 		Memory memory = program.getMemory();
 		AddressSetView initialized = memory.getAllInitializedAddressSet();
@@ -169,7 +213,14 @@ public final class C6000PacketContext {
 				primeBranchMode(program, hdrAddr);
 			}
 		}
-		return packets;
+		C6000ParallelReadScheduler.Result parallel =
+			C6000ParallelReadScheduler.prime(program, scope, monitor);
+		return new PrimeResult(packets, parallel.deferredPackets(), parallel.refusedPackets());
+	}
+
+	/** Revoke deferral when post-analysis references enter a packet interior. */
+	public static int audit(Program program, TaskMonitor monitor) throws Exception {
+		return C6000ParallelReadScheduler.audit(program, monitor);
 	}
 
 	private static AddressSet fetchPackets(AddressSetView addresses) {

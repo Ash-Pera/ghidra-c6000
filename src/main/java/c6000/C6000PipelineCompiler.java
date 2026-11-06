@@ -489,7 +489,9 @@ public final class C6000PipelineCompiler {
     public C6000PipelineCompiler(Program p,Function f,Set<String> previousE1Writes){
         this(p,f,previousE1Writes,f.getEntryPoint().getOffset());
     }
+    private final Set<String> previousE1Writes;
     private C6000PipelineCompiler(Program p,Function f,Set<String> previousE1Writes,long startPc){
+        this.previousE1Writes=Set.copyOf(previousE1Writes);
         program=p;
         String variant=p.getLanguage().getLanguageDescription().getVariant();
         // SPRU198K 6.3.2.2: C64x cross-path stalls do not occur on C67x.
@@ -982,7 +984,17 @@ public final class C6000PipelineCompiler {
 
     public Result compile()throws Exception{
         if(traceContract!=null||closedCall!=null||callerTail!=null||storeTailContract!=null)throw fail("trace compiler is not an ordinary function schedule");
-        return compileInternal();
+        var result=compileInternal();
+        if(!ordinarySchedule())return result;
+        // The tracked registers must not depend on the body, which activation expands over the covered code: recompile
+        // until every register B the schedule covers is tracked (a fixed point of the covered code alone).
+        for(int round=0;;round++){
+            var regs=new LinkedHashSet<>(constantRegisters());regs.addAll(branchRegisters(result.covered()));
+            if(regs.equals(new LinkedHashSet<>(constantRegisters())))return result;
+            if(round>4)throw fail("tracked call registers do not converge");
+            var again=new C6000PipelineCompiler(program,function,previousE1Writes);again.monitor=monitor;again.callRegisters=List.copyOf(regs);
+            result=again.compileInternal();callRegisters=again.callRegisters;
+        }
     }
     public Result compile(TaskMonitor monitor)throws Exception{
         this.monitor=Objects.requireNonNull(monitor);
@@ -1445,8 +1457,13 @@ public final class C6000PipelineCompiler {
     private List<Long> constantRegisters(){
         if(callRegisters!=null)return callRegisters;
         var regs=new LinkedHashSet<Long>();regs.add(linkOffset());
-        if(ordinarySchedule())for(var i:program.getListing().getInstructions(function.getBody(),true)){var r=i.getRegister(0);if(i.getMnemonicString().matches("(\\[[^]]*\\])?B(NOP)?\\..*")&&r!=null&&r.getBitLength()==32)regs.add(r.getAddress().getOffset());}
+        if(ordinarySchedule())regs.addAll(branchRegisters(function.getBody()));
         return callRegisters=List.copyOf(regs);
+    }
+    private Set<Long> branchRegisters(AddressSetView where){
+        var regs=new LinkedHashSet<Long>();
+        for(var i:program.getListing().getInstructions(where,true)){var r=i.getRegister(0);if(i.getMnemonicString().matches("(\\[[^]]*\\])?B(NOP)?\\..*")&&r!=null&&r.getBitLength()==32)regs.add(r.getAddress().getOffset());}
+        return regs;
     }
     private List<Long> callRegisters;
     private void forgetReturnOutput(Map<Long,Long> links,Set<Long> written,Dest output,Long value,boolean exact){

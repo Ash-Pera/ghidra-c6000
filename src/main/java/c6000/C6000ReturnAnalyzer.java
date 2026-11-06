@@ -74,8 +74,9 @@ public class C6000ReturnAnalyzer extends AbstractAnalyzer {
 	static boolean entryLinkCopy(Program program, Instruction branch) {
 		Register target = branch.getRegister(0), b3 = program.getRegister("B3");
 		Function function = program.getFunctionManager().getFunctionContaining(branch.getAddress());
-		if (target == null || function == null ||
-			!target.getName().startsWith("B") || target.equals(b3)) return false;
+		// B .S2X Ax reads an A-side copy through the cross path (SPRUFE8B 3.4).
+		if (target == null || function == null || target.equals(b3) ||
+			!target.getName().matches("[AB]([0-9]|[12][0-9]|3[01])")) return false;
 		Instruction copy = null;
 		for (Instruction i : program.getListing().getInstructions(function.getBody(), true)) {
 			if (i.getDelaySlotDepth() != 0) continue;

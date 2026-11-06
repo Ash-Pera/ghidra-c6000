@@ -11,8 +11,8 @@ import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 
 public class C6000LinkCopyReturnTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x1000L, 0x1020L, 0x1040L, 0x1060L, 0x1080L };
-	private static final String[] NAMES = { "copyret", "addret", "notb3", "twowr", "stale" };
+	private static final long[] ENTRIES = { 0x1000L, 0x1020L, 0x1040L, 0x1060L, 0x1080L, 0x10a0L, 0x10c0L, 0x10e0L, 0x1100L };
+	private static final String[] NAMES = { "copyret", "addret", "notb3", "twowr", "stale", "aret", "amv", "abad", "atwo" };
 
 	@Override
 	protected void run() throws Exception {
@@ -28,14 +28,17 @@ public class C6000LinkCopyReturnTest extends GhidraScript {
 		// Known-good: B3 copied before any branch or B3 write, and B9 has no other writer.
 		returns(0x100cL, 0x1010L);
 		returns(0x1024L, 0x1028L);
+		// Known-good: an A-side copy branched through the cross path (B .S2X A2).
+		returns(0x10a8L, 0x10acL);
+		returns(0x10c4L, 0x10c8L);
 		// Known-bad: another register's copy, a second writer, B3 rewritten before the copy.
-		for (long at : new long[] { 0x1044L, 0x1068L, 0x108cL }) {
+		for (long at : new long[] { 0x1044L, 0x1068L, 0x108cL, 0x10e4L, 0x1108L }) {
 			Instruction b = getInstructionAt(toAddr(at));
 			if (b == null || b.getFlowOverride() == FlowOverride.RETURN) {
 				throw new AssertionError("not a return at " + toAddr(at) + ": " + describe(b));
 			}
 		}
-		println("C6000_LINK_COPY_RETURN_OK checks=5");
+		println("C6000_LINK_COPY_RETURN_OK checks=9");
 	}
 
 	/** A RETURN after its window: the A4 write in slot precedes the RETURN op. */

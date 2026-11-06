@@ -13,8 +13,8 @@ import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.symbol.Reference;
 
 public class C6000RegisterCallTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x1000L, 0x1040L, 0x1080L, 0x10a0L, 0x10e0L };
-	private static final String[] NAMES = { "rcall", "rknown", "rtail", "rpred", "sink" };
+	private static final long[] ENTRIES = { 0x1000L, 0x1040L, 0x1080L, 0x10a0L, 0x10e0L, 0x1100L, 0x1140L, 0x1160L, 0x1180L, 0x11a0L };
+	private static final String[] NAMES = { "rcall", "rknown", "rtail", "rpred", "sink", "rtwo", "rcopy", "rjump", "sink2", "rloop" };
 
 	@Override
 	protected void run() throws Exception {

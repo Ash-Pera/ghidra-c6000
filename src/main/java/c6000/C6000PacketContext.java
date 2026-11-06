@@ -64,6 +64,8 @@ public final class C6000PacketContext {
 	private static final int BR_SHIFT = 15;
 	private static final int SAT_SHIFT = 14;
 
+	public record PrimeResult(int compactPackets, int deferredPackets, int refusedPackets) {}
+
 	private C6000PacketContext() {
 		// static utility
 	}
@@ -93,8 +95,13 @@ public final class C6000PacketContext {
 
 	/** Prime whole fetch packets overlapping a native analyzer's changed byte set. */
 	public static int prime(Program program, AddressSetView changed, TaskMonitor monitor) throws Exception {
+		return primeDetailed(program, changed, monitor).compactPackets();
+	}
+
+	static PrimeResult primeDetailed(Program program, AddressSetView changed, TaskMonitor monitor)
+			throws Exception {
 		if (!isC6000(program)) {
-			return 0;
+			return new PrimeResult(0, 0, 0);
 		}
 		Memory memory = program.getMemory();
 		AddressSetView initialized = memory.getAllInitializedAddressSet();
@@ -169,7 +176,14 @@ public final class C6000PacketContext {
 				primeBranchMode(program, hdrAddr);
 			}
 		}
-		return packets;
+		C6000ParallelReadScheduler.Result parallel =
+			C6000ParallelReadScheduler.prime(program, scope, monitor);
+		return new PrimeResult(packets, parallel.deferredPackets(), parallel.refusedPackets());
+	}
+
+	/** Revoke deferral when post-analysis references enter a packet interior. */
+	public static int audit(Program program, TaskMonitor monitor) throws Exception {
+		return C6000ParallelReadScheduler.audit(program, monitor);
 	}
 
 	private static AddressSet fetchPackets(AddressSetView addresses) {

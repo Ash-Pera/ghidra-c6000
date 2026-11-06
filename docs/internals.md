@@ -335,19 +335,16 @@ assume every bit 12 is a cross selector.
 
 ### Language prototype migration
 
-Big-endian languages are version 2.0 (issue #31). `data/languages/old/` describes the
-version 1 `default` and `analysis` languages, and `C6000BeDefaultLanguageTranslator` /
-`C6000BeAnalysisLanguageTranslator` carry each context field over by name. After
-Ghidra's re-disassembly they prime `c_h16` and re-disassemble again, which keeps
-references, overrides and comments. Re-run auto-analysis afterwards so delay windows and
-calls are recovered from the corrected order. The C67x variants were never released at
-version 1.
+Little-endian languages are version 2.0; big-endian languages are version 3.0. The
+little-endian version 1 and big-endian version 1 programs migrate directly to the current
+definition, while big-endian version 2 programs migrate to version 3. Translators carry
+context fields by name, prime compact halfwords and packet schedules, and re-decode
+instructions. Re-run auto-analysis afterwards so delay windows and calls are recovered.
 
-The 1.2 language minor version forces Ghidra's native re-disassembly upgrade. This is
-necessary when a corrected compact operand partition distinguishes bits that an older
-shared persisted prototype ignored. Updating the extension alone can leave old programs
-with stale operand text and p-code. Preserve a packed backup and annotation inventory
-before upgrade. Native migration can remove existing Bad Instruction error bookmarks;
-retain/restore those from the backup if preserving every annotation is required. Audit
-actual processor context and instruction extents as well as symbols, functions and
-references.
+The version bumps resize the context register for parallel-read packet fields and force
+Ghidra's native re-disassembly upgrade. Updating the extension alone can leave old
+programs with stale operand text and p-code. Preserve a packed backup and annotation
+inventory before upgrade. Native migration can remove existing Bad Instruction error
+bookmarks; retain/restore those from the backup if preserving every annotation is
+required. Audit actual processor context and instruction extents as well as symbols,
+functions and references.

@@ -16,13 +16,19 @@
 package c6000;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Map;
 
+import ghidra.app.util.PseudoInstruction;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.address.AddressSetView;
+import ghidra.program.model.lang.ProcessorContextImpl;
 import ghidra.program.model.lang.Register;
+import ghidra.program.model.lang.RegisterValue;
+import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.Program;
+import ghidra.program.model.mem.DumbMemBufferImpl;
 import ghidra.program.model.mem.Memory;
 import ghidra.util.task.TaskMonitor;
 
@@ -68,6 +74,42 @@ public final class C6000PacketContext {
 
 	private C6000PacketContext() {
 		// static utility
+	}
+
+	/** Decode result metadata without the native packet wrapper's union of possible writes. */
+	static Object[] architecturalResults(Program program, Instruction instruction) {
+		return architectural(program, instruction).getResultObjects();
+	}
+
+	/** The instruction decoded without packet staging: its p-code writes the architectural registers. */
+	static Instruction architectural(Program program, Instruction instruction) {
+		Address at = instruction.getAddress();
+		try {
+			var context = new ProcessorContextImpl(program.getLanguage());
+			var base = program.getLanguage().getContextBaseRegister();
+			var stored = program.getProgramContext().getRegisterValue(base, at);
+			if (stored != null) context.setRegisterValue(stored);
+			for (var field : physicalDecodeFields(program, at).entrySet()) {
+				context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),
+					BigInteger.valueOf(field.getValue())));
+			}
+			context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),
+				BigInteger.ZERO));
+			for (String name : List.of("c_pkt_active", "c_pkt_start", "c_pkt_end",
+					"c_pkt_branch_end", "c_pkt_pred", "c_pkt_write0", "c_pkt_write1")) {
+				context.setRegisterValue(new RegisterValue(program.getRegister(name), BigInteger.ZERO));
+			}
+			var memory = new DumbMemBufferImpl(program.getMemory(), at);
+			var prototype = program.getLanguage().parse(memory, context, false);
+			var raw = new PseudoInstruction(program, at, prototype, memory, context);
+			if (raw.getLength() != instruction.getLength()) {
+				throw new IllegalStateException("physical decode width changed at " + at);
+			}
+			return raw;
+		}
+		catch (Exception error) {
+			throw new IllegalStateException("Could not decode architectural results at " + at, error);
+		}
 	}
 
 	/**

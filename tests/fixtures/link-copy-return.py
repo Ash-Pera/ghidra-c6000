@@ -3,7 +3,7 @@
 """Build branches through a copy of B3. Usage: IMAGE [be].
 
 Load at 0x1000 with entry 0x1000 and auto-analysis; C6000LinkCopyReturnTest.java
-prepare declares the nine functions, as ELF symbols would. Words are TI cl6x
+prepare declares the ten functions, as ELF symbols would. Words are TI cl6x
 8.3.15 output (-mv6740 --no_compress), listed by dis6x (SPRUFE8B 4.2.6, B, MV):
 
   1000 copyret  MV B3,B9 ; ADD 1,A4,A4 ; NOP ; B B9 ; ADD 1,A4,A4 ; NOP 4   return a + 2
@@ -15,6 +15,7 @@ prepare declares the nine functions, as ELF symbols would. Words are TI cl6x
   10c0 amv      MV .S1X B3,A2 ; B .S2X A2 ; ADD 5,A4,A4 ; NOP 4   return a + 5
   10e0 abad     MV .S1X B4,A2 ; B .S2X A2 ; NOP 5        A2 is not the link: not a return
   1100 atwo     MV .S1X B3,A2 ; [A1] MV .S1X B4,A2 ; B .S2X A2 ; NOP 5   A2 written twice: not a return
+  1120 acall    MV .S1X B3,A2 ; B copyret ; MVK/MVKH 1134,B3 ; NOP 3 ; B .S2X A2 ; NOP 5   a call may clobber A2: not a return
 """
 
 from pathlib import Path
@@ -31,7 +32,8 @@ WORDS = {
     0x10AC: 0x02108058, 0x10B0: 0x00006000, 0x10C0: 0x010C16A0, 0x10C4: 0x00081362,
     0x10C8: 0x0210A058, 0x10CC: 0x00006000, 0x10E0: 0x011016A0, 0x10E4: 0x00081362,
     0x10E8: 0x00008000, 0x1100: 0x010C16A0, 0x1104: 0x811016A0, 0x1108: 0x00081362,
-    0x110C: 0x00008000,
+    0x110C: 0x00008000, 0x1120: 0x010C16A0, 0x1124: 0x0FFFDC12, 0x1128: 0x01889A2A,
+    0x112C: 0x0180006A, 0x1130: 0x00004000, 0x1134: 0x00081362, 0x1138: 0x00008000,
 }
 
 
@@ -39,7 +41,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x120)
+    image = bytearray(0x140)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

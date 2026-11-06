@@ -89,6 +89,10 @@ public class C6000ReturnAnalyzer extends AbstractAnalyzer {
 			}
 		}
 		if (copy == null || !b3.equals(C6000EncodingInfo.registerCopySource(copy))) return false;
+		// A call may clobber a caller-saved copy (C6000 ABI: only A10-A15, B10-B15 survive).
+		if (!target.getName().matches("[AB]1[0-5]"))
+			for (Instruction i : program.getListing().getInstructions(function.getBody(), true))
+				if (i.getFlowType().isCall()) return false;
 		var references = program.getReferenceManager();
 		for (Instruction i = program.getListing().getInstructionAt(function.getEntryPoint()); i != null;
 				i = program.getListing().getInstructionAt(i.getMaxAddress().next())) {

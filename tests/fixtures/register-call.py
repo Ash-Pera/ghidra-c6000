@@ -27,6 +27,8 @@ prepare declares the ten functions, as ELF symbols would. Words are TI cl6x
                a call whose fresh link is no sequential return point (a software-pipelined call loop shape)
   11e0 rcopy2  NOP ; MV B3,A0 ; MVK/MVKH sink,B5 ; B.S2 B5 ; ADDKPC 0x11f8,B3,4 ; B.S2X A0 ; NOP 5
                rcopy with the copy after the entry packet
+  1200 rcopy3  MV B3,A0 ; MV B3,A0 ; MVK/MVKH sink,B5 ; B.S2 B5 ; ADDKPC 0x1218,B3,4 ; B.S2X A0 ; NOP 5
+               rcopy with two writers of A0: no listed return
 """
 
 from pathlib import Path
@@ -56,6 +58,8 @@ WORDS = {
     0x11B4: 0x00000000, 0x11B8: 0x01B406A2, 0x11BC: 0x000C0362, 0x11C0: 0x00008000,
     0x11E0: 0x00000000, 0x11E4: 0x000C1FD8, 0x11E8: 0x0288702A, 0x11EC: 0x0280006A,
     0x11F0: 0x00140362, 0x11F4: 0x01868162, 0x11F8: 0x00001362, 0x11FC: 0x00008000,
+    0x1200: 0x000C1FD8, 0x1204: 0x000C1FD8, 0x1208: 0x0288702A, 0x120C: 0x0280006A,
+    0x1210: 0x00140362, 0x1214: 0x01868162, 0x1218: 0x00001362, 0x121C: 0x00008000,
 }
 
 
@@ -63,7 +67,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x200)
+    image = bytearray(0x220)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

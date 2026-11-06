@@ -296,7 +296,7 @@ public class C6000JumpTableAnalyzer extends AbstractAnalyzer {
 				Long limit = operandValue(insn, name.equals("CMPLTU") ? 0 : 1, regs);
 				if (limit != null) bound = limit;
 			}
-			for (Object written : insn.getResultObjects()) {
+			for (Object written : C6000PacketContext.architecturalResults(program, insn)) {
 				if (written instanceof Register r) {
 					tableBase.remove(r);
 					loaded.remove(r);

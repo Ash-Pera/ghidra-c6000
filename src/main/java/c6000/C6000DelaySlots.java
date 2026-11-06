@@ -259,7 +259,7 @@ public final class C6000DelaySlots {
         for (Instruction i : packet) {
             if (i == null) return true;
             if (C6000CallAnalyzer.baseName(i).startsWith("LD")) continue;
-            for (Object o : i.getResultObjects()) {
+            for (Object o : C6000PacketContext.architecturalResults(p, i)) {
                 if (o instanceof ghidra.program.model.lang.Register r && r.contains(b3)) return true;
             }
         }

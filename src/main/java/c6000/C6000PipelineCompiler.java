@@ -52,6 +52,9 @@ public final class C6000PipelineCompiler {
     private record OpaqueCall(long site,long target,Long continuation,boolean ret) {} // continuation null: tail call
     private final Map<Long,OpaqueCall> opaqueCalls=new HashMap<>(); // keyed by an idle marker pc, never a memory address
     private static final long LINK_CONST=-0x1000L; // ReturnFlow key: B3's exact constant on this path
+    private static final long REGISTER_CALL=-0x2000L; // Branch target: an opaque call through the register read at E1
+    private static final long REG_CONST=-0x3000L; // ReturnFlow key REG_CONST-offset: a call register's exact constant
+    private static final long LINK_STALE=-0x1001L; // ReturnFlow key: B3 still holds the last opaque call's continuation
     private final List<StoreTailBoundary> storeTailBoundaries=new ArrayList<>();
 
     public StoreTailResult compileStoreTail(StoreTailContract contract)throws Exception {
@@ -1207,7 +1210,7 @@ public final class C6000PipelineCompiler {
                 else{
                     nextBranches.add(new Branch(branch.pc(),branch.age()+1,branch.target(),branch.returns()));
                     if(branch.returns())copy(moves,slot("target",branch.pc(),branch.age()+1,0,4),slot("target",branch.pc(),branch.age(),0,4));
-                    if(closedCall!=null&&closedCalls.containsKey(branch.pc()))copy(moves,slot("call_target",branch.pc(),branch.age()+1,0,4),slot("call_target",branch.pc(),branch.age(),0,4));
+                    if(closedCall!=null&&closedCalls.containsKey(branch.pc())||branch.target()==REGISTER_CALL)copy(moves,slot("call_target",branch.pc(),branch.age()+1,0,4),slot("call_target",branch.pc(),branch.age(),0,4));
                 }
             }
             for(var move:moves)move.run();
@@ -1235,8 +1238,8 @@ public final class C6000PipelineCompiler {
                         if(loop!=null){var tsr=program.getRegister("TSR");b.op(PcodeOp.INT_AND,new Varnode(tsr.getAddress(),4),new Varnode(tsr.getAddress(),4),c(0xffffbfffL,4));}
                         b.jump(PcodeOp.BRANCH,"exit",null);continue;
                     }
-                } else if(opaqueLanding(s,landing)){
-                    nextPc=opaqueCall(landing,returnFlow,nextFlights,nextBranches,issueBranch,loop);
+                } else if(landing.target()==REGISTER_CALL||opaqueLanding(s,landing)){
+                    nextPc=landing.target()==REGISTER_CALL?opaqueRegisterBranch(landing,returnFlow,nextFlights,nextBranches,issueBranch,loop):opaqueCall(landing,returnFlow,nextFlights,nextBranches,issueBranch,loop);
                     for(var flight:nextFlights)idle=Math.max(idle,decode(flight.pc()).latency()-flight.age());
                 } else {
                     var plan=closedCalls.get(landing.pc());boolean call=plan!=null||decode(landing.pc()).name().equals("CALLP");
@@ -1304,11 +1307,15 @@ public final class C6000PipelineCompiler {
         var listed=program.getListing().getInstructionAt(instruction.getAddress());boolean provenCall=listed!=null&&listed.getFlowOverride()==ghidra.program.model.listing.FlowOverride.CALL;
         boolean returns=!call&&register!=null&&(source.returns().activeCall()!=NO_CALL?origin!=null&&origin==source.returns().activeCall():origin!=null&&origin==ENTRY_LINK||register.getName().equals("B3")&&!provenCall);
         if(closedCall!=null&&!call&&register!=null){var active=closedCalls.get(source.returns().activeCall());if(active!=null&&at!=active.calleeReturnPc()||active==null&&!Objects.equals(at,closedCall.callerReturnPc()))throw fail("closed-call undeclared register edge");}
-        if(register!=null&&!returns&&!call)throw fail("unresolved register branch "+instruction);
+        boolean registerCall=register!=null&&!returns&&!call&&ordinarySchedule();
+        if(register!=null&&!returns&&!call&&!registerCall)throw fail("unresolved register branch "+instruction);
+        Long known=!registerCall?null:source.returns().links().get(register.getAddress().getOffset()==linkOffset()?LINK_CONST:REG_CONST-register.getAddress().getOffset());
+        if(known!=null&&program.getFunctionManager().getFunctionAt(entry.getNewAddress(known))==null)throw fail("register branch to a constant that is no function "+instruction);
         // SPRUFE8B B IRP p.155, B NRP p.157: the target is IRP or NRP, neither a register operand nor a displacement.
-        if(plan==null&&!returns&&instruction.getAddress(0)==null)throw fail("unresolved branch target "+instruction);
-        long target=plan!=null?plan.callee().start():returns?0:instruction.getAddress(0).getOffset();
-        if(call)b.op(PcodeOp.COPY,slot("call_target",at,1,0,4),register==null?c(target,4):captured.get(at).get(register.getAddress().getOffset()));
+        if(plan==null&&!returns&&known==null&&!registerCall&&instruction.getAddress(0)==null)throw fail("unresolved branch target "+instruction);
+        long target=plan!=null?plan.callee().start():returns?0:known!=null?known:registerCall?REGISTER_CALL:instruction.getAddress(0).getOffset();
+        if(known!=null)registerCall=false; // an exact constant: the opaque direct call at landing
+        if(call||registerCall)b.op(PcodeOp.COPY,slot("call_target",at,1,0,4),register==null?c(target,4):captured.get(at).get(register.getAddress().getOffset()));
         if(callerTail!=null&&!returns){if(!callerTail.callee().contains(target))throw fail("caller-tail callee branch leaves declared scope");validateCallerTailTarget(target);}
         if(returns)b.op(PcodeOp.COPY,slot("target",at,1,0,4),captured.get(at).get(register.getAddress().getOffset()));
         List<Branch> yes=new ArrayList<>(branches);yes.add(new Branch(at,1,target,returns));
@@ -1337,7 +1344,25 @@ public final class C6000PipelineCompiler {
     /** Local, opt-in (C6000PipelineSchedules.opaqueCalls): the exactcheck gate's ABI model, not an upstream contract. */
     private boolean ordinarySchedule(){return C6000PipelineSchedules.opaqueCalls(program,function)&&traceContract==null&&closedCall==null&&callerTail==null&&storeTailContract==null;}
     private long linkOffset(){return program.getRegister("B3").getAddress().getOffset();}
-    private boolean writesLinkAt(Insn instruction,int phase){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()==phase&&d.offset()<b3+4&&b3<d.offset()+d.size());}
+
+    /** Local (gate model, exactcheck SPEC R3/R7a): a register B that is no return, landing with no other effect pending, is an
+     *  opaque call to the value it read at E1. It resumes at B3 when the listing calls it or B3 holds an exact link written
+     *  since the last opaque call (the callee returns there: a software-pipelined call loop); a computed jump the listing
+     *  leaves unrecovered (no flow reference), with B3 the entry link or still the last call's continuation, is a tail call.
+     *  Anything else stays unresolved. */
+    private long opaqueRegisterBranch(Branch landing,ReturnFlow flow,List<Flight> flights,List<Branch> branches,Insn issued,LoopPlan loop)throws Exception {
+        var listed=program.getListing().getInstructionAt(entry.getNewAddress(landing.pc()));
+        Long link=flow.links().get(LINK_CONST);boolean stale=link!=null&&link.equals(flow.links().get(LINK_STALE));
+        if(listed!=null&&listed.getFlowType().isCall()||link!=null&&!stale)return opaqueCall(landing,flow,flights,branches,issued,loop);
+        boolean open=listed!=null&&listed.getFlowType().isJump()&&listed.getFlowType().isComputed()&&Arrays.stream(listed.getReferencesFrom()).noneMatch(r->r.getReferenceType().isFlow());
+        if(!open||!stale&&!Objects.equals(flow.links().get(linkOffset()),ENTRY_LINK))throw fail("unresolved register branch "+listed);
+        if(loop!=null||!branches.isEmpty()||issued!=null)throw fail("opaque call has unresolved control effects");
+        long marker=-0x100000000L-landing.pc();
+        opaqueCalls.put(marker,new OpaqueCall(landing.pc(),REGISTER_CALL,null,false));
+        return marker;
+    }
+    private boolean writesLinkAt(Insn instruction,int phase){return writesAt(instruction,phase,linkOffset());}
+    private boolean writesAt(Insn instruction,int phase,long reg){return instruction.outputs().stream().anyMatch(d->d.phase()==phase&&d.offset()<reg+4&&reg<d.offset()+d.size());}
     private boolean writesLink(Insn instruction,int after){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()>after&&d.offset()<b3+4&&b3<d.offset()+d.size());}
     private boolean opaqueLanding(State s,Branch landing)throws Exception {
         if(!ordinarySchedule()||s.returns().activeCall()!=NO_CALL||closedCalls.containsKey(landing.pc())||decode(landing.pc()).name().equals("CALLP"))return false;
@@ -1345,13 +1370,15 @@ public final class C6000PipelineCompiler {
         return callee!=null&&!callee.equals(function);
     }
     /** B3 after an E1 constant write whose predicate is true on this path (truth 1); null when not exact. */
-    private Long linkConstant(Insn instruction,Long old,int truth){
+    private Long linkConstant(Insn instruction,Long old,int truth){return constantWrite(instruction,old,truth,linkOffset());}
+    /** reg after an E1 constant write whose predicate is true on this path (truth 1); null when not exact. */
+    private Long constantWrite(Insn instruction,Long old,int truth,long reg){
         if(!Set.of("MVK","MVKL","MVKH","ADDKPC").contains(instruction.name())||instruction.predicate()!=null&&truth!=1)return null;
-        var code=new ArrayList<PcodeOp>();if(old!=null)code.add(new PcodeOp(entry,0,PcodeOp.COPY,new Varnode[]{c(old,4)},arch(linkOffset(),4)));
+        var code=new ArrayList<PcodeOp>();if(old!=null)code.add(new PcodeOp(entry,0,PcodeOp.COPY,new Varnode[]{c(old,4)},arch(reg,4)));
         // Local: a predicated MVK/MVKH on its taken fork (the if/else call pair) gets the proven predicate value.
         if(instruction.predicate()!=null)code.add(new PcodeOp(entry,0,PcodeOp.COPY,new Varnode[]{c(instruction.inverted()?0:1,4)},arch(instruction.predicate().getAddress().getOffset(),4)));
         code.addAll(Arrays.asList(instruction.raw()));
-        Long value=C6000LoopCounterProof.constantOutput(program.getLanguage(),code.toArray(PcodeOp[]::new),linkOffset(),4);
+        Long value=C6000LoopCounterProof.constantOutput(program.getLanguage(),code.toArray(PcodeOp[]::new),reg,4);
         return value==null?null:value&0xffffffffL;
     }
     private long opaqueCall(Branch landing,ReturnFlow flow,List<Flight> flights,List<Branch> branches,Insn issued,LoopPlan loop)throws Exception {
@@ -1378,12 +1405,13 @@ public final class C6000PipelineCompiler {
         if(!s.flights().isEmpty()||!s.branches().isEmpty()||s.loop()!=null)throw fail("opaque call still has pending effects");
         if(call.ret()){b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),slot("opaque_return",call.site(),0,0,4));b.jump(PcodeOp.BRANCH,"exit",null);return;}
         if(call.continuation()==null)b.op(PcodeOp.COPY,new Varnode(program.getRegister("C6000_PIPE_RET").getAddress(),4),arch(linkOffset(),4));
-        b.op(PcodeOp.CALL,null,new Varnode(entry.getNewAddress(call.target()),4));
+        if(call.target()==REGISTER_CALL)b.op(PcodeOp.CALLIND,null,slot("call_target",call.site(),5,0,4));
+        else b.op(PcodeOp.CALL,null,new Varnode(entry.getNewAddress(call.target()),4));
         if(call.continuation()==null){b.jump(PcodeOp.BRANCH,"exit",null);return;}
         // Callee-saved registers keep their link roles; B3 now holds this continuation.
         var kept=new HashMap<Long,Long>();
         for(var link:s.returns().links().entrySet()){if(link.getKey()<0)continue;var register=program.getRegister(program.getAddressFactory().getRegisterSpace().getAddress(link.getKey()),4);if(register!=null&&register.getName().matches("[AB]1[0-5]"))kept.put(link.getKey(),link.getValue());}
-        kept.put(LINK_CONST,call.continuation());
+        kept.put(LINK_CONST,call.continuation());kept.put(LINK_STALE,call.continuation());
         b.jump(PcodeOp.BRANCH,"node"+state(new State(call.continuation(),0,List.of(),List.of(),List.of(),null,PredicateFacts.unknown().canonical(),new ReturnFlow(NO_CALL,Map.copyOf(kept)))),null);
     }
     private long callpContinuation(Insn call){
@@ -1400,12 +1428,27 @@ public final class C6000PipelineCompiler {
     }
     /** Local: B3's exact constant on this path, for the opaque-call link; facts are one fork's predicate facts. */
     private ReturnFlow withLink(State source,List<Insn> pack,PredicateFacts facts,ReturnFlow flow){
-        Long link=source.returns().links().get(LINK_CONST);
-        for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesLinkAt(decodeKnown(flight.pc()),flight.age()+1))link=null;
-        for(var instruction:pack){int truth=predicateTruth(instruction,facts);if(truth!=0&&writesLinkAt(instruction,1))link=truth<0?null:linkConstant(instruction,link,truth);}
-        var after=new HashMap<>(flow.links());if(link==null)after.remove(LINK_CONST);else after.put(LINK_CONST,link);
+        var after=new HashMap<>(flow.links());
+        for(long reg:constantRegisters()){
+            long key=reg==linkOffset()?LINK_CONST:REG_CONST-reg;
+            Long value=source.returns().links().get(key);
+            for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesAt(decodeKnown(flight.pc()),flight.age()+1,reg))value=null;
+            boolean wrote=false;
+            for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesAt(decodeKnown(flight.pc()),flight.age()+1,reg))wrote=true;
+            for(var instruction:pack){int truth=predicateTruth(instruction,facts);if(truth!=0&&writesAt(instruction,1,reg)){wrote=true;value=truth<0?null:constantWrite(instruction,value,truth,reg);}}
+            if(value==null)after.remove(key);else after.put(key,value);
+            if(key==LINK_CONST&&(wrote||value==null))after.remove(LINK_STALE);
+        }
         return new ReturnFlow(flow.activeCall(),Map.copyOf(after));
     }
+    /** B3, plus every register a register B of the function reads: their exact E1 constants are tracked. */
+    private List<Long> constantRegisters(){
+        if(callRegisters!=null)return callRegisters;
+        var regs=new LinkedHashSet<Long>();regs.add(linkOffset());
+        if(ordinarySchedule())for(var i:program.getListing().getInstructions(function.getBody(),true)){var r=i.getRegister(0);if(i.getMnemonicString().matches("(\\[[^]]*\\])?B(NOP)?\\..*")&&r!=null&&r.getBitLength()==32)regs.add(r.getAddress().getOffset());}
+        return callRegisters=List.copyOf(regs);
+    }
+    private List<Long> callRegisters;
     private void forgetReturnOutput(Map<Long,Long> links,Set<Long> written,Dest output,Long value,boolean exact){
         for(String bank:List.of("A","B"))for(int k=0;k<32;k++){long offset=program.getRegister(bank+k).getAddress().getOffset();if(output.offset()>=offset+4||offset>=output.offset()+output.size())continue;
             if(!written.add(offset)||!exact||output.offset()!=offset||output.size()!=4||value==null)links.remove(offset);else links.put(offset,value);

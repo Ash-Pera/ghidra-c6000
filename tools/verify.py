@@ -133,6 +133,7 @@ CORE = [
     case("mvc-tscl", "MvcControl", "C6000_MVC_CONTROL_OK"),
     case("circular-addressing", "CircularAddress", "C6000_CIRCULAR_ADDRESS_OK"),
     case("nonalign-circular", "NonalignedCircular", "C6000_NONALIGNED_CIRCULAR_OK"),
+    case("store-alignment", "StoreAlignment", "C6000_STORE_ALIGNMENT_OK"),
     case("elf-local-label", "ElfLocalLabel", "C6000_ELF_LOCAL_LABEL_OK", None, analysis=True),
     case("elf-compact", "ElfCompact", "C6000_ELF_COMPACT_OK", None, analysis=True),
 ]

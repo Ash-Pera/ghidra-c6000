@@ -59,6 +59,10 @@ public class C6000RegisterCallScheduleTest extends GhidraScript {
 		finally {
 			System.clearProperty("c6000.opaqueCalls");
 		}
+		// Without the gate model a copy return stays refused, as before.
+		try { schedule(0x1140L); throw new AssertionError("00001140 scheduled without opaque calls"); }
+		catch (IllegalArgumentException e) { if (!e.getMessage().contains("unresolved register branch")) throw e; }
+		checks++;
 		println("C6000_REGISTER_CALL_SCHEDULE_OK checks=" + checks);
 	}
 

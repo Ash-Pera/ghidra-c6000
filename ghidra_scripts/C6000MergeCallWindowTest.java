@@ -2,7 +2,7 @@
 // @category C6000
 // Delay-window recovery over a call a flow repair disassembled outside any
 // function body, in a tests/fixtures/merge-call-window.py image.
-// Run as preScript with "prepare", then as postScript with no arguments.
+// Run as a postScript with -noanalysis (verify.py: analysis=False).
 
 import c6000.C6000DelaySlots;
 import c6000.C6000PacketContext;
@@ -15,15 +15,9 @@ import ghidra.program.model.listing.Instruction;
 public class C6000MergeCallWindowTest extends GhidraScript {
 	@Override
 	protected void run() throws Exception {
-		if (getScriptArgs().length == 1 && getScriptArgs()[0].equals("prepare")) {
-			// Only the self-contained handler is declared; nothing reaches the
-			// packet at 0x1040, so auto-analysis leaves it undecoded and unowned.
-			currentProgram.getSymbolTable().addExternalEntryPoint(toAddr(0x1000L));
-			C6000PacketContext.prime(currentProgram, monitor);
-			disassemble(toAddr(0x1000L));
-			createFunction(toAddr(0x1000L), "handler");
-			return;
-		}
+		// Run with -noanalysis, as a flow repair is: auto-analysis would decode
+		// this small image whole and recover the window before the repair runs.
+		C6000PacketContext.prime(currentProgram, monitor);
 
 		Address issue = toAddr(0x1044L);   // LDW .. || B callee : the delayed call
 		Address last = toAddr(0x1050L);    // ADD 0,B5,A4 : the last delay slot (the MV into A4)
@@ -38,6 +32,9 @@ public class C6000MergeCallWindowTest extends GhidraScript {
 		Instruction call = getInstructionAt(issue);
 		if (call == null || !call.getMnemonicString().equals("B.S1")) {
 			throw new AssertionError("fixture shape changed: issue is " + call);
+		}
+		if (call.getPrototype().getDelaySlotByteCount() != 0) {
+			throw new AssertionError("fixture precondition: the window is already native, recovery not exercised: " + call);
 		}
 
 		C6000DelaySlots.recover(currentProgram, monitor, new MessageLog());
@@ -60,6 +57,6 @@ public class C6000MergeCallWindowTest extends GhidraScript {
 		if (!writesA4) {
 			throw new AssertionError("fixture shape changed: the last slot does not write A4: " + mv);
 		}
-		println("C6000_MERGE_CALL_WINDOW_OK checks=3");
+		println("C6000_MERGE_CALL_WINDOW_OK checks=4");
 	}
 }

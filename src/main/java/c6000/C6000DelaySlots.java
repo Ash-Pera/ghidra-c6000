@@ -31,7 +31,7 @@ public final class C6000DelaySlots {
             List<SavedRef> references, boolean fallThroughOverridden, Address fallThrough) { }
     private record Window(Instruction branch, Address end, Function owner) { }
 
-    /** B/BNOP or CALLP; nested transfers and ownership conflicts are refused. */
+    /** B/BNOP or CALLP; a same-target prologue branch nests soundly, other nested transfers refuse. */
     public static List<Repair> recover(Program program, TaskMonitor monitor, MessageLog log)
             throws Exception {
         int transaction = program.startTransaction("Recover C6000 delay windows");
@@ -318,6 +318,8 @@ public final class C6000DelaySlots {
                 !original.getMnemonicString().startsWith("CALLP"));
         if(isReturn)override=FlowOverride.RETURN;
         listing.clearCodeUnits(at,end,false);
+        // A branch issued inside the window is a plain slot goto, never its own window.
+        if(end.compareTo(at.next())>=0)p.getProgramContext().setValue(p.getRegister("c_flow_delay"),at.next(),end,BigInteger.ZERO);
         p.getProgramContext().setValue(p.getRegister("c_flow_delay"),at,at,BigInteger.valueOf(bytes));
         if(registerBranch)
             p.getProgramContext().setValue(p.getRegister("c_branch_terminal"),at,at,BigInteger.ONE);
@@ -365,6 +367,24 @@ public final class C6000DelaySlots {
         }
         Instruction next(Instruction i){var next=decode(i.getMaxAddress().next());
             while(next!=null&&C6000CallAnalyzer.baseName(next).equals("CPKT"))next=decode(next.getMaxAddress().next());return next;}
+        /** Single displacement target of a plain B, else null (register, call or ambiguous forms give null). */
+        private Address dispTarget(Instruction b){String n=C6000CallAnalyzer.baseName(b);
+            if(b.getRegister(0)!=null||!(n.equals("B.S1")||n.equals("B.S2"))||b.getFlowType().isCall())return null;
+            var flows=b.getDefaultFlows();return flows.length==1?flows[0]:null;}
+        /**
+         * A branch issued in the outer's window that a native delay-slot lift represents soundly
+         * (SPRUFE8B 4.2.6): the outer is an unconditional B that always transfers to its target, and
+         * the inner redirects to that same target (the pipelined-prologue idiom), so a slot goto that
+         * fires lands exactly where the outer would. The caller still requires every window instruction
+         * after it to be inert, so the slot goto drops nothing. A predicated outer has a fall-through
+         * path that a window would reroute; that and other shapes (complementary pairs, returns, calls)
+         * have no sound one-window form and refuse.
+         */
+        private boolean soundInner(Instruction issue,Instruction inner){
+            if(issue.getMnemonicString().startsWith("["))return false;
+            Address it=dispTarget(inner),ot=dispTarget(issue);
+            return it!=null&&ot!=null&&ot.equals(it);
+        }
         Window window(Instruction issue,TaskMonitor monitor)throws CancelledException {
             int remaining=5;
             String name=C6000CallAnalyzer.baseName(issue);
@@ -383,7 +403,7 @@ public final class C6000DelaySlots {
             var owner=program.getFunctionManager().getFunctionContaining(issue.getAddress());
             Instruction current=issue;int count=0;
             try {
-                boolean issuePacket=true;
+                boolean issuePacket=true;boolean sawInner=false;
                 do {
                     int cycles=issuePacket?packetCycles(issue):1;
                     if(cycles<0)return null;
@@ -415,7 +435,13 @@ public final class C6000DelaySlots {
                     while(!issuePacket||C6000ExecutionPackets.parallelWithNext(program,current)) {
                         monitor.checkCancelled();if(++packetInstructions>8)return null;var next=next(current);if(next==null||++count>MAX_INSTRUCTIONS)return null;
                         if(next.getAddress().subtract(issue.getMaxAddress())>MAX_BYTES)return null;
-                        if(next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal())return null;
+                        // A branch issued in the window is accepted only when a native slot lift
+                        // represents it soundly (same outer target, or same-packet complement);
+                        // then every following window instruction must be inert, so a slot goto
+                        // that fires drops nothing (SPRUFE8B 4.2.6). Everything else still refuses.
+                        boolean transfer=next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal();
+                        if(transfer){if(!soundInner(issue,next))return null;sawInner=true;}
+                        else if(sawInner&&!C6000CallAnalyzer.baseName(next).equals("NOP"))return null;
                         var other=program.getFunctionManager().getFunctionContaining(next.getAddress());
                         if(other!=null&&!other.equals(owner))return null;
                         if(program.getFunctionManager().getFunctionAt(next.getAddress())!=null)return null;

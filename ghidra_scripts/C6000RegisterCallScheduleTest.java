@@ -6,6 +6,7 @@
 
 import c6000.C6000PipelineCompiler;
 import c6000.C6000PipelineContracts;
+import c6000.C6000PipelineSchedules;
 import ghidra.app.decompiler.DecompInterface;
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.listing.Function;
@@ -41,6 +42,12 @@ public class C6000RegisterCallScheduleTest extends GhidraScript {
 			// but a tail CALLIND, as the reference (SPEC R7a) takes it, although the listing returns through the copy.
 			calls(0x1140L, List.of(0x10e0L), 1);
 			tail(0x1140L);
+			// The same with the copy after the entry packet: enabling rewrites the entry, and the schedule rebound then
+			// (C6000PipelineContracts.bind) must still take B A0 as the tail call.
+			calls(0x11e0L, List.of(0x10e0L), 1);
+			tail(0x11e0L);
+			C6000PipelineSchedules.enable(currentProgram, getFunctionAt(toAddr(0x11e0L)), "fixture entry: drained pipeline", Set.of(), monitor);
+			checks++;
 			// A fresh link that is no sequential return point: the callee returns there (SPEC R3), no tail call. Natively
 			// the branch is no call, so the return point is declared part of the function, as ELF symbol sizes would.
 			disassemble(toAddr(0x11b8L));

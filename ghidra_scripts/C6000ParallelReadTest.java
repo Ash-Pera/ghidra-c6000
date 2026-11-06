@@ -10,7 +10,6 @@ import java.util.List;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import c6000.C6000PacketContext;
-import ghidra.app.cmd.disassemble.DisassembleCommand;
 import ghidra.app.script.GhidraScript;
 import ghidra.pcode.exec.BytesPcodeArithmetic;
 import ghidra.pcode.exec.BytesPcodeExecutorState;
@@ -20,10 +19,13 @@ import ghidra.pcode.exec.PcodeExecutorStatePiece;
 import ghidra.pcode.exec.PcodeProgram;
 import ghidra.pcode.exec.PcodeStateCallbacks;
 import ghidra.pcode.exec.PcodeUseropLibrary;
+import ghidra.app.util.PseudoInstruction;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSet;
+import ghidra.program.model.lang.ProcessorContextImpl;
 import ghidra.program.model.lang.Register;
 import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.mem.DumbMemBufferImpl;
 import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 import ghidra.program.model.symbol.RefType;
@@ -45,16 +47,20 @@ public class C6000ParallelReadTest extends GhidraScript {
 		Address at = address(offset);
 		Instruction result = getInstructionAt(at);
 		if (result == null) {
-			DisassembleCommand command = new DisassembleCommand(at,
-				new AddressSet(at, at.add(3)), false);
-			if (!command.applyTo(currentProgram, monitor)) {
-				throw new AssertionError("Cannot disassemble " + at + ": " +
-					command.getStatusMsg());
-			}
-			result = getInstructionAt(at);
+			result = parseInstruction(offset);
 		}
-		if (result == null) throw new AssertionError("No instruction at " + at);
 		return result;
+	}
+
+	private Instruction parseInstruction(long offset) throws Exception {
+		Address at = address(offset);
+		var processor = new ProcessorContextImpl(currentProgram.getLanguage());
+		var registerValue = currentProgram.getProgramContext().getRegisterValue(
+			currentProgram.getLanguage().getContextBaseRegister(), at);
+		if (registerValue != null) processor.setRegisterValue(registerValue);
+		var memory = new DumbMemBufferImpl(currentProgram.getMemory(), at);
+		var prototype = currentProgram.getLanguage().parse(memory, processor, false);
+		return new PseudoInstruction(currentProgram, at, prototype, memory, processor);
 	}
 
 	private BytesPcodeExecutorState state(JsonObject input) {
@@ -130,7 +136,7 @@ public class C6000ParallelReadTest extends GhidraScript {
 		Address branchAt = address(branchPc);
 		currentProgram.getProgramContext().setValue(currentProgram.getRegister("c_flow_delay"),
 			branchAt, branchAt, BigInteger.valueOf(row.get("delay_bytes").getAsInt()));
-		Instruction branch = instruction(branchPc);
+		Instruction branch = parseInstruction(branchPc);
 		Register tested = currentProgram.getRegister("B1");
 		Register delayed = currentProgram.getRegister("B6");
 		int read = -1;
@@ -150,6 +156,12 @@ public class C6000ParallelReadTest extends GhidraScript {
 			if (commit < 0 && overlaps(tested, op.getOutput())) commit = index;
 			if (delayWrite < 0 && overlaps(delayed, op.getOutput())) delayWrite = index;
 		}
+		println("PARALLEL_READ_BRANCH_PCODE " + branch + " context=" +
+			context("c_pkt_active", branchPc) + "/" +
+			context("c_pkt_branch_end", branchPc) + "/" +
+			context("c_pkt_pred", branchPc) + "/" +
+			context("c_pkt_write0", branchPc) + "/" +
+			Arrays.toString(code));
 		check(branch.getMnemonicString().contains("B.S2"),
 			"branch-terminal decoded as " + branch);
 		check(read >= 0, "branch does not read B1");
@@ -178,9 +190,13 @@ public class C6000ParallelReadTest extends GhidraScript {
 	private void checkJump(JsonObject jump, boolean late) throws Exception {
 		String name = jump.get("name").getAsString();
 		long writer = jump.get("packet").getAsLong();
-		Register defer = currentProgram.getRegister("c_pkt_write");
-		check(defer != null, "parallel-read context field missing for " + name);
-		BigInteger before = context("c_pkt_write", writer);
+		check(currentProgram.getRegister("c_pkt_active") != null &&
+			currentProgram.getRegister("c_pkt_write0") != null &&
+			currentProgram.getRegister("c_pkt_write1") != null,
+			"parallel-read context fields missing for " + name);
+		BigInteger before = context("c_pkt_active", writer);
+		if (!late) check(before == null || before.signum() == 0,
+			name + " was not refused during prime: " + before);
 		if (late) {
 			try {
 				Method audit = C6000PacketContext.class.getMethod("audit",
@@ -193,9 +209,15 @@ public class C6000ParallelReadTest extends GhidraScript {
 				check(false, "post-analysis packet audit is missing");
 			}
 		}
-		BigInteger after = context("c_pkt_write", writer);
+		BigInteger after = context("c_pkt_active", writer);
+		BigInteger write0 = context("c_pkt_write0", writer);
+		BigInteger write1 = context("c_pkt_write1", writer);
 		check(after == null || after.signum() == 0,
-			name + " retained writer deferral, before=" + before + " after=" + after);
+			name + " retained packet deferral, before=" + before + " after=" + after);
+		check(write0 == null || write0.signum() == 0,
+			name + " retained first deferred writer: " + write0);
+		check(write1 == null || write1.signum() == 0,
+			name + " retained second deferred writer: " + write1);
 		println("PARALLEL_READ_JUMP " + name + " before=" + before + " after=" + after);
 	}
 

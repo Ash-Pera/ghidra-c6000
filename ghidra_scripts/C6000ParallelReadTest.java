@@ -63,6 +63,19 @@ public class C6000ParallelReadTest extends GhidraScript {
 		return new PseudoInstruction(currentProgram, at, prototype, memory, processor);
 	}
 
+	private Instruction materializeInstruction(long offset) throws Exception {
+		Address at = address(offset);
+		Instruction listed = currentProgram.getListing().getInstructionAt(at);
+		if (listed != null) return listed;
+		var processor = new ProcessorContextImpl(currentProgram.getLanguage());
+		var registerValue = currentProgram.getProgramContext().getRegisterValue(
+			currentProgram.getLanguage().getContextBaseRegister(), at);
+		if (registerValue != null) processor.setRegisterValue(registerValue);
+		var memory = new DumbMemBufferImpl(currentProgram.getMemory(), at);
+		var prototype = currentProgram.getLanguage().parse(memory, processor, false);
+		return currentProgram.getListing().createInstruction(at, prototype, memory, processor, 0);
+	}
+
 	private BytesPcodeExecutorState state(JsonObject input) {
 		BytesPcodeExecutorState result =
 			new BytesPcodeExecutorState(currentProgram.getLanguage(), PcodeStateCallbacks.NONE);
@@ -130,6 +143,19 @@ public class C6000ParallelReadTest extends GhidraScript {
 		return start < registerEnd && registerStart < end;
 	}
 
+	private boolean referencesPacketShadow(Instruction instruction) {
+		Register shadowA4 = currentProgram.getRegister("C6000_PKT_A4");
+		Register shadowB4 = currentProgram.getRegister("C6000_PKT_B4");
+		if (shadowA4 == null || shadowB4 == null) return false;
+		for (PcodeOp op : instruction.getPcode(false)) {
+			for (Varnode input : op.getInputs()) {
+				if (overlaps(shadowA4, input) || overlaps(shadowB4, input)) return true;
+			}
+			if (overlaps(shadowA4, op.getOutput()) || overlaps(shadowB4, op.getOutput())) return true;
+		}
+		return false;
+	}
+
 	private void checkBranchDelay(JsonObject row) throws Exception {
 		long entry = row.get("entry").getAsLong();
 		long branchPc = entry + 4;
@@ -156,12 +182,6 @@ public class C6000ParallelReadTest extends GhidraScript {
 			if (commit < 0 && overlaps(tested, op.getOutput())) commit = index;
 			if (delayWrite < 0 && overlaps(delayed, op.getOutput())) delayWrite = index;
 		}
-		println("PARALLEL_READ_BRANCH_PCODE " + branch + " context=" +
-			context("c_pkt_active", branchPc) + "/" +
-			context("c_pkt_branch_end", branchPc) + "/" +
-			context("c_pkt_pred", branchPc) + "/" +
-			context("c_pkt_write0", branchPc) + "/" +
-			Arrays.toString(code));
 		check(branch.getMnemonicString().contains("B.S2"),
 			"branch-terminal decoded as " + branch);
 		check(read >= 0, "branch does not read B1");
@@ -235,8 +255,20 @@ public class C6000ParallelReadTest extends GhidraScript {
 		checkBranchDelay(cases.getAsJsonObject("branch"));
 		JsonObject late = jumps.get(1).getAsJsonObject();
 		instruction(late.get("source").getAsLong());
+		long packet = late.get("packet").getAsLong();
+		Instruction writer = materializeInstruction(packet);
+		materializeInstruction(packet + 4);
+		check(referencesPacketShadow(writer),
+			"late-target packet was not staged before its audit");
 		addJumpReference(late);
 		checkJump(late, true);
+		for (long pc : new long[] {packet, packet + 4}) {
+			Instruction decoded = getInstructionAt(address(pc));
+			check(decoded != null, "audit did not re-decode packet instruction at " +
+				Long.toHexString(pc));
+			if (decoded != null) check(!referencesPacketShadow(decoded),
+				"audit retained packet-shadow p-code at " + Long.toHexString(pc));
+		}
 		if (!failures.isEmpty()) throw new AssertionError(String.join("; ", failures));
 		println("C6000_PARALLEL_READ_OK runs=" + cases.getAsJsonArray("runs").size() +
 			" jumps=" + jumps.size() + " packets=" + packets);

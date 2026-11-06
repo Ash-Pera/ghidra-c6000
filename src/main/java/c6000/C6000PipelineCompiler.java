@@ -1309,7 +1309,7 @@ public final class C6000PipelineCompiler {
         Long origin=register==null?null:source.returns().links().get(register.getAddress().getOffset());
         // A B B3 the call analyzer proved a call is not a return; without a closed-call plan it is refused (issue #39).
         var listed=program.getListing().getInstructionAt(instruction.getAddress());boolean provenCall=listed!=null&&listed.getFlowOverride()==ghidra.program.model.listing.FlowOverride.CALL;
-        boolean returns=!call&&register!=null&&(source.returns().activeCall()!=NO_CALL?origin!=null&&origin==source.returns().activeCall():origin!=null&&origin==ENTRY_LINK||register.getName().equals("B3")&&!provenCall);
+        boolean returns=!call&&register!=null&&(source.returns().activeCall()!=NO_CALL?origin!=null&&origin==source.returns().activeCall():origin!=null&&origin==ENTRY_LINK||register.getName().equals("B3")&&!provenCall||copyReturn(instruction));
         if(closedCall!=null&&!call&&register!=null){var active=closedCalls.get(source.returns().activeCall());if(active!=null&&at!=active.calleeReturnPc()||active==null&&!Objects.equals(at,closedCall.callerReturnPc()))throw fail("closed-call undeclared register edge");}
         boolean registerCall=register!=null&&!returns&&!call&&ordinarySchedule();
         if(register!=null&&!returns&&!call&&!registerCall)throw fail("unresolved register branch "+instruction);
@@ -1356,16 +1356,16 @@ public final class C6000PipelineCompiler {
         var listed=program.getListing().getInstructionAt(entry.getNewAddress(landing.pc()));
         Long link=flow.links().get(LINK_CONST);boolean stale=link!=null&&link.equals(flow.links().get(LINK_STALE));
         if(listed!=null&&listed.getFlowType().isCall()||link!=null&&!stale)return opaqueCall(landing,flow,flights,branches,issued,loop);
-        // A listed return through a register other than B3 (C6000ReturnAnalyzer.entryLinkCopy, decided before any schedule
-        // rewrote the entry) whose copy the clobber model killed is open, as a computed jump is.
-        boolean copyReturn=listed!=null&&listed.getFlowOverride()==FlowOverride.RETURN&&listed.getRegister(0)!=null&&!listed.getRegister(0).getName().equals("B3");
-        boolean open=listed!=null&&(copyReturn||listed.getFlowType().isJump()&&listed.getFlowType().isComputed()&&Arrays.stream(listed.getReferencesFrom()).noneMatch(r->r.getReferenceType().isFlow()));
+        boolean open=listed!=null&&listed.getFlowType().isJump()&&listed.getFlowType().isComputed()&&Arrays.stream(listed.getReferencesFrom()).noneMatch(r->r.getReferenceType().isFlow());
         if(!open||!stale&&!Objects.equals(flow.links().get(linkOffset()),ENTRY_LINK))throw fail("unresolved register branch "+listed);
         if(loop!=null||!branches.isEmpty()||issued!=null)throw fail("opaque call has unresolved control effects");
         long marker=-0x100000000L-landing.pc();
         opaqueCalls.put(marker,new OpaqueCall(landing.pc(),REGISTER_CALL,null,false));
         return marker;
     }
+    /** Local (gate model, exactcheck SPEC R2): a listed return through an entry copy of B3 (C6000ReturnAnalyzer) is a return,
+     *  even when the clobber model hashed the copy across a call. */
+    private boolean copyReturn(Instruction instruction){var listed=program.getListing().getInstructionAt(instruction.getAddress());return ordinarySchedule()&&listed!=null&&listed.getFlowOverride()==FlowOverride.RETURN&&listed.getRegister(0)!=null&&!listed.getRegister(0).getName().equals("B3");}
     private boolean writesLinkAt(Insn instruction,int phase){return writesAt(instruction,phase,linkOffset());}
     private boolean writesAt(Insn instruction,int phase,long reg){return instruction.outputs().stream().anyMatch(d->d.phase()==phase&&d.offset()<reg+4&&reg<d.offset()+d.size());}
     private boolean writesLink(Insn instruction,int after){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()>after&&d.offset()<b3+4&&b3<d.offset()+d.size());}

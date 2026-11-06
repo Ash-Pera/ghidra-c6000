@@ -93,6 +93,8 @@ printf '  Ghidra    : %s\n  JDK       : %s\n  user.home : %s\n' \
   "$GHIDRA" "$JH" "$WORK/home"
 
 note "compiling SLEIGH"
+python3 "$ROOT/tools/gen_packet_sinc.py"
+python3 "$ROOT/tools/gen_flow_delay.py"
 for spec in "$ROOT"/data/languages/*.slaspec; do
   ( cd "$ROOT" && "$GHIDRA/support/sleigh" "$spec" )
 done

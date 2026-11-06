@@ -28,7 +28,7 @@ interrupt and exceptional-loop limitations are detailed in [limitations](limitat
 |---|---|
 | Repository release | `v1.3.0` |
 | Ghidra compatibility matrix | 12.1.4 / JDK 21; 12.2 / JDK 25 |
-| Language version | 2.0 for all eight definitions (big-endian since issue #31; little-endian since v1.3.0, 64-bit context register) |
+| Language version | 2.0 for the four little-endian definitions (64-bit context register since v1.3.0); locally 3.0 for the four big-endian ones (12-byte context register) |
 | Archive naming | `ghidra_<Ghidra version>_PUBLIC_<build date>_C6000.zip` |
 | Extension-property version | Ghidra compatibility version, substituted from `@extversion@` during build |
 
@@ -43,6 +43,8 @@ each context field into the 64-bit context register by name; review their exact
 schedules again. Re-run auto-analysis afterwards. Both migrations re-disassemble existing
 programs, which can drop an instruction after a delay window that mixes 32-bit and
 compact instructions (Ghidra #10242).
+Locally big-endian programs go to version 3 (version 2 ones through
+`C6000Be*V2LanguageTranslator`), and the translators also prime packet staging.
 Keep a packed backup and annotation inventory before upgrading; existing Bad
 Instruction bookmarks may be removed. Preserve and, where required, restore their
 recorded addresses, types, categories and comments before saving. See

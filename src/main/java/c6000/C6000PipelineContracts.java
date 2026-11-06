@@ -259,6 +259,11 @@ public final class C6000PipelineContracts {
                 var normalized = new ProcessorContextImpl(program.getLanguage());
                 if (value != null) normalized.setRegisterValue(value);
                 normalized.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"), BigInteger.ZERO));
+                for (String name : List.of("c_pkt_active", "c_pkt_start", "c_pkt_end",
+                        "c_pkt_branch_end", "c_pkt_pred", "c_pkt_write0", "c_pkt_write1")) {
+                    normalized.setRegisterValue(new RegisterValue(program.getRegister(name),
+                        BigInteger.ZERO));
+                }
                 text.append(':').append(normalized.getRegisterValue(base)).append('\n');
                 if (!at.equals(entry) && schedule.covered().contains(at) &&
                     BigInteger.ONE.equals(context.getValue(program.getRegister("c_schedule_entry"), at, false))) {

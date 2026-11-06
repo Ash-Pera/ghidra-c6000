@@ -411,11 +411,17 @@ function bodies. Delay-window recovery therefore sets every windowed conditional
 fall-through to the next execute packet after its native window, the packet primer's
 parallel-peer windows included, and keeps the whole window in the function's body.
 
-The 1.2 language minor version forces Ghidra's native re-disassembly upgrade. This is
-necessary when a corrected compact operand partition distinguishes bits that an older
-shared persisted prototype ignored. Updating the extension alone can leave old programs
-with stale operand text and p-code. Preserve a packed backup and annotation inventory
-before upgrade. Native migration can remove existing Bad Instruction error bookmarks;
-retain/restore those from the backup if preserving every annotation is required. Audit
-actual processor context and instruction extents as well as symbols, functions and
-references.
+Locally big-endian languages are version 3.0 and their `contextreg` is 12 bytes, for the
+packet-staging fields. The version 1 translators above go straight to 3, and
+`C6000Be*V2LanguageTranslator` take version 2 programs to 3; both prime compact halfwords
+and packet staging, then re-decode. Little-endian version 1 programs use the `.trans`
+files: Ghidra keeps one translator per version pair, so the packet-staging commit's
+little-endian Java translators are not carried (local).
+
+The version bumps resize the context register for parallel-read packet fields and force
+Ghidra's native re-disassembly upgrade. Updating the extension alone can leave old
+programs with stale operand text and p-code. Preserve a packed backup and annotation
+inventory before upgrade. Native migration can remove existing Bad Instruction error
+bookmarks; retain/restore those from the backup if preserving every annotation is
+required. Audit actual processor context and instruction extents as well as symbols,
+functions and references.

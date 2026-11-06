@@ -773,9 +773,14 @@ public final class C6000DelaySlots {
                         if(prior.getFlowType().isJump()||prior.getFlowType().isCall()||prior.getFlowType().isTerminal())return null;
                         var priorOwner=program.getFunctionManager().getFunctionContaining(priorAt);
                         // A physical predecessor's p bit does not prove that
-                        // an alternate entry executed it. Require the owned
-                        // prefix and reject incoming control into this suffix.
-                        if(owner==null||!owner.equals(priorOwner))return null;
+                        // an alternate entry executed it. The prefix must share
+                        // the issue's ownership, and incoming control into this
+                        // suffix is rejected below. A call a flow repair just
+                        // disassembled (e.g. a switch-merge target) is not yet
+                        // in any function body when recovery runs over it;
+                        // accept owner==null when the prefix is unowned too, not
+                        // only when both are the same function.
+                        if(owner==null?priorOwner!=null:!owner.equals(priorOwner))return null;
                         var incoming=program.getReferenceManager().getReferencesTo(issue.getAddress());
                         while(incoming.hasNext())if(incoming.next().getReferenceType().isFlow())return null;
                         if(C6000ExecutionPackets.startsMulticycleNop(prior)) {

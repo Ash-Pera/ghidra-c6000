@@ -1362,7 +1362,9 @@ public final class C6000PipelineCompiler {
         var listed=program.getListing().getInstructionAt(entry.getNewAddress(landing.pc()));
         Long link=flow.links().get(LINK_CONST);boolean stale=link!=null&&link.equals(flow.links().get(LINK_STALE));
         if(listed!=null&&listed.getFlowType().isCall()||link!=null&&!stale)return opaqueCall(landing,flow,flights,branches,issued,loop);
-        boolean open=listed!=null&&listed.getFlowType().isJump()&&listed.getFlowType().isComputed()&&Arrays.stream(listed.getReferencesFrom()).noneMatch(r->r.getReferenceType().isFlow());
+        // A listed return through an entry copy of B3 that the clobber model killed is open, as a computed jump is.
+        boolean copyReturn=listed!=null&&listed.getFlowOverride()==FlowOverride.RETURN&&C6000ReturnAnalyzer.entryLinkCopy(program,listed);
+        boolean open=listed!=null&&(copyReturn||listed.getFlowType().isJump()&&listed.getFlowType().isComputed()&&Arrays.stream(listed.getReferencesFrom()).noneMatch(r->r.getReferenceType().isFlow()));
         if(!open||!stale&&!Objects.equals(flow.links().get(linkOffset()),ENTRY_LINK))throw fail("unresolved register branch "+listed);
         if(loop!=null||!branches.isEmpty()||issued!=null)throw fail("opaque call has unresolved control effects");
         long marker=-0x100000000L-landing.pc();

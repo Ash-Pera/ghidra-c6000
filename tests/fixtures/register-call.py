@@ -25,6 +25,8 @@ prepare declares the ten functions, as ELF symbols would. Words are TI cl6x
   1180 sink2   ADD 2,A4,A4 ; B B3 ; NOP 5
   11a0 rloop   MV B3,B13 ; B.S2X A4 ; MVK/MVKH 0x11b8,B3 ; NOP 3 ; NOP ; MV B13,B3 ; B B3 ; NOP 5
                a call whose fresh link is no sequential return point (a software-pipelined call loop shape)
+  11e0 rcopy2  NOP ; MV B3,A0 ; MVK/MVKH sink,B5 ; B.S2 B5 ; ADDKPC 0x11f8,B3,4 ; B.S2X A0 ; NOP 5
+               rcopy with the copy after the entry packet
 """
 
 from pathlib import Path
@@ -52,6 +54,8 @@ WORDS = {
     0x1180: 0x02104058, 0x1184: 0x000C0362, 0x1188: 0x00008000, 0x11A0: 0x068C0FDA,
     0x11A4: 0x00101362, 0x11A8: 0x0188DC2A, 0x11AC: 0x0180006A, 0x11B0: 0x00004000,
     0x11B4: 0x00000000, 0x11B8: 0x01B406A2, 0x11BC: 0x000C0362, 0x11C0: 0x00008000,
+    0x11E0: 0x00000000, 0x11E4: 0x000C1FD8, 0x11E8: 0x0288702A, 0x11EC: 0x0280006A,
+    0x11F0: 0x00140362, 0x11F4: 0x01868162, 0x11F8: 0x00001362, 0x11FC: 0x00008000,
 }
 
 

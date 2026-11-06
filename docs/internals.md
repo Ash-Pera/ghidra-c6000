@@ -96,9 +96,21 @@ Bit 0 of a full32 opcode is its p-bit. Compact instructions take their p-bits fr
 13–0 of the fetch-packet header. A set p-bit chains the following instruction into the
 same execute packet, including across fetch boundaries.
 
-Default lifting handles instructions individually. A reader may therefore see a parallel
-writer's value too early, and ordinary result latencies are not scheduled. Supported
-functions can instead use an explicitly enabled
+`C6000ParallelReadScheduler` analyzes raw p-code for each physical packet and selects
+only GPRs with an intra-packet read-after-write. The SLEIGH root wrapper saves each
+selected architectural register, builds the instruction, copies its output to a hidden
+`C6000_PKT_*` shadow, then restores the architectural register. The final member commits
+the mask-selected shadows; if a branch is last, `CFlowDelay` commits after its operands
+are read and before its delay slots. Instruction operands and register names remain the
+architectural A/B registers.
+
+Packets with opaque semantics, unsupported predicates or control transfers, more than
+two deferred outputs per writer, or incoming targets into the staged packet interior are
+left unstaged. Prime-time references are checked before disassembly; the post-analysis
+audit also checks newly discovered targets, clears deferral, and re-decodes listed
+members. Exact pipeline-schedule p-code parsing normalizes these context fields to zero,
+so native staging is not applied a second time. Ordinary result latencies are still not
+scheduled by this native path; supported functions can instead use an explicitly enabled
 [exact packet schedule](pipeline-schedules.md), with a proved entry contract.
 
 ### Native delay windows

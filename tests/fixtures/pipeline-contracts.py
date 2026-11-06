@@ -20,8 +20,9 @@ def main():
     struct.pack_into(order + 'I', data, 0x141c, 0xe0200000)  # First word is compact.
     struct.pack_into(order + 'II', data, 0x1420, 0x000c0362, 0x00008000)  # B B3; NOP5.
     image.write_bytes(data)
+    # SPRUFE8B section 3.5: the parallel MV reads A3 before the MVK writes it.
     cases.write_text(json.dumps([
-        dict(name='parallel_old', entry=0x1000, inputs=dict(A3=0x44), output='A4', expected=0x44, raw=1),
+        dict(name='parallel_old', entry=0x1000, inputs=dict(A3=0x44), output='A4', expected=0x44, raw=0x44),
         dict(name='mpysp_delay', entry=0x1100, inputs=dict(A3=0x40000000, A4=0x40400000, A5=0x55),
              output='A6', expected=0x55, raw=0x40c00000),
         dict(name='load_write_phases', entry=0x1e40, inputs=dict(A4=0x8000),

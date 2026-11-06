@@ -40,6 +40,23 @@ public class C6000PipelinePackTest extends GhidraScript {
         if (!frame.isFinished()) throw new AssertionError("Step bound: " + name);
     }
 
+    private void executePacket(Instruction first, BytesPcodeExecutorState state, String name) throws Exception {
+        Instruction member = first;
+        int index = 0;
+        while (true) {
+            execute(member.getPcode(false), state, name + " member " + index++);
+            if (!c6000.C6000ExecutionPackets.parallelWithNext(currentProgram, member)) return;
+            var next = member.getMaxAddress().next();
+            if (getInstructionAt(next) == null &&
+                !new DisassembleCommand(next, new AddressSet(next, next.add(3)), false)
+                    .applyTo(currentProgram, monitor)) {
+                throw new AssertionError("Cannot decode packet member at " + next);
+            }
+            member = getInstructionAt(next);
+            if (member == null) throw new AssertionError("Missing packet member at " + next);
+        }
+    }
+
     private long value(BytesPcodeExecutorState state, String register) {
         return arithmetic.toLong(state.getVar(currentProgram.getRegister(register),
             PcodeExecutorStatePiece.Reason.INSPECT), PcodeArithmetic.Purpose.INSPECT);
@@ -83,7 +100,7 @@ public class C6000PipelinePackTest extends GhidraScript {
             }
 
             var rawState = initialized(row);
-            execute(instruction.getPcode(false), rawState, name + " raw");
+            executePacket(instruction, rawState, name + " raw");
             String rawDestination = row.get("raw_destination").getAsString();
             long rawActual = value(rawState, rawDestination);
             if (rawActual != row.get("raw_expected").getAsLong())

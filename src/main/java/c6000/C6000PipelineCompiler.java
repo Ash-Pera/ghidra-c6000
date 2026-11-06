@@ -1330,8 +1330,8 @@ public final class C6000PipelineCompiler {
         emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);
     }
 
-    /** Local, opt-in (-Dc6000.opaqueCalls=true): the exactcheck gate's ABI model, not an upstream contract. */
-    private boolean ordinarySchedule(){return Boolean.getBoolean("c6000.opaqueCalls")&&traceContract==null&&closedCall==null&&callerTail==null&&storeTailContract==null;}
+    /** Local, opt-in (C6000PipelineSchedules.opaqueCalls): the exactcheck gate's ABI model, not an upstream contract. */
+    private boolean ordinarySchedule(){return C6000PipelineSchedules.opaqueCalls(program,function)&&traceContract==null&&closedCall==null&&callerTail==null&&storeTailContract==null;}
     private long linkOffset(){return program.getRegister("B3").getAddress().getOffset();}
     private boolean writesLinkAt(Insn instruction,int phase){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()==phase&&d.offset()<b3+4&&b3<d.offset()+d.size());}
     private boolean writesLink(Insn instruction,int after){long b3=linkOffset();return instruction.outputs().stream().anyMatch(d->d.phase()>after&&d.offset()<b3+4&&b3<d.offset()+d.size());}

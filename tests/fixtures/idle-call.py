@@ -3,7 +3,7 @@
 """Build B calls whose B3 returns to earlier code of the caller. Usage: IMAGE [be].
 
 Load at 0x1000 with entry 0x1000 and auto-analysis; C6000IdleCallTest.java
-prepare declares the eight functions, as ELF symbols would. Words are TI cl6x
+prepare declares the fourteen functions, as ELF symbols would. Words are TI cl6x
 8.3.15 output (-mv6740 --no_compress), listed by dis6x (SPRUFE8B 4.2.6, B, MVK/MVKH):
 
   1000 idle     MVK tbl,A4 ; B run || MVKH ; LDW *A4,A4 || MVK 0x1000,B3 ; MVKH ; NOP 3
@@ -22,6 +22,19 @@ prepare declares the eight functions, as ELF symbols would. Words are TI cl6x
                 predicated: not a call returning to 0x10e4 ; 10f8 B B3 ; NOP 5
   1100 run      B B3 ; NOP 5
   1120 tbl      .word 0
+  1140 regcall  MVK run,B5 ; MVKH ; B B5 ; MVK 7,A4 ; MVK 0x1140,B3 ; MVKH ; NOP 2
+                register B: lifted with its slots, not a call returning to regcall
+  1160 callp    MVK 1,A4 ; 1164 CALLP run,B3 ; B run ; MVK 0x1164,B3 ; MVKH ; NOP 3
+                CALLP has no delay slots: call, returns to 0x1164
+  1180 bnop     [A1] BNOP 0x1194,5 ; MVK 0x1180,B3 ; MVKH ; B run ; NOP 5 ; 1194 B B3 ; NOP 5
+                BNOP 5 has no delay slots: call, returns to bnop
+  11a0 nullify  B run ; MVK 0x11b0,B3 ; MVKH ; NOP 3 ; 11b0 [A1] B 0x11c8 ; NOP 5 ;
+                [A1] MVK 0x11b0,B3 ; [A1] MVKH ; B run ; NOP 5 ; 11c8 B B3 ; NOP 5
+                the B3 writes are nullified, B3 still the call's link: tail call
+  11e0 partial  B run ; MVK 0x11f0,B3 ; MVKH ; NOP 3 ; 11f0 MVKH 0,B3 ; B run ; NOP 5
+                B3's low half still the call's link: tail call
+  1200 regref   regcall's code, its B given a reference to run by the test
+                a register B with a known target: still not a call returning to regref
 """
 
 from pathlib import Path
@@ -41,6 +54,18 @@ WORDS = {
     0x10D4: 0x00000812, 0x10D8: 0x00008000, 0x10E0: 0x008000A8, 0x10E4: 0x02102058,
     0x10E8: 0x80000411, 0x10EC: 0x0188722A, 0x10F0: 0x0180006A, 0x10F4: 0x00006000,
     0x10F8: 0x000C0362, 0x10FC: 0x00008000, 0x1100: 0x000C0362, 0x1104: 0x00008000,
+    0x1140: 0x0288802A, 0x1144: 0x0280006A, 0x1148: 0x00140362, 0x114C: 0x020003A8,
+    0x1150: 0x0188A02A, 0x1154: 0x0180006A, 0x1158: 0x00002000, 0x1160: 0x020000A8,
+    0x1164: 0x1FFFF412, 0x1168: 0x0FFFF412, 0x116C: 0x0188B22A, 0x1170: 0x0180006A,
+    0x1174: 0x00004000, 0x1180: 0x8005A120, 0x1184: 0x0188C02A, 0x1188: 0x0180006A,
+    0x118C: 0x0FFFF012, 0x1190: 0x00008000, 0x1194: 0x000C0362, 0x1198: 0x00008000,
+    0x11A0: 0x0FFFEC10, 0x11A4: 0x0188D82A, 0x11A8: 0x0180006A, 0x11AC: 0x00004000,
+    0x11B0: 0x80000510, 0x11B4: 0x00008000, 0x11B8: 0x8188D82A, 0x11BC: 0x8180006A,
+    0x11C0: 0x0FFFE812, 0x11C4: 0x00008000, 0x11C8: 0x000C0362, 0x11CC: 0x00008000,
+    0x11E0: 0x0FFFE410, 0x11E4: 0x0188F82A, 0x11E8: 0x0180006A, 0x11EC: 0x00004000,
+    0x11F0: 0x0180006A, 0x11F4: 0x0FFFE412, 0x11F8: 0x00008000, 0x1200: 0x0288802A,
+    0x1204: 0x0280006A, 0x1208: 0x00140362, 0x120C: 0x020003A8, 0x1210: 0x0189002A,
+    0x1214: 0x0180006A, 0x1218: 0x00002000,
 }
 
 
@@ -48,7 +73,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x124)
+    image = bytearray(0x21C)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

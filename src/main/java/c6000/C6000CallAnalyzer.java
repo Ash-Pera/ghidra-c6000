@@ -378,7 +378,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			if (ret[0] < branchAt) {
 				// One fall-through cannot hold a predicated call's not-taken path.
 				Address loop = partner == null && predicate(branch) == null &&
-					freshLink(execution, branchIndex, b3) ? loopReturn(branch, ret[0], callee) : null;
+					freshLink(execution, branchIndex, b3, facts) ? loopReturn(branch, ret[0], callee) : null;
 				return loop == null ? null : new Call(callee, loop);
 			}
 			if (ret[0] < branchAt + 4 || ret[0] > windowEnd + 8) return null;
@@ -523,15 +523,17 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		 * B3 last written after the window of every earlier branch on the path
 		 * (a via jump aside): an earlier call's return link is not this one.
 		 */
-		private boolean freshLink(List<Instruction> execution, int branchIndex, Register b3) {
+		private boolean freshLink(List<Instruction> execution, int branchIndex, Register b3, List<PredicateFact> facts) {
 			int writer = -1, after = -1;
 			for (int i = 0; i < execution.size(); i++) {
 				Instruction insn = execution.get(i);
 				if (i < branchIndex && insn != viaInsn && isFlow(insn)) {
-					List<Instruction> slots = window(insn);
+					List<Instruction> slots = window(insn, delayCycles(insn));
 					if (slots == null) return false;
 					after = i + slots.size();
 				}
+				// A nullified write leaves the old link, and MVKH keeps its low half.
+				if (Boolean.FALSE.equals(executes(execution, i, facts)) || baseName(insn).startsWith("MVKH")) continue;
 				Register load = loadDestination(insn);
 				if ((load != null && overlaps(load, b3)) ||
 					issueWrites(insn).stream().anyMatch(r -> overlaps(r, b3))) writer = i;
@@ -912,12 +914,18 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 
 		/** The rest of {@code jump}'s execute packet and its five delay cycles; null on an incomplete window. */
 		private List<Instruction> window(Instruction jump) {
+			return window(jump, DELAY_CYCLES);
+		}
+
+		/** The rest of {@code jump}'s execute packet and {@code delay} cycles after it; null on an incomplete window. */
+		private List<Instruction> window(Instruction jump, int delay) {
+			if (delay < 0) return null;
 			List<Instruction> slots = new ArrayList<>();
 			Instruction current = jump;
 			int cycles = 0;
 			boolean branchPacket = true;
 			try {
-				while (cycles < DELAY_CYCLES) {
+				do {
 					int packetCycles = 1;
 					do {
 						if (branchPacket && !parallelWithNext(current)) break;
@@ -929,12 +937,21 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 					} while (parallelWithNext(current));
 					if (!branchPacket) cycles += packetCycles;
 					branchPacket = false;
-				}
+				} while (cycles < delay);
 			}
 			catch (MemoryAccessException e) {
 				return null;
 			}
 			return slots;
+		}
+
+		/** Delay cycles left for physical slots: none after CALLP, 5 - n after BNOP n (SPRUFE8B 3.12 BNOP, CALLP). */
+		private static int delayCycles(Instruction insn) {
+			String op = baseName(insn);
+			if (op.startsWith("CALLP")) return 0;
+			if (!op.startsWith("BNOP")) return DELAY_CYCLES;
+			Scalar n = insn.getScalar(1);
+			return n == null ? -1 : Math.max(0, DELAY_CYCLES - (int) n.getValue());
 		}
 
 		/** The address just past {@code jump}'s delay window. */

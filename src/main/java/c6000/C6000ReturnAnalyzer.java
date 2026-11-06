@@ -80,7 +80,7 @@ public class C6000ReturnAnalyzer extends AbstractAnalyzer {
 		Instruction copy = null;
 		for (Instruction i : program.getListing().getInstructions(function.getBody(), true)) {
 			if (i.getDelaySlotDepth() != 0) continue;
-			for (Object o : i.getResultObjects()) {
+			for (Object o : C6000PacketContext.architecturalResults(program, i)) {
 				if (!(o instanceof Register r) || !(r.contains(target) || target.contains(r))) continue;
 				if (copy != null) return false;
 				copy = i;
@@ -95,7 +95,7 @@ public class C6000ReturnAnalyzer extends AbstractAnalyzer {
 				references.getReferenceCountTo(i.getAddress()) != 0) return false;
 			if (i.getDelaySlotDepth() != 0 || i.getFlowType().isJump() || i.getFlowType().isCall() ||
 				i.getFlowType().isTerminal() || !i.getFlowType().hasFallthrough()) return false;
-			for (Object o : i.getResultObjects()) {
+			for (Object o : C6000PacketContext.architecturalResults(program, i)) {
 				if (o instanceof Register r && (r.contains(b3) || b3.contains(r))) return false;
 			}
 		}

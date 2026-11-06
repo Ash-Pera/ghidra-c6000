@@ -584,7 +584,8 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			// their own physical instruction and issue time in this walk.
 			if (insn.getDelaySlotDepth() != 0) return writes;
 			Register load = loadDestination(insn);
-			for (Object result : insn.getResultObjects()) if (result instanceof Register r && (load == null || !overlaps(r, load))) writes.add(r);
+			for (Object result : C6000PacketContext.architecturalResults(program, insn))
+				if (result instanceof Register r && (load == null || !overlaps(r, load))) writes.add(r);
 			if (load != null) { Register base = updatingBase(insn);if (base != null && !writes.contains(base)) writes.add(base); }
 			return writes;
 		}
@@ -700,7 +701,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			// A compact branch folds its parallel followers into its own p-code
 			// as delay slots; they are tracked separately, so skip its writes.
 			if (insn.getDelaySlotDepth() == 0) {
-				for (Object written : insn.getResultObjects()) {
+				for (Object written : C6000PacketContext.architecturalResults(program, insn)) {
 					if (written instanceof Register r) regs.remove(r);
 				}
 			}

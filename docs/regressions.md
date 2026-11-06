@@ -98,9 +98,8 @@ error bookmarks and `q1`, `f2` and `f3` must be functions, in both byte orders
 
 `tests/fixtures/upgrade-v1.py IMAGE [be]` copies a packed program of the same ELF saved
 with the version 1 languages (`tests/fixtures/data/`). Import it with Ghidra's GZF loader
-and run `C6000ElfCompactTest.java upgraded`: the big-endian program must migrate to
-language version 2 through `C6000BeDefaultLanguageTranslator` and decode in `dis6x`
-order; the little-endian one stays at version 1.
+and run `C6000ElfCompactTest.java upgraded`: little-endian programs must migrate to
+language version 2 and big-endian programs to version 3, then decode in `dis6x` order.
 
 Hand-built fixtures list compact slots in execution order, one halfword per address.
 `tests/fixtures/compact_order.py` rewrites their big-endian images so each compact
@@ -659,6 +658,19 @@ Windows` analyzer must release exactly one of them (bookmarked, depth 0, target 
 `dmany` must then decompile. On earlier Ghidra versions, which only warn, nothing is
 released. A second release pass must change nothing, and delay-window recovery must not
 lay a released window again.
+
+## Native execute-packet parallel reads
+
+`tests/fixtures/parallel-read.py` encodes self-written packet assembly in both
+byte orders; run it with `python3 tools/verify.py --only parallel-read`. Its swap,
+complementary-predicate, and multi-cycle cases execute the lifted p-code and
+require every packet member to read the pre-packet register values. The branch
+case checks that a terminal `[B1] ADD || [B1] B` reads B1 before the packet
+commit and that the commit precedes its delay-slot write. Prime-time and
+post-analysis interior-target cases must clear deferral; the latter also checks
+that audit re-decodes already-listed instructions without packet-shadow p-code.
+The baseline and a deferral-disabled mutant both produce stale swap, predicate,
+and multi-cycle reads in LE and BE.
 
 ## Additional decoder accuracy checks
 

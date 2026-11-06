@@ -95,6 +95,52 @@ public final class C6000ExecutionPackets {
         return new Slot(at, length, parallel, false);
     }
 
+    /** Instruction starts physically covered by one fetch packet. */
+    static List<Address> instructionStarts(Program program, Address fetchBase)
+            throws MemoryAccessException {
+        var memory = program.getMemory();
+        Address base = fetchBase.getAddressSpace().getAddressInThisSpaceOnly(
+            fetchBase.getOffset() & ~31L);
+        Address headerAt = base.add(28);
+        boolean compactPacket = memory.getAllInitializedAddressSet()
+            .contains(headerAt, headerAt.add(3)) &&
+            (memory.getInt(headerAt) >>> 28) == 0xe;
+        int header = compactPacket ? memory.getInt(headerAt) : 0;
+        List<Address> starts = new ArrayList<>();
+        for (int word = 0; word < (compactPacket ? 7 : 8); word++) {
+            Address at = base.add(word * 4L);
+            boolean compact = compactPacket && ((header >>> (21 + word)) & 1) != 0;
+            int width = compact ? 2 : 4;
+            if (memory.getAllInitializedAddressSet().contains(at, at.add(width - 1))) {
+                starts.add(at);
+            }
+            if (compact) {
+                Address second = at.add(2);
+                if (memory.getAllInitializedAddressSet().contains(second, second.add(1))) {
+                    starts.add(second);
+                }
+            }
+        }
+        return starts;
+    }
+
+    /** All members of the physical execute packet beginning at {@code at}. */
+    static List<Address> packetMembers(Program program, Address at)
+            throws MemoryAccessException {
+        List<Address> members = new ArrayList<>();
+        Slot current = slot(program, at);
+        if (current.header()) throw new MemoryAccessException("Fetch-packet header is not an instruction");
+        members.add(at);
+        while (current.parallel()) {
+            if (members.size() == 8) throw new MemoryAccessException("Oversized execute packet");
+            Slot next = slot(program, following(current));
+            if (next.header()) next = slot(program, following(next));
+            members.add(next.at());
+            current = next;
+        }
+        return List.copyOf(members);
+    }
+
     /** Raw fetch-layout shape for explicit trace scopes, independent of listing context. */
     static int instructionLengthAt(Program program,Address at)throws MemoryAccessException {
         var instruction=slot(program,at);

@@ -257,6 +257,7 @@ public final class C6000PipelineCompiler {
         var at=entry.getNewAddress(pc);int length=closedPhysicalLength(at);var context=new ProcessorContextImpl(program.getLanguage());
         for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
+        for(String name:List.of("c_pkt_active","c_pkt_start","c_pkt_end","c_pkt_branch_end","c_pkt_pred","c_pkt_write0","c_pkt_write1"))context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         var memory=new DumbMemBufferImpl(program.getMemory(),at);var prototype=program.getLanguage().parse(memory,context,false);var instruction=new PseudoInstruction(program,at,prototype,memory,context);
         if(instruction.getLength()!=length)throw fail("caller-entry width conflicts with physical layout at "+at);validateWindowInstruction(instruction,window);return instruction;
     }
@@ -578,6 +579,7 @@ public final class C6000PipelineCompiler {
         context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
+        for(String name:List.of("c_pkt_active","c_pkt_start","c_pkt_end","c_pkt_branch_end","c_pkt_pred","c_pkt_write0","c_pkt_write1"))context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         var memory=new DumbMemBufferImpl(program.getMemory(),at);
         var prototype=program.getLanguage().parse(memory,context,false);
         var ins=new PseudoInstruction(program,at,prototype,memory,context);

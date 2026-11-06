@@ -38,16 +38,17 @@ public class C6000RegisterCallScheduleTest extends GhidraScript {
 			// A computed jump with B3 untouched: a tail CALLIND of A1 at E1.
 			capturedAtIssue(0x1160L, 0x1168L, "A1");
 			tail(0x1160L);
-			// The entry copy of B3 in caller-saved A0 does not survive the call (gate clobber model): B A0 is no return
-			// but a tail CALLIND, as the reference (SPEC R7a) takes it, although the listing returns through the copy.
-			calls(0x1140L, List.of(0x10e0L), 1);
-			tail(0x1140L);
-			// The same with the copy after the entry packet: enabling rewrites the entry, and the schedule rebound then
-			// (C6000PipelineContracts.bind) must still take B A0 as the tail call.
-			calls(0x11e0L, List.of(0x10e0L), 1);
-			tail(0x11e0L);
+			// The listing returns through the entry copy of B3 in caller-saved A0 (C6000ReturnAnalyzer): a listed return is a
+			// return (SPEC R2), although the clobber model hashed A0 across the call.
+			calls(0x1140L, List.of(0x10e0L), 0);
+			// The same with the copy after the entry packet, also once enabling has rewritten the entry (bind recompiles).
+			calls(0x11e0L, List.of(0x10e0L), 0);
 			C6000PipelineSchedules.enable(currentProgram, getFunctionAt(toAddr(0x11e0L)), "fixture entry: drained pipeline", Set.of(), monitor);
 			checks++;
+			// Two writers of A0: no listed return, and the copy does not survive the call (gate clobber model), so B A0 is
+			// a tail CALLIND, as the native decompile and the reference (SPEC R7a) take an unrecovered computed jump.
+			calls(0x1200L, List.of(0x10e0L), 1);
+			tail(0x1200L);
 			// A fresh link that is no sequential return point: the callee returns there (SPEC R3), no tail call. Natively
 			// the branch is no call, so the return point is declared part of the function, as ELF symbol sizes would.
 			disassemble(toAddr(0x11b8L));

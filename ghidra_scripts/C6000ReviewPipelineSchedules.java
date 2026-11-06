@@ -80,6 +80,23 @@ public class C6000ReviewPipelineSchedules extends GhidraScript {
             footprints.put(plan.entry(), C6000PipelineContracts.footprint(currentProgram,
                 currentProgram.getFunctionManager().getFunctionAt(toAddr(plan.entry())), plan, monitor));
         }
+        // A caller-evidence window another plan pins (entry_sources) inside packets an enable absorbs would go stale
+        // mid-batch: refuse that plan, keep the absorber (local, gate readable mode).
+        for (var absorber : footprints.entrySet()) {
+            for (var plan : List.copyOf(plans)) {
+                if (plan.entry() == absorber.getKey()) continue;
+                ghidra.program.model.address.AddressSetView pinned = new ghidra.program.model.address.AddressSet();
+                for (var window : plan.entrySources()) ((ghidra.program.model.address.AddressSet) pinned).add(toAddr(window.start()), toAddr(window.start() + window.length() - 1));
+                var own = footprints.get(plan.entry());   // its own packets: the absorber rule below decides those
+                if (own != null) pinned = pinned.subtract(new ghidra.program.model.address.AddressSet(own.source()));
+                if (!pinned.intersects(absorber.getValue().absorbed())) continue;
+                var row = rows.get(plan.entry());
+                row.put("status", "refused");row.remove("review");
+                row.put("reason", "its entry source is absorbed by enabling " + toAddr(absorber.getKey()) + " in this batch");
+                plans.removeIf(p -> p.entry() == plan.entry());
+            }
+        }
+        footprints.keySet().removeIf(entry -> plans.stream().noneMatch(p -> p.entry() == entry));
         for (var absorber : footprints.entrySet()) {
             for (var other : footprints.entrySet()) {
                 if (other.getKey().equals(absorber.getKey()) ||

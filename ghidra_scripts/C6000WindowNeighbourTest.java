@@ -35,6 +35,21 @@ public class C6000WindowNeighbourTest extends GhidraScript {
 		currentProgram.getReferenceManager().delete(jump);
 		// Known-good: no schedule reads the shared packet, so the absorber alone stays reviewable.
 		review(absorber);
+		// One batch: callee pins the shared packet as caller evidence (a manifest entry source), absorber absorbs it.
+		// The callee is refused and the absorber kept; refusing nothing staled the callee mid-apply.
+		Function callee = getFunctionAt(toAddr(0x10c0L));
+		Path pinned = Files.createTempDirectory("c6000-window-pinned");
+		Path pm = pinned.resolve("manifest.json"), pr = pinned.resolve("report.json");
+		Files.writeString(pm, manifest(Map.of(callee, List.of(source(callee), source(neighbour))), absorber, callee));
+		runScript("C6000ReviewPipelineSchedules.java", new String[] { pm.toString(), pr.toString() });
+		var pinnedRows = JsonParser.parseString(Files.readString(pr)).getAsJsonObject().getAsJsonArray("functions");
+		if (!pinnedRows.get(0).getAsJsonObject().get("status").getAsString().equals("eligible") ||
+			!pinnedRows.get(1).getAsJsonObject().get("reason").getAsString().contains("absorbed by enabling 0000112c")) {
+			throw new AssertionError("batch must refuse the pinned callee and keep the absorber: " + pinnedRows);
+		}
+		checks++;
+		try (var files = Files.newDirectoryStream(pinned)) { for (Path file : files) Files.delete(file); }
+		Files.delete(pinned);
 		// One batch, absorber first: its enable would change the neighbour's pinned source.
 		Path directory = Files.createTempDirectory("c6000-window-neighbour");
 		Path manifest = directory.resolve("manifest.json"), report = directory.resolve("report.json");
@@ -77,7 +92,9 @@ public class C6000WindowNeighbourTest extends GhidraScript {
 		return C6000PipelineContracts.review(currentProgram, f, EVIDENCE, Set.of(), List.of(source(f)), monitor);
 	}
 
-	private String manifest(Function... functions) throws Exception {
+	private String manifest(Function... functions) throws Exception { return manifest(Map.of(), functions); }
+
+	private String manifest(Map<Function, List<C6000PipelineContracts.SourceWindow>> windows, Function... functions) throws Exception {
 		var plan = new JsonObject();
 		plan.addProperty("schema", 1);
 		plan.addProperty("language_id", currentProgram.getLanguageID().getIdAsString());
@@ -88,7 +105,7 @@ public class C6000WindowNeighbourTest extends GhidraScript {
 			row.addProperty("drained_entry_evidence", EVIDENCE);
 			row.add("previous_e1_writes", new JsonArray());
 			var sources = new JsonArray();
-			sources.add(new Gson().toJsonTree(source(f)));
+			for (var w : windows.getOrDefault(f, List.of(source(f)))) sources.add(new Gson().toJsonTree(w));
 			row.add("entry_sources", sources);
 			rows.add(row);
 		}

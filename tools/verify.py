@@ -40,6 +40,7 @@ CORE = [
     case("reserved-predicate", "ReservedPredicate", "C6000_RESERVED_PREDICATE_OK"),
     case("return-delay", "ReturnDelay", "C6000_RETURN_DELAY_OK"),
     case("preempted-jump", "PreemptedJump", "C6000_PREEMPTED_JUMP_OK", None, analysis=True),
+    case("parallel-read", "ParallelRead", "C6000_PARALLEL_READ_OK", "json"),
     case("packet-call", "PacketCall", "C6000_PACKET_CALL_OK"),
     case("peer-cancel", "PeerCancel", "C6000_PEER_CANCEL_OK", "json"),
     # The refusal script constructs its own memory blocks outside this small image.

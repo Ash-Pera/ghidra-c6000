@@ -2791,13 +2791,15 @@ macro c6000_sem_ldh(a, d) { d = sext(*[ram]:2 a); }
 macro c6000_sem_ldhu(a, d) { d = zext(*[ram]:2 a); }
 
 # SEM: STW
-macro c6000_sem_stw(s, a) { *[ram]:4 a = s; }
+# Stores ignore the low address bits, as LDW does (SPRUFE8B); an unmasked
+# STORE lets the decompiler split it into narrower stores at the wrong bytes.
+macro c6000_sem_stw(s, a) { local aligned:4 = a & 0xfffffffc; *[ram]:4 aligned = s; }
 # SEM: STDW
-macro c6000_sem_stdw(s, a) { *[ram]:8 a = s; }
+macro c6000_sem_stdw(s, a) { local aligned:4 = a & 0xfffffff8; *[ram]:8 aligned = s; }
 # SEM: STB
 macro c6000_sem_stb(s, a) { *[ram]:1 a = s:1; }
 # SEM: STH
-macro c6000_sem_sth(s, a) { *[ram]:2 a = s:2; }
+macro c6000_sem_sth(s, a) { local aligned:4 = a & 0xfffffffe; *[ram]:2 aligned = s:2; }
 
 # ---------------------------------------------------------------------------
 # Branches - SPRUFE8B section 3.12, B / CALLP, and section 3.4 for the delay

@@ -457,6 +457,7 @@ public final class C6000PipelineContracts {
             TaskMonitor monitor) throws Exception {
         var schedule = C6000PipelineSchedules.compileConfigured(program, function, Set.copyOf(review.previousE1Writes()), monitor);
         check(program, function, review, review.sourceSha256(), schedule, monitor);
+        C6000PipelineSchedules.recordOpaqueCalls(program, function);
         program.getOptions(C6000PipelineSchedules.OPTIONS).setString(key(function),
             JSON.toJson(new Binding(review, "")));
     }
@@ -471,6 +472,7 @@ public final class C6000PipelineContracts {
             throw new IllegalArgumentException("body expansion changes the reviewed schedule; review the complete scope first");
         }
         Review review = reviewed(program, function, evidence, writes, sources, schedule, monitor);
+        C6000PipelineSchedules.recordOpaqueCalls(program, function);
         program.getOptions(C6000PipelineSchedules.OPTIONS).setString(key(function),
             JSON.toJson(new Binding(review, review.sourceSha256())));
     }

@@ -1322,8 +1322,8 @@ public final class C6000PipelineCompiler {
         emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);
     }
 
-    /** Local, opt-in (-Dc6000.opaqueCalls=true): the exactcheck gate's ABI model, not an upstream contract. */
-    private boolean ordinarySchedule(){return Boolean.getBoolean("c6000.opaqueCalls")&&traceContract==null&&closedCall==null&&callerTail==null&&storeTailContract==null;}
+    /** Local, opt-in (C6000PipelineSchedules.opaqueCalls): the exactcheck gate's ABI model, not an upstream contract. */
+    private boolean ordinarySchedule(){return C6000PipelineSchedules.opaqueCalls(program,function)&&traceContract==null&&closedCall==null&&callerTail==null&&storeTailContract==null;}
     private long linkOffset(){return program.getRegister("B3").getAddress().getOffset();}
 
     /** A B B3 the native analysis made a call (B3 set to its return point in the slots, upstream #39). */

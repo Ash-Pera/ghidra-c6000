@@ -27,6 +27,22 @@ public final class C6000PipelineSchedules {
         return "Previous E1 writes " + function.getEntryPoint();
     }
 
+    public static String opaqueCallsKey(Function function) {
+        return "Opaque calls " + function.getEntryPoint();
+    }
+
+    /** Local gate model: -Dc6000.opaqueCalls=true, or recorded with the function's schedule. */
+    public static boolean opaqueCalls(Program program, Function function) {
+        if (Boolean.getBoolean("c6000.opaqueCalls")) return true;
+        var options = program.getOptions(OPTIONS); // a read with a default would register the option
+        return options.contains(opaqueCallsKey(function)) && "true".equals(options.getString(opaqueCallsKey(function), ""));
+    }
+
+    /** Records the property with a schedule so it decompiles the same without the JVM flag. */
+    static void recordOpaqueCalls(Program program, Function function) {
+        if (Boolean.getBoolean("c6000.opaqueCalls")) program.getOptions(OPTIONS).setString(opaqueCallsKey(function), "true");
+    }
+
     public static String storeTailKey(Function function) {
         return "Post-return store tail " + function.getEntryPoint();
     }

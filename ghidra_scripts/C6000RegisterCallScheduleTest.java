@@ -38,7 +38,7 @@ public class C6000RegisterCallScheduleTest extends GhidraScript {
 			capturedAtIssue(0x1160L, 0x1168L, "A1");
 			tail(0x1160L);
 			// The entry copy of B3 in caller-saved A0 does not survive the call (gate clobber model): B A0 is no return
-			// but a tail CALLIND, as the native decompile and the reference (SPEC R7a) take an unrecovered computed jump.
+			// but a tail CALLIND, as the reference (SPEC R7a) takes it, although the listing returns through the copy.
 			calls(0x1140L, List.of(0x10e0L), 1);
 			tail(0x1140L);
 			// A fresh link that is no sequential return point: the callee returns there (SPEC R3), no tail call. Natively

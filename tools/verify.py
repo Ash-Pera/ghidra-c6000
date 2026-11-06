@@ -39,6 +39,7 @@ CORE = [
     case("full32-encoding-info", "Full32EncodingInfo", "C6000_FULL32_ENCODING_INFO_OK"),
     case("reserved-predicate", "ReservedPredicate", "C6000_RESERVED_PREDICATE_OK"),
     case("return-delay", "ReturnDelay", "C6000_RETURN_DELAY_OK"),
+    case("parallel-read", "ParallelRead", "C6000_PARALLEL_READ_OK", "json"),
     case("packet-call", "PacketCall", "C6000_PACKET_CALL_OK"),
     # The refusal script constructs its own memory blocks outside this small image.
     case("branch-flow", "DelaySafety", "C6000_DELAY_SAFETY_OK", args=[]),

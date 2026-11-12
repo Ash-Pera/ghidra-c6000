@@ -341,6 +341,13 @@ public final class C6000PipelineContracts {
     public static Review review(Program program, Function function, String evidence,
             Set<String> previousE1Writes, List<SourceWindow> entrySources,
             TaskMonitor monitor) throws Exception {
+        return review(program, function, evidence, previousE1Writes, entrySources, Set.of(), monitor);
+    }
+
+    /** In a batch that records new reviews of rereviewed before enabling, judge absorption by those (then keepsRecorded). */
+    public static Review review(Program program, Function function, String evidence,
+            Set<String> previousE1Writes, List<SourceWindow> entrySources, Set<Long> rereviewed,
+            TaskMonitor monitor) throws Exception {
         if (evidence == null || evidence.isBlank()) {
             throw new IllegalArgumentException("reviewed drained-entry evidence is required");
         }
@@ -352,7 +359,7 @@ public final class C6000PipelineContracts {
                 !ownedOrWindowTail(program, function, schedule.covered())) {
             throw new IllegalArgumentException("reviewed activation requires complete function ownership of the scheduled code");
         }
-        absorptionKeepsRecorded(program, function, schedule, monitor);
+        absorptionKeepsRecorded(program, function, schedule, rereviewed, monitor);
         return reviewed(program, function, evidence, previousE1Writes, entrySources, schedule, monitor);
     }
 
@@ -408,9 +415,16 @@ public final class C6000PipelineContracts {
             Set.copyOf(review.previousE1Writes()), monitor).covered(), review.entrySources());
     }
 
+    /** A reviewed batch plan's enable must not change the source of a recorded review outside rereviewed. */
+    public static void keepsRecorded(Program program, Function function, Review review, Set<Long> rereviewed,
+            TaskMonitor monitor) throws Exception {
+        absorptionKeepsRecorded(program, function, C6000PipelineSchedules.compileConfigured(program, function,
+            Set.copyOf(review.previousE1Writes()), monitor), rereviewed, monitor);
+    }
+
     /** Enable's absorption must not change the source a recorded schedule pins. */
     private static void absorptionKeepsRecorded(Program program, Function function,
-            C6000PipelineCompiler.Result schedule, TaskMonitor monitor) throws Exception {
+            C6000PipelineCompiler.Result schedule, Set<Long> rereviewed, TaskMonitor monitor) throws Exception {
         var absorbed = footprint(program, function, schedule.covered(), List.of()).absorbed();
         if (absorbed.isEmpty()) return;
         boolean present = false;
@@ -421,7 +435,8 @@ public final class C6000PipelineContracts {
             if (!name.startsWith(PREFIX)) continue;
             Address at = program.getAddressFactory().getAddress(name.substring(PREFIX.length()));
             Function other = at == null ? null : program.getFunctionManager().getFunctionAt(at);
-            if (other == null || other.getEntryPoint().equals(function.getEntryPoint())) continue;
+            if (other == null || other.getEntryPoint().equals(function.getEntryPoint()) ||
+                rereviewed.contains(other.getEntryPoint().getOffset())) continue;
             AddressSetView covered = other.getBody();
             List<SourceWindow> windows = recordedReview(program, other).entrySources();
             // Enable put an active schedule's covered code in its body; a pending or closed-call one may extend past it.
@@ -501,7 +516,7 @@ public final class C6000PipelineContracts {
         var schedule = C6000PipelineSchedules.compileConfigured(program, function, writes, monitor);
         check(program, function, review, binding.activeSourceSha256().isEmpty() ?
             review.sourceSha256() : binding.activeSourceSha256(), schedule, monitor);
-        absorptionKeepsRecorded(program, function, schedule, monitor);
+        absorptionKeepsRecorded(program, function, schedule, Set.of(), monitor);
         // Expected refusals are read-only. enable() owns the write transaction
         // and repeats pending-review validation before changing the selector.
         return C6000PipelineSchedules.enable(program, function, review.evidence(), writes, monitor);

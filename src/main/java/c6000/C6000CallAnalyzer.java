@@ -953,7 +953,9 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				}
 				trace.before(issue[i]);
 				if (entered[i]) meetEntries(insn, regs, trace);
-				if (insn != viaInsn && isFlow(insn)) trace.write(issue[i], program.getRegister("B3"), null, i);
+				// A shared tail's jump writes no link: B3 set before it still holds.
+				if (insn != viaInsn && isFlow(insn) && (forced == null || !insn.getAddress().equals(forced.jump().getAddress())))
+					trace.write(issue[i], program.getRegister("B3"), null, i);
 				trace.instruction(insn, runs, issue[i], i);
 			}
 

@@ -54,6 +54,7 @@ CORE = [
     case("link-copy-return", "LinkCopyReturn", "C6000_LINK_COPY_RETURN_OK", None, analysis=True),
     case("wide-call-window", "WideCallWindow", "C6000_WIDE_CALL_WINDOW_OK", None, analysis=True),
     case("b3-call", "B3Call", "C6000_B3_CALL_OK", None, analysis=True),
+    case("low-half-reference", "LowHalfReference", "C6000_LOW_HALF_REFERENCE_OK", None, analysis=True),
     case("preempted-jump", "PreemptedJump", "C6000_PREEMPTED_JUMP_OK", None, analysis=True),
     case("merge-call-window", "MergeCallWindow", "C6000_MERGE_CALL_WINDOW_OK", None),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
@@ -293,6 +294,8 @@ def main():
                     command += ["-preScript", "C6000RegisterCallTest.java", "prepare"]
                 elif fixture == "b3-call":
                     command += ["-preScript", "C6000B3CallTest.java", "prepare"]
+                elif fixture == "low-half-reference":
+                    command += ["-preScript", "C6000LowHalfReferenceTest.java", "prepare"]
                 elif fixture == "entered-window":
                     command += ["-preScript", "C6000EnteredWindowTest.java", "prepare"]
                 elif fixture == "delay-window-forms":

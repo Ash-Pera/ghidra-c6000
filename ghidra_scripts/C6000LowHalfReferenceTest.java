@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: Apache-2.0
+// @category C6000
+// Check MVK low-half references in a tests/fixtures/low-half-reference.py image.
+// Run as preScript with "prepare", then as postScript with no arguments.
+
+import c6000.C6000PacketContext;
+import ghidra.app.script.GhidraScript;
+
+public class C6000LowHalfReferenceTest extends GhidraScript {
+	private static final long[] ENTRIES = { 0x1000L, 0x1024L, 0x1068L };
+	private static final String[] NAMES = { "f", "h", "g" };
+
+	@Override
+	protected void run() throws Exception {
+		if (getScriptArgs().length == 1 && getScriptArgs()[0].equals("prepare")) {
+			currentProgram.getSymbolTable().addExternalEntryPoint(toAddr(0x1000L));
+			C6000PacketContext.prime(currentProgram, monitor);
+			for (int i = 0; i < ENTRIES.length; i++) {
+				disassemble(toAddr(ENTRIES[i]));
+				createFunction(toAddr(ENTRIES[i]), NAMES[i]);
+			}
+			// The last slot of h's second jump and the MVKH past its landing, as code.
+			disassemble(toAddr(0x1040L));
+			return;
+		}
+		// Known-good: completed to another address, in straight code and in a call's slots.
+		expect(0x1000L, false);
+		expect(0x1028L, false);
+		// Known-bad: completed to the same address, read before the MVKH, a branch landing first.
+		expect(0x1008L, true);
+		expect(0x1010L, true);
+		expect(0x1040L, true);
+		println("C6000_LOW_HALF_REFERENCE_OK checks=5");
+	}
+
+	private void expect(long at, boolean kept) {
+		if (getInstructionAt(toAddr(at)) == null) throw new AssertionError("no MVK at " + toAddr(at));
+		boolean has = false;
+		for (var r : getReferencesFrom(toAddr(at))) has |= r.getToAddress().equals(toAddr(0x1068L));
+		if (has != kept) throw new AssertionError("MVK at " + toAddr(at) + (kept ? " lost" : " keeps") +
+			" its reference to 00001068");
+	}
+}

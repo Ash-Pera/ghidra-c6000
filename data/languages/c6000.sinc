@@ -83,9 +83,7 @@ define register offset=0x4100 size=4
     C6000_PKT_B20 C6000_PKT_B21 C6000_PKT_B22 C6000_PKT_B23
     C6000_PKT_B24 C6000_PKT_B25 C6000_PKT_B26 C6000_PKT_B27
     C6000_PKT_B28 C6000_PKT_B29 C6000_PKT_B30 C6000_PKT_B31 ];
-define register offset=0x4200 size=8 [ C6000_PKT_MASK ];
-define register offset=0x4210 size=4 [ C6000_PKT_DUMMY ];
-define register offset=0x4220 size=1 [ C6000_PKT_TAKE ];
+define register offset=0x4200 size=4 [ C6000_PKT_OLD0 C6000_PKT_OLD1 ];
 
 # ---------------------------------------------------------------------------
 # Control registers
@@ -139,13 +137,18 @@ define context contextreg
   c_pkt_start = (25,25) noflow
   c_pkt_end = (26,26) noflow
   c_pkt_branch_end = (27,27) noflow
-  c_pkt_pred = (28,31) noflow
+  c_pkt_chain0 = (28,28) noflow # write0 continues an earlier member's write of the register
+  c_pkt_chain1 = (29,29) noflow
 @if ENDIAN == "big"
   c_pkt_write0 = (48,54) noflow
   c_pkt_write1 = (55,61) noflow
+  c_pkt_commit0 = (64,70) noflow
+  c_pkt_commit1 = (71,77) noflow
 @else
   c_pkt_write0 = (32,38) noflow
   c_pkt_write1 = (39,45) noflow
+  c_pkt_commit0 = (46,52) noflow
+  c_pkt_commit1 = (53,59) noflow
 @endif
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"
@@ -591,7 +594,8 @@ define pcodeop c6000_tsch_read;
 define pcodeop c6000_fp_status;
 @endif
 @include "c6000_packet_registers.sinc"
-@include "c6000_packet_semantics.sinc"
+PktCommit: is c_pkt_branch_end=1 { }
+PktCommit: is c_pkt_branch_end=0 & PktCommit0 & PktCommit1 { build PktCommit0; build PktCommit1; }
 @include "c6000_flow_delay.sinc"
 @include "c6000_semantics.sinc"
 define pcodeop c6000_pipeline;
@@ -599,44 +603,15 @@ define pcodeop c6000_pipeline;
 # operand BEFORE the userop. The native return hides the physical CFG; dynamic
 # injection supplies the exact scheduled CFG and its captured return target.
 :^instruction is c_schedule_entry=1 & instruction [ c_schedule_entry=0; c_flow_delay=0; ] { c6000_pipeline(); return [C6000_PIPE_RET]; build instruction; }
-:^instruction is c_pkt_active=1 & c_schedule_entry=0 &
-  PktReg0 & PktShadow0 & PktSelector0 & PktReg1 & PktShadow1 & PktSelector1 &
-  PktPredicate & PktTiming & instruction [ c_pkt_active=0; ]
+:^instruction is c_pkt_active=1 & c_schedule_entry=0 & PktIn0 & PktIn1 & PktOut0 & PktOut1 &
+  PktCommit & instruction [ c_pkt_active=0; ]
 {
-  local old0:4 = PktReg0;
-  local old1:4 = PktReg1;
-  local take:1 = 1;
-  if (PktSelector0 == 0) goto <pkt_take_write1>;
-  c6000_pkt_condition(PktPredicate, take);
-  C6000_PKT_TAKE = take;
-  goto <pkt_take_ready>;
-  <pkt_take_write1>
-  if (PktSelector1 == 0) goto <pkt_take_ready>;
-  c6000_pkt_condition(PktPredicate, take);
-  C6000_PKT_TAKE = take;
-  <pkt_take_ready>
-  if ((PktTiming & 1) == 0) goto <pkt_started>;
-  C6000_PKT_MASK = 0;
-  <pkt_started>
+  build PktIn0;
+  build PktIn1;
   build instruction;
-  if ((PktTiming & 4) != 0) goto <pkt_done>;
-  if (PktSelector0 == 0) goto <pkt_slot1>;
-  if (take == 0) goto <pkt_restore0>;
-  PktShadow0 = PktReg0;
-  C6000_PKT_MASK = C6000_PKT_MASK | (1:8 << (PktSelector0 - 1));
-  <pkt_restore0>
-  PktReg0 = old0;
-  <pkt_slot1>
-  if (PktSelector1 == 0) goto <pkt_commit>;
-  if (take == 0) goto <pkt_restore1>;
-  PktShadow1 = PktReg1;
-  C6000_PKT_MASK = C6000_PKT_MASK | (1:8 << (PktSelector1 - 1));
-  <pkt_restore1>
-  PktReg1 = old1;
-  <pkt_commit>
-  if ((PktTiming & 2) == 0) goto <pkt_done>;
-  c6000_pkt_commit_all();
-  <pkt_done>
+  build PktOut0;
+  build PktOut1;
+  build PktCommit;
 }
 with : c_schedule_entry=0 {
 # Figure F-8 pointer branches use op=110 (IRP) or 111 (NRP).

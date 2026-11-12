@@ -37,16 +37,14 @@ import ghidra.util.task.TaskMonitor;
 
 /** Stages only GPR writers whose values are read later in the same issue packet. */
 final class C6000ParallelReadScheduler {
-    private static final List<String> CONTEXT_FIELDS = List.of(
-        "c_pkt_active", "c_pkt_start", "c_pkt_end", "c_pkt_branch_end",
-        "c_pkt_pred", "c_pkt_write0", "c_pkt_write1");
+    private static final List<String> CONTEXT_FIELDS = C6000PacketContext.PACKET_FIELDS;
     private static final Set<String> GENERAL_REGISTERS = generalRegisters();
 
     record Result(int deferredPackets, int refusedPackets) {}
 
-    private record Fields(int active, int start, int end, int branchEnd, int predicate,
-            int write0, int write1) {
-        static Fields zero() { return new Fields(0, 0, 0, 0, 0, 0, 0); }
+    private record Fields(int active, int start, int end, int branchEnd, int chain0,
+            int chain1, int write0, int write1, int commit0, int commit1) {
+        static Fields zero() { return new Fields(0, 0, 0, 0, 0, 0, 0, 0, 0, 0); }
     }
 
     private record Member(Address address, Set<String> reads, Set<String> writes,
@@ -145,25 +143,45 @@ final class C6000ParallelReadScheduler {
                 return zeroPlan(addresses, true);
             }
         }
+        // The last member commits every staged register: at most two.
+        if (deferred.size() > 2) return zeroPlan(addresses, true);
         Member last = members.get(members.size() - 1);
         boolean branchEnd = last.control();
         if (branchEnd && !last.branchCommitHook()) return zeroPlan(addresses, true);
+        // A terminal branch commits before its delay slots, so it cannot stage its own writes.
+        if (branchEnd && last.writes().stream().anyMatch(deferred::contains)) {
+            return zeroPlan(addresses, true);
+        }
         if (hasIncomingTarget(program,
                 unsafeRanges(program, addresses, members, deferred), flowTargets, monitor)) {
             return zeroPlan(addresses, true);
         }
 
+        List<String> commits = deferred.stream()
+            .sorted(Comparator.comparingInt(C6000ParallelReadScheduler::selector)).toList();
+        Set<String> staged = new HashSet<>();
         List<Fields> fields = new ArrayList<>();
         for (int i = 0; i < members.size(); i++) {
             Member member = members.get(i);
             List<String> writes = member.writes().stream().filter(deferred::contains)
                 .sorted(Comparator.comparingInt(C6000ParallelReadScheduler::selector)).toList();
-            int write0 = writes.isEmpty() ? 0 : selector(writes.get(0));
-            int write1 = writes.size() < 2 ? 0 : selector(writes.get(1));
-            fields.add(new Fields(1, i == 0 ? 1 : 0,
-                i == members.size() - 1 && !branchEnd ? 1 : 0,
-                i == members.size() - 1 && branchEnd ? 1 : 0,
-                writes.isEmpty() ? 0 : member.predicate(), write0, write1));
+            int[] chain = new int[2];
+            for (int slot = 0; slot < writes.size(); slot++) {
+                if (!staged.contains(writes.get(slot))) continue;
+                // A continuing writer reads the shadow in place of the register, predicate included.
+                if (writes.get(slot).equals(predicateRegister(member.predicate()))) {
+                    return zeroPlan(addresses, true);
+                }
+                chain[slot] = 1;
+            }
+            staged.addAll(writes);
+            boolean final_ = i == members.size() - 1;
+            fields.add(new Fields(1, i == 0 ? 1 : 0, final_ && !branchEnd ? 1 : 0,
+                final_ && branchEnd ? 1 : 0, chain[0], chain[1],
+                writes.isEmpty() ? 0 : selector(writes.get(0)),
+                writes.size() < 2 ? 0 : selector(writes.get(1)),
+                final_ ? selector(commits.get(0)) : 0,
+                final_ && commits.size() > 1 ? selector(commits.get(1)) : 0));
         }
         return new Plan(List.copyOf(addresses), List.copyOf(fields), true, false);
     }
@@ -197,7 +215,10 @@ final class C6000ParallelReadScheduler {
             setContext(context, program, name, 0);
         }
         for (String name : CONTEXT_FIELDS) setContext(context, program, name, 0);
-        if (branchEnd) setContext(context, program, "c_pkt_branch_end", 1);
+        if (branchEnd) {
+            setContext(context, program, "c_pkt_branch_end", 1);
+            setContext(context, program, "c_pkt_commit0", selector("A0"));
+        }
         var memory = new DumbMemBufferImpl(program.getMemory(), address);
         var prototype = program.getLanguage().parse(memory, context, false);
         var instruction = new PseudoInstruction(program, address, prototype, memory, context);
@@ -207,16 +228,14 @@ final class C6000ParallelReadScheduler {
         return instruction;
     }
 
+    /** True if the branch, decoded as a packet's last member, commits staged registers. */
     private static boolean branchCommitHook(Program program, Address address) throws Exception {
         Instruction branch = parse(program, address, true);
-        Register mask = program.getRegister("C6000_PKT_MASK");
+        Register shadow = program.getRegister("C6000_PKT_A0");
         for (PcodeOp operation : branch.getPcode(false)) {
-            Varnode output = operation.getOutput();
-            if (output != null && output.isRegister() &&
-                    output.getAddress().getAddressSpace().equals(mask.getAddress().getAddressSpace()) &&
-                    output.getOffset() < mask.getAddress().getOffset() + mask.getMinimumByteSize() &&
-                    mask.getAddress().getOffset() < output.getOffset() + output.getSize()) {
-                return true;
+            for (Varnode input : operation.getInputs()) {
+                if (input.isRegister() &&
+                        input.getAddress().equals(shadow.getAddress())) return true;
             }
         }
         return false;
@@ -249,6 +268,18 @@ final class C6000ParallelReadScheduler {
     private static int selector(String name) {
         int index = Integer.parseInt(name.substring(1));
         return (name.charAt(0) == 'A' ? 0 : 32) + index + 1;
+    }
+
+    private static String predicateRegister(int predicate) {
+        return switch (predicate) {
+            case 2, 3 -> "B0";
+            case 4, 5 -> "B1";
+            case 6, 7 -> "B2";
+            case 8, 9 -> "A1";
+            case 10, 11 -> "A2";
+            case 12, 13 -> "A0";
+            default -> null;
+        };
     }
 
     private static int predicate(String mnemonic) {
@@ -315,7 +346,8 @@ final class C6000ParallelReadScheduler {
     private static void setFields(Program program, Address address, Fields fields)
             throws Exception {
         int[] values = { fields.active(), fields.start(), fields.end(), fields.branchEnd(),
-            fields.predicate(), fields.write0(), fields.write1() };
+            fields.chain0(), fields.chain1(), fields.write0(), fields.write1(),
+            fields.commit0(), fields.commit1() };
         for (int i = 0; i < CONTEXT_FIELDS.size(); i++) {
             Register register = program.getRegister(CONTEXT_FIELDS.get(i));
             BigInteger wanted = BigInteger.valueOf(values[i]);

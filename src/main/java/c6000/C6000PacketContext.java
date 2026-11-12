@@ -59,6 +59,10 @@ public final class C6000PacketContext {
 
 	/** C6000 fetch packets are eight 32-bit words. */
 	public static final int FETCH_PACKET_SIZE = 32;
+	/** Context fields of native parallel-read packet staging (C6000ParallelReadScheduler). */
+	public static final List<String> PACKET_FIELDS = List.of("c_pkt_active", "c_pkt_start",
+		"c_pkt_end", "c_pkt_branch_end", "c_pkt_chain0", "c_pkt_chain1", "c_pkt_write0",
+		"c_pkt_write1", "c_pkt_commit0", "c_pkt_commit1");
 
 	/** Layout field bit i set means word i holds two 16-bit instructions. */
 	private static final int LAYOUT_SHIFT = 21;
@@ -90,8 +94,7 @@ public final class C6000PacketContext {
 			}
 			context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),
 				BigInteger.ZERO));
-			for (String name : List.of("c_pkt_active", "c_pkt_start", "c_pkt_end",
-					"c_pkt_branch_end", "c_pkt_pred", "c_pkt_write0", "c_pkt_write1")) {
+			for (String name : PACKET_FIELDS) {
 				context.setRegisterValue(new RegisterValue(program.getRegister(name), BigInteger.ZERO));
 			}
 			var memory = new DumbMemBufferImpl(program.getMemory(), at);

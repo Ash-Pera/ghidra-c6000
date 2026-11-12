@@ -47,9 +47,9 @@ public class C6000PreemptedJumpTest extends GhidraScript {
 		continues(0x10a0L, 0x10a4L, 0x10bcL);
 		window(0x10a8L, 3, FlowOverride.RETURN);
 		returns(0x10a0L, "0x333");
-		// The unconditional return has no native window (mid is a jump target), but b's return gets one.
-		continues(0x10d0L, 0x10d4L, 0x10f4L);
-		window(0x10e8L, 3, FlowOverride.RETURN);
+		// mid enters the unconditional return's window, which upstream keeps (issue #52): that
+		// straight-line window stands, so the non-exact jump keeps its target and the C is still right.
+		keeps(0x10d0L);
 		returns(0x10c0L, "0x33");
 		// Known-bads: the jump keeps its target.
 		for (long at : new long[] { 0x1104L, 0x1148L, 0x1184L, 0x11c4L, 0x1204L, 0x1228L }) keeps(at);

@@ -598,6 +598,9 @@ define pcodeop c6000_fp_status;
 @include "c6000_packet_registers.sinc"
 PktCommit: is c_pkt_branch_end=1 { }
 PktCommit: is c_pkt_branch_end=0 & PktCommit0 & PktCommit1 { build PktCommit0; build PktCommit1; }
+# Local: a branch made inert (C6000DelaySlots.carryTails) still commits the packet it ends.
+PktInertCommit: is c_pkt_branch_end=0 { }
+PktInertCommit: is c_pkt_branch_end=1 & PktCommit0 & PktCommit1 { build PktCommit0; build PktCommit1; }
 @include "c6000_flow_delay.sinc"
 @include "c6000_semantics.sinc"
 define pcodeop c6000_pipeline;

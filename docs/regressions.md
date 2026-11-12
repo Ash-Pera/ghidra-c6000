@@ -662,6 +662,11 @@ both issuing branches stop transferring (`c_inert`). `tailidle` (idle tail) and 
 (the tail sets the argument) must call `callee` inside their loops and the jump must keep
 its window; `tailpred` (the owning call is predicated), `tailother` (another callee) and
 `tailentry` (a jump with no call pending also enters the tail) must stay native.
+`shared-tail-packet.py` and `C6000SharedTailPacketTest.java` repeat `tailidle` and
+`tailbusy` with a staged packet (see parallel reads above): the owning call ends a packet
+whose commit it holds, and the tail's last instruction ends a packet that commits the
+call's argument. The inert call must still commit its packet, and the carried call must
+follow its packet's commit; before `PktInertCommit` the inert branch dropped the commit.
 
 ## Additional decoder accuracy checks
 

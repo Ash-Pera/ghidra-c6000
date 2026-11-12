@@ -1133,6 +1133,8 @@ public final class C6000PipelineCompiler {
                 issued.put(pc,e);
                 span=Math.max(span,i.span());
                 if(Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(i.name())){
+                    // Local: two B on complementary predicates of one register; exactly one is taken (SPRUFE8B 3.7).
+                    if(issueBranch!=null&&!pairs.containsKey(issueBranch.instruction().getAddress().getOffset())&&complementary(issueBranch,i)){pairs.put(issueBranch.instruction().getAddress().getOffset(),i);continue;}
                     if(issueBranch!=null)throw fail("multiple branches in a packet");
                     if(i.name().equals("CALLP")&&(!s.branches().isEmpty()||s.returns().activeCall()!=NO_CALL||loop!=null))throw fail("CALLP requires no pending branch or nested invocation");
                     issueBranch=i;
@@ -1315,7 +1317,13 @@ public final class C6000PipelineCompiler {
 
     private void emitTransfer(State source,ReturnFlow returnFlow,List<Insn> pack,long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,Insn issueBranch,Map<Long,Map<Long,Varnode>> captured,Map<Long,Eval> issued,boolean updateLoopStatus,boolean finishedCurrentBuffer){
         if(updateLoopStatus){var tsr=new Varnode(program.getRegister("TSR").getAddress(),4);boolean active=loop!=null&&!loop.abrupt()&&!finishedCurrentBuffer;b.op(active?PcodeOp.INT_OR:PcodeOp.INT_AND,tsr,tsr,c(active?0x4000:0xffffbfffL,4));}
-        if(issueBranch==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,source.facts());return;}
+        emitIssue(source,source.facts(),returnFlow,pack,pc,idle,flights,branches,hazards,loop,issueBranch,captured,issued);
+    }
+    private final Map<Long,Insn> pairs=new HashMap<>();
+    private static boolean complementary(Insn a,Insn b){return a.name().equals("B")&&b.name().equals("B")&&a.predicate()!=null&&a.predicate().equals(b.predicate())&&a.inverted()!=b.inverted();}
+    /** The transfer of one issued branch under facts; a complementary partner (pairs) takes the not-taken side. */
+    private void emitIssue(State source,PredicateFacts facts,ReturnFlow returnFlow,List<Insn> pack,long pc,int idle,List<Flight> flights,List<Branch> branches,List<Hazard> hazards,LoopFrame loop,Insn issueBranch,Map<Long,Map<Long,Varnode>> captured,Map<Long,Eval> issued){
+        if(issueBranch==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,facts);return;}
         var instruction=issueBranch.instruction();long at=instruction.getAddress().getOffset();var register=instruction.getRegister(0);var plan=closedCalls.get(at);boolean call=plan!=null||issueBranch.name().equals("CALLP");
         Long origin=register==null?null:source.returns().links().get(register.getAddress().getOffset());
         // A B B3 the call analyzer proved a call is not a return; without a closed-call plan it is refused (issue #39).
@@ -1339,21 +1347,23 @@ public final class C6000PipelineCompiler {
             // Preserve raw transfer truth and leave these fact partitions broad.
             String no="counter_not_taken_"+b.labelCounter++;
             b.jump(PcodeOp.CBRANCH,no,invert(issued.get(at).transferTaken()));
-            emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,source.facts());
-            b.label(no);emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,source.facts());
+            emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,facts);
+            b.label(no);emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,facts);
             return;
         }
-        if(issueBranch.predicate()==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,source.facts());return;}
+        if(issueBranch.predicate()==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,facts);return;}
         int index=Set.of("B","BNOP").contains(issueBranch.name())?predicateIndex(issueBranch.predicate().getAddress().getOffset()):-1;
         // Fork the E1 snapshot before evaluating any same-packet writes. A copied
         // old predicate and a changed predicate must never be conflated here.
-        PredicateFacts taken=index<0?source.facts():source.facts().constrain(index,issueBranch.inverted()?0:1);
-        PredicateFacts skipped=index<0?source.facts():source.facts().constrain(index,issueBranch.inverted()?1:0);
-        if(taken==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);return;}
+        PredicateFacts taken=index<0?facts:facts.constrain(index,issueBranch.inverted()?0:1);
+        PredicateFacts skipped=index<0?facts:facts.constrain(index,issueBranch.inverted()?1:0);
+        Insn partner=pairs.get(at);
+        if(taken==null){if(partner!=null)emitIssue(source,skipped,returnFlow,pack,pc,idle,flights,branches,hazards,loop,partner,captured,issued);else emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);return;}
         if(skipped==null){emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,taken);return;}
         String no="predicate_not_taken_"+b.labelCounter++;b.jump(PcodeOp.CBRANCH,no,invert(issued.get(at).predicate()));
         emitFactTransfer(source,returnFlow,pack,pc,idle,flights,yes,hazards,loop,taken);b.label(no);
-        emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);
+        if(partner!=null)emitIssue(source,skipped,returnFlow,pack,pc,idle,flights,branches,hazards,loop,partner,captured,issued);
+        else emitFactTransfer(source,returnFlow,pack,pc,idle,flights,branches,hazards,loop,skipped);
     }
 
     /** Local, opt-in (C6000PipelineSchedules.opaqueCalls): the exactcheck gate's ABI model, not an upstream contract. */

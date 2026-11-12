@@ -2816,8 +2816,7 @@ macro c6000_sem_ldh(a, d) { d = sext(*[ram]:2 a); }
 macro c6000_sem_ldhu(a, d) { d = zext(*[ram]:2 a); }
 
 # SEM: STW
-# Stores ignore the low address bits, as LDW does (SPRUFE8B); an unmasked
-# STORE lets the decompiler split it into narrower stores at the wrong bytes.
+# SPRUFE8B STH/STW/STDW: addresses must be size-aligned; mask as LDW does, else the decompiler may split the STORE.
 macro c6000_sem_stw(s, a) { local aligned:4 = a & 0xfffffffc; *[ram]:4 aligned = s; }
 # SEM: STDW
 macro c6000_sem_stdw(s, a) { local aligned:4 = a & 0xfffffff8; *[ram]:8 aligned = s; }

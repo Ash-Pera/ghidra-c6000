@@ -123,7 +123,7 @@ public class C6000StoreMaskPrintTest extends GhidraScript {
         finally {
             decompiler.dispose();
         }
-        if (checked < 6) throw new AssertionError("expected six cases, checked " + checked);
+        if (checked < 7) throw new AssertionError("expected seven cases, checked " + checked);
         println("C6000_STORE_MASK_PRINT_OK cases=" + checked);
     }
 }

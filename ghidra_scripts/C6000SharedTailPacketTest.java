@@ -52,8 +52,12 @@ public class C6000SharedTailPacketTest extends GhidraScript {
 			if (getInstructionAt(toAddr(at)) == null) throw new AssertionError("issuing call's window lost its instruction at " + toAddr(at));
 		checks++;
 		// The issuing call's packet companion, its only laid slot, is decoded again once the call is inert.
-		carried(0x117cL, 0x1168L, 0x1190L, 0x1188L);
-		if (getInstructionAt(toAddr(0x1194L)) == null) throw new AssertionError("inert call lost its packet companion");
+		carried(0x1178L, 0x1168L, 0x1194L, 0x1184L);
+		if (getInstructionAt(toAddr(0x1198L)) == null) throw new AssertionError("inert call lost its packet companion");
+		// A call whose window would hold the inert call gets no window: flow from its entry reaches every instruction.
+		var body = ghidra.app.cmd.function.CreateFunctionCmd.getFunctionBody(currentProgram, toAddr(0x1160L), monitor);
+		if (!body.contains(toAddr(0x1160L), toAddr(0x11b3L)))
+			throw new AssertionError("pktfw body from flow " + body + "; call at 0x118c: " + getInstructionAt(toAddr(0x118cL)).getPrototype().getDelaySlotByteCount() + " slot bytes");
 		checks++;
 		loopCalls(0x1000L);
 		loopCalls(0x1060L);

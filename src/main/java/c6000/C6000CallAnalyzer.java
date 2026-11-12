@@ -104,6 +104,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			String op = baseName(branch);
 			// A B B3 is a call too when its slots set B3 past the window (issue #39), and so is a BNOP (issue #69).
 			if ((op.equals("B.S1") || op.equals("B.S2") || op.equals("BNOP.S1") || op.equals("BNOP.S2")) &&
+				!C6000DelaySlots.flag(program, branch.getAddress(), "c_inert") &&
 				(reclassifiable(program, branch) || missingTarget(branch))) {
 				branches.add(branch.getAddress());
 			}
@@ -233,10 +234,22 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	 * byte, {@code landing} the address just past those NOPs at the target, and
 	 * {@code exact} whether a return window cut at {@code windowEnd} is its
 	 * window on every path: the return is taken only with the jump, or the
-	 * straight-line code it would otherwise run is NOPs too.
+	 * straight-line code it would otherwise run is NOPs too. Local: {@code exclusive}
+	 * when the transfer is taken exactly with the jump (shared call tails).
 	 */
 	record Preemption(Instruction jump, Instruction transfer, int cycle, Address windowEnd,
-			Address landing, boolean exact) {
+			Address landing, boolean exact, boolean exclusive) {
+	}
+
+	/**
+	 * Local: a jump into the last {@code cycle} cycles of another call's window
+	 * (the compiler's shared call tail), with a call to the same function issued
+	 * in the jump's window and taken exactly when the jump is: that call lands
+	 * after the tail ({@code landing}, its link). {@code last} is the tail's last
+	 * instruction (C6000DelaySlots.carryTails).
+	 */
+	record SharedTail(Instruction jump, Instruction transfer, Address callee, Address tail, Address last,
+			Address landing) {
 	}
 
 	/**
@@ -789,7 +802,19 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		}
 
 		Call recognize(Instruction branch) {
-			Arrival arrival = arrive(branch);
+			return recognize(branch, null);
+		}
+
+		/** Local: the transfer of a shared tail's preemption (sharedTail); its window ends where the jump lands. */
+		private Preemption forced;
+
+		/** {@code exclusive}: the call is the transfer of this exclusive preemption, predicated or not. */
+		private Call recognize(Instruction branch, Preemption exclusive) {
+			Preemption outer = forced;
+			forced = exclusive != null && exclusive.exclusive() ? exclusive : null;
+			Arrival arrival;
+			try { arrival = arrive(branch); }
+			finally { forced = outer; }
 			if (arrival == null) return null;
 			Landed landed = arrival.landed();
 			Long target = arrival.target();
@@ -797,15 +822,20 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			int branchIndex = arrival.branchIndex();
 			Register b3 = program.getRegister("B3");
 			Instruction partner = landed.partner();
-			if (partner != null && jumpArm(branch, partner)) return null;
 			long[] ret = landed.values().get(b3);
+			Address callee = target == null ? null :
+				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
+			if (callee != null && !program.getMemory().contains(callee)) callee = null;
+			if (exclusive != null && exclusive.exclusive()) {
+				// A link just past the landing NOPs is this arm's own: a call whatever the other arm is.
+				return ret != null && ret[1] == FULL && ret[0] == exclusive.landing().getOffset() &&
+					landed.end() == exclusive.windowEnd().getOffset() + 1 ? new Call(callee, null, exclusive.landing()) : null;
+			}
+			if (partner != null && jumpArm(branch, partner)) return null;
 			// B3 may also be set on the look-back path.
 			if (ret == null || ret[1] != FULL) return null;
 			long branchAt = branch.getMinAddress().getOffset();
 			long windowEnd = landed.end();
-			Address callee = target == null ? null :
-				branch.getMinAddress().getNewAddress(target & 0xffffffffL);
-			if (callee != null && !program.getMemory().contains(callee)) callee = null;
 			if (predicate(branch) != null && partner == null && branch.getRegister(0) == null && ret[0] <= branchAt) {
 				// A predicated call needs two fall-throughs, the return and the not-taken path (issue #66).
 				backwardReturn = loopReturn(branch, ret[0]);
@@ -995,7 +1025,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			timedCycles = cycles;
 			try {
 				int cycle = cycles[branchIndex];
-				long ours = cycle + 1 + DELAY_CYCLES;
+				long ours = cycle + 1 + DELAY_CYCLES - (forced == null ? 0 : forced.cycle()); // local: a shared tail's call stops where its jump lands
 				int span = 1;
 				for (int i = branchIndex; i >= 0 && cycles[i] == cycle; i--) {
 					if (untimed(program, prefix.get(i))) return null;
@@ -1099,11 +1129,16 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		 * in the window must be the opposite arm, not taken with the jump.
 		 */
 		Preemption preemption(Instruction jump) {
+			return preemption(jump, false);
+		}
+
+		/** {@code busy}: the target may run any non-transfer code until the transfer lands. */
+		private Preemption preemption(Instruction jump, boolean busy) {
 			if (!displacementJump(jump)) return null;
 			Address target = jump.getDefaultFlows()[0];
-			// The target must idle while the transfer is in flight: most jumps stop here, before the window is decoded.
+			// The target must idle while the transfer is in flight (busy: any 32-bit instruction): most jumps stop here, before the window is decoded.
 			Instruction first = decode(target);
-			if (first == null || !baseName(first).equals("NOP")) return null;
+			if (first == null || (busy ? first.getLength() != 4 : !baseName(first).equals("NOP"))) return null;
 			try {
 				for (Address at : C6000ExecutionPackets.issuePrefix(program, jump.getMinAddress())) {
 					Instruction prior = decode(at);
@@ -1123,8 +1158,10 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			int[] issue = issueCycles(execution);
 			String guard = predicate(jump);
 			int found = -1;
+			boolean generator = false;
 			for (int i = at + 1; i < execution.size(); i++) {
 				Instruction slot = execution.get(i);
+				if (issue[i] == issue[at] && extraCycles(program, slot) > 0) generator = true;
 				if (!transfer(slot)) continue;
 				if (issue[i] == issue[at]) return null;
 				if (complementary(jump, slot) && stable(execution, i, at, guard, true)) continue;
@@ -1138,21 +1175,28 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Address windowEnd = execution.get(end).getMaxAddress();
 			if (target.compareTo(jump.getMinAddress()) >= 0 && target.compareTo(windowEnd) <= 0) return null;
 			// Where the transfer lands in the jump's target, once its remaining cycles idle there.
-			Address landing = idle(decode(target), cycle);
+			Address landing = idle(decode(target), cycle, false);
+			if (landing == null && busy) landing = idle(decode(target), cycle, true);
 			if (landing == null) return null;
+			// Local (shared tails): a 32-bit displacement B taken exactly with the jump, unconditional or under its stable predicate.
+			String own = predicate(transfer), op = baseName(transfer);
+			boolean wide = jump.getLength() == 4 && transfer.getLength() == 4;
+			for (Instruction slot : slots) wide &= slot.getLength() == 4;
+			boolean exclusive = wide && !generator && (op.equals("B.S1") || op.equals("B.S2")) && cycle >= 1 && cycle <= DELAY_CYCLES &&
+				(own == null ? guard == null : own.equals(guard) && stable(execution, found, at, guard, true));
 			// Exact when the proposed lifting runs what the hardware runs on every path.
-			boolean exact = compare(jump, jump, new Proposal(jump, transfer, windowEnd)) == null;
-			return new Preemption(jump, transfer, cycle, windowEnd, landing, exact);
+			boolean exact = !busy && compare(jump, jump, new Proposal(jump, transfer, windowEnd)) == null;
+			return new Preemption(jump, transfer, cycle, windowEnd, landing, exact, exclusive);
 		}
 
-		/** The address after {@code cycles} cycles of NOP-only execute packets from {@code start}, else null. */
-		private Address idle(Instruction start, int cycles) {
+		/** The address after {@code cycles} cycles of NOP-only (busy: transfer-free) execute packets from {@code start}, else null. */
+		private Address idle(Instruction start, int cycles, boolean busy) {
 			Instruction current = start;
 			try {
 				while (current != null) {
 					int span = 1;
 					while (true) {
-						if (!baseName(current).equals("NOP")) return null;
+						if (busy ? current.getLength() != 4 || transfer(current) || untimed(program, current) : !baseName(current).equals("NOP")) return null;
 						span = Math.max(span, 1 + extraCycles(program, current));
 						if (!parallelWithNext(current)) break;
 						current = next(current);
@@ -1182,6 +1226,20 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				if (found != null && found.transfer().getMinAddress().equals(at)) return found;
 			}
 			return null;
+		}
+
+		/** Local: the shared call tail {@code jump} enters, or null (C6000DelaySlots.carryTails). */
+		SharedTail sharedTail(Instruction jump) {
+			Preemption p = preemption(jump, true);
+			if (p == null || !p.exclusive()) return null;
+			Instruction transfer = p.transfer();
+			if (transfer.getRegister(0) != null || transfer.getDefaultFlows().length != 1) return null;
+			Call call = recognize(transfer, p);
+			if (call == null || !p.landing().equals(call.link())) return null;
+			Instruction last = listing.getInstructionContaining(p.landing().previous());
+			if (last == null || !last.getMaxAddress().next().equals(p.landing())) return null;
+			return new SharedTail(jump, transfer, transfer.getDefaultFlows()[0], jump.getDefaultFlows()[0],
+				last.getAddress(), p.landing());
 		}
 
 		/** Relative E1 cycle of each physical instruction, including idle spans. */

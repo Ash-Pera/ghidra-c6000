@@ -115,7 +115,7 @@ define register offset=0x3000 size=8 [ contextreg ];
 # Synthetic execution address for Ghidra's p-code emulator.  C6000 exposes
 # PCE1 to instructions, while the emulator needs a distinct current PC.
 define register offset=0x3100 size=4 [ PC ];
-define register offset=0x3200 size=4 [ C6000_PIPE_RET C6000_PIPE_ILC C6000_PIPE_RILC ];
+define register offset=0x3200 size=4 [ C6000_PIPE_RET C6000_PIPE_ILC C6000_PIPE_RILC C6000_CARRY ];
 
 # Every field is `noflow`: each describes the fetch packet that physically
 # contains the slot, so it must never be inherited from the instruction that
@@ -141,6 +141,8 @@ define context contextreg
   c_pkt_branch_end = (27,27) noflow
   c_pkt_chain0 = (28,28) noflow # write0 continues an earlier member's write of the register
   c_pkt_chain1 = (29,29) noflow
+  c_inert = (30,30) noflow # local: a branch whose transfer a carried call replaces (C6000DelaySlots.carryTails)
+  c_carry = (31,31) noflow # local: last instruction of a shared call tail, then the call (target by reference)
 @if ENDIAN == "big"
   c_pkt_write0 = (48,54) noflow
   c_pkt_write1 = (55,61) noflow
@@ -605,6 +607,8 @@ define pcodeop c6000_pipeline;
 # operand BEFORE the userop. The native return hides the physical CFG; dynamic
 # injection supplies the exact scheduled CFG and its captured return target.
 :^instruction is c_schedule_entry=1 & instruction [ c_schedule_entry=0; c_flow_delay=0; ] { c6000_pipeline(); return [C6000_PIPE_RET]; build instruction; }
+# Local: the shared tail's last instruction, then the call both of its issuing branches pended (SPRUFE8B 3.5, 4.2.6 B).
+:^instruction is c_schedule_entry=0 & c_carry=1 & instruction [ c_carry=0; ] { build instruction; call [C6000_CARRY]; }
 :^instruction is c_pkt_active=1 & c_schedule_entry=0 & PktIn0 & PktIn1 & PktOut0 & PktOut1 &
   PktCommit & instruction [ c_pkt_active=0; ]
 {
@@ -615,7 +619,7 @@ define pcodeop c6000_pipeline;
   build PktOut1;
   build PktCommit;
 }
-with : c_schedule_entry=0 {
+with : c_schedule_entry=0 & c_carry=0 {
 # Figure F-8 pointer branches use op=110 (IRP) or 111 (NRP).
 # The op field overlaps the five-bit register field of Figure F-7; match
 # these fully encoded forms before the general B-register constructors.

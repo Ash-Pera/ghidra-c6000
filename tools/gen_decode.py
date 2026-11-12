@@ -842,6 +842,10 @@ def main():
                         placeholder_mnemonics.add(mnem)
                     w(":%s is %s { %s }" % (disp, " & ".join(pat), sem))
                     n += 1
+                    if mnem in {"STW", "STH", "STDW"} and (not short_memory or "i7=1" in pat):  # SPRAB89 3.2: B15 is 8-byte aligned, store unmasked
+                        sp_pat = pat + (["base_idx=15"] if short_memory else ["i7=1"])
+                        w(":%s is %s { %s }" % (disp, " & ".join(sp_pat), sem.replace("c6000_sem_%s(" % mnem.lower(), "c6000_sem_%s_sp(" % mnem.lower())))
+                        n += 1
                     if mnem in {"ABSDP", "RCPDP", "RSQRDP"}:  # SPRUFE8B 3.12 ABSDP/RCPDP/RSQRDP: also the assemblers' odd-src2 form
                         odd = [t.replace("Src2Pair", "Src2PairDpsp") for t in pat
                                if not any(t.startswith(f"i{i}=") for i in range(12, 18))]

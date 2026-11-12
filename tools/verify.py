@@ -139,6 +139,7 @@ TI = [
          "json", ["cases.json", "results.json"]),
     case("pipeline-postloop", "PostLoopDispatch", "C6000_POSTLOOP_OK", "json"),
     case("store-mask-print", "StoreMaskPrint", "C6000_STORE_MASK_PRINT_OK", "json"),
+    case("store-mask-schedule", "StoreMaskSchedule", "C6000_STORE_MASK_SCHEDULE_OK", "json"),
 ]
 
 

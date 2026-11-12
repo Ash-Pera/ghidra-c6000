@@ -1325,6 +1325,7 @@ public final class C6000PipelineCompiler {
         // Local: an exact constant inside this function's own body that no function starts at is a direct jump there.
         boolean local=known!=null&&program.getFunctionManager().getFunctionAt(entry.getNewAddress(known))==null&&function.getBody().contains(entry.getNewAddress(known));
         if(known!=null&&!local&&program.getFunctionManager().getFunctionAt(entry.getNewAddress(known))==null)throw fail("register branch to a constant that is no function "+instruction);
+        if(plan==null&&!returns&&known==null&&!registerCall&&instruction.getAddress(0)==null)throw fail("unresolved branch target "+instruction);
         long target=plan!=null?plan.callee().start():returns?0:known!=null?known:registerCall?REGISTER_CALL:instruction.getAddress(0).getOffset();
         if(known!=null)registerCall=false; // an exact constant: the opaque direct call at landing
         if(call||registerCall)b.op(PcodeOp.COPY,slot("call_target",at,1,0,4),register==null?c(target,4):captured.get(at).get(register.getAddress().getOffset()));

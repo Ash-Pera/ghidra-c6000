@@ -29,6 +29,6 @@ public class C6000PipelineConstantJumpTest extends GhidraScript {
             for(var expected:row.getAsJsonObject("expected").entrySet())equal(expected.getValue().getAsLong(),value(state,expected.getKey()),row.get("name")+" "+expected.getKey());
             count++;
         }
-        equal(1,count,"in-body jump");equal(1,refused,"outside the body");println("C6000_PIPELINE_CONSTANT_JUMP_OK cases="+count+" refused="+refused);}finally{System.clearProperty("c6000.opaqueCalls");}
+        equal(1,count,"in-body jump");equal(2,refused,"outside the body; no target");println("C6000_PIPELINE_CONSTANT_JUMP_OK cases="+count+" refused="+refused);}finally{System.clearProperty("c6000.opaqueCalls");}
     }
 }

@@ -19,6 +19,16 @@ public class C6000OpaqueCallLinkTest extends GhidraScript {
 			review(getFunctionAt(toAddr(0x1040L)));
 			// Known-good: the link written in the call's own issue packet, before its predicate forks.
 			review(getFunctionAt(toAddr(0x10e0L)));
+			// Known-good: the link written under the call's predicate before the packet that forks on it.
+			review(getFunctionAt(toAddr(0x1180L)));
+			// Known-bad: the predicate is rewritten between the link and the call.
+			try {
+				review(getFunctionAt(toAddr(0x11c0L)));
+				throw new AssertionError("accepted a link written under a since-rewritten predicate");
+			}
+			catch (IllegalArgumentException e) {
+				if (!e.getMessage().contains("opaque call lacks an exact B3 link proof")) throw e;
+			}
 			// Known-bad: the link is written under [B0], unknown on the call path.
 			try {
 				review(getFunctionAt(toAddr(0x1080L)));
@@ -31,7 +41,7 @@ public class C6000OpaqueCallLinkTest extends GhidraScript {
 		finally {
 			System.clearProperty("c6000.opaqueCalls");
 		}
-		println("C6000_OPAQUE_CALL_LINK_OK checks=3");
+		println("C6000_OPAQUE_CALL_LINK_OK checks=5");
 	}
 
 	private void review(Function f) throws Exception {

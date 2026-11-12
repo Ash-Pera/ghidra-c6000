@@ -1333,7 +1333,9 @@ public final class C6000PipelineCompiler {
         boolean registerCall=register!=null&&!returns&&!call&&ordinarySchedule();
         if(register!=null&&!returns&&!call&&!registerCall)throw fail("unresolved register branch "+instruction);
         Long known=!registerCall?null:source.returns().links().get(register.getAddress().getOffset()==linkOffset()?LINK_CONST:REG_CONST-register.getAddress().getOffset());
-        if(known!=null&&program.getFunctionManager().getFunctionAt(entry.getNewAddress(known))==null)throw fail("register branch to a constant that is no function "+instruction);
+        // Local: an exact constant inside this function's own body that no function starts at is a direct jump there.
+        boolean local=known!=null&&program.getFunctionManager().getFunctionAt(entry.getNewAddress(known))==null&&function.getBody().contains(entry.getNewAddress(known));
+        if(known!=null&&!local&&program.getFunctionManager().getFunctionAt(entry.getNewAddress(known))==null)throw fail("register branch to a constant that is no function "+instruction);
         // SPRUFE8B B IRP p.155, B NRP p.157: the target is IRP or NRP, neither a register operand nor a displacement.
         if(plan==null&&!returns&&known==null&&!registerCall&&instruction.getAddress(0)==null)throw fail("unresolved branch target "+instruction);
         long target=plan!=null?plan.callee().start():returns?0:known!=null?known:registerCall?REGISTER_CALL:instruction.getAddress(0).getOffset();

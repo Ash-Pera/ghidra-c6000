@@ -22,10 +22,10 @@ SPRUFE8B 3.5):
                  making the call inert must re-decode the companion and keep the staging.
   1120 callee    B B3 ; ADD A4,A4,A4 ; NOP 4
   1140 callee2   B B3 ; ADD 3,A4,A4 ; NOP 4
-  1160 pktfw     tailidle whose jump and issuing call each have a packet companion
-                 ([A1] B tail4 || [A1] ADD 1,A4,A4 ; [A1] B callee || [A1] MVKL ret4,B3), with
-                 [!A1] B callee2 next in the jump's window, so only the companions are laid
-                 as slots: making the call inert must re-decode its companion.
+  1160 pktfw     as the firmware: [A1] B tail4 || [A1] ADD 1,A4,A4 ; [!A1] B callee2 ||
+                 [!A1] MVKL exit4,B3 ; [A1] B callee || [A1] MVKL ret4,B3 ; ... with a
+                 two-cycle tail (tail4: NOP 2). The opposite-predicate call to callee2 is
+                 issued in the jump's window and holds the issuing call in its own window.
 """
 
 from pathlib import Path
@@ -44,9 +44,9 @@ WORDS = [
     0x00000000, 0x00000000, 0x01B40FDA, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000,
     0x000C0362, 0x02108078, 0x00006000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x000C0362, 0x02106058, 0x00006000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-    0x068C0FDB, 0x05100FD8, 0x0FFFF810, 0x020000A8, 0x0188C02A, 0x0180006A, 0x00000000, 0x00000000,
-    0x052BE058, 0x00A80FD8, 0x8FFFFF93, 0x82102058, 0x8FFFF411, 0x8188C02A, 0x9FFFF811, 0x9188D62A,
-    0x8180006A, 0x9180006A, 0x00004000, 0x01B40FDA, 0x000C0362, 0x00008000, 0x00000000, 0x00000000,
+    0x068C0FDB, 0x05100FD8, 0x0FFFF810, 0x020000A8, 0x0188BE2A, 0x0180006A, 0x00002000, 0x052BE058,
+    0x00A80FD8, 0x8FFFFF13, 0x82102058, 0x9FFFF811, 0x9188D42A, 0x8FFFF411, 0x8188BE2A, 0x8180006A,
+    0x9180006A, 0x00002000, 0x01B40FDA, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000,
 ]
 
 

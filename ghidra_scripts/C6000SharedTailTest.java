@@ -10,9 +10,9 @@ import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 
 public class C6000SharedTailTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x11e0L, 0x1200L, 0x1000L, 0x1060L, 0x10c0L, 0x1120L, 0x1180L };
+	private static final long[] ENTRIES = { 0x11e0L, 0x1200L, 0x1000L, 0x1060L, 0x10c0L, 0x1120L, 0x1180L, 0x1220L };
 	private static final String[] NAMES = { "callee", "callee2", "tailidle", "tailbusy", "tailpred", "tailother",
-		"tailentry" };
+		"tailentry", "tailearly" };
 	private int checks;
 
 	@Override
@@ -30,8 +30,11 @@ public class C6000SharedTailTest extends GhidraScript {
 		// The loop calls callee on every iteration (natively the loop's call was lost).
 		loopCalls(0x1000L);
 		loopCalls(0x1060L);
+		loopCalls(0x1220L);
 		carried(0x101cL, 0x1008L, 0x102cL, 0x1028L);
 		carried(0x107cL, 0x106cL, 0x108cL, 0x1088L);
+		// The link written before the jump: the jump writes no link, so it still holds.
+		carried(0x123cL, 0x122cL, 0x1254L, 0x1250L);
 		// Known-bads: the first call keeps its own transfer and no tail instruction calls.
 		for (long[] c : new long[][] { { 0x10e0L, 0x10d0L }, { 0x113cL, 0x112cL }, { 0x11a8L, 0x1198L } }) {
 			Instruction tail = getInstructionAt(toAddr(c[0])), call = getInstructionAt(toAddr(c[1]));

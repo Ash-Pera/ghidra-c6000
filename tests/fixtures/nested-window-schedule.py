@@ -25,6 +25,10 @@ output (-mv6740 --no_compress), listed by dis6x (SPRUFE8B 4.2.6, B, MVK/MVKH):
   112c absorber MVK 1,A4 ; B tail2 ; ADD 15,A4,A4 ; NOP 3 ; B B3 ; ADD 8 ; ADD 8
        1148     tail2: ADD 2,A4,A4 ; ADD 4,A4,A4 ; NOP 3: retjump's shape, returns 22;
                 its unowned slots 0x1134-0x113f share neighbour's fetch packet 0x1120
+  1180 ifcall4  MV A4,A1 || MV B3,B13 ; [A1] MVKL ret4,B3 ; [A1] MVKH ret4,B3 ; [A1] B callee ;
+                [A1] MVK 7,A4 ; NOP 4 ; ret4: ADD 2,A4,A4 ; MV B13,B3 ; B B3 ; NOP 5
+                the link is written under the call's predicate before the packet that forks on it
+  11c0 ifbad4   as ifcall4, with MV A6,A1 between the link and the call: no exact link
 """
 
 from pathlib import Path
@@ -48,6 +52,12 @@ WORDS = {
     0x1124: 0x000C0362, 0x1128: 0x00008000, 0x112C: 0x020000A8, 0x1130: 0x00000510,
     0x1134: 0x0211E058, 0x1138: 0x00004000, 0x113C: 0x000C0362, 0x1140: 0x02110058,
     0x1144: 0x02110058, 0x1148: 0x02104058, 0x114C: 0x02108058, 0x1150: 0x00004000,
+    0x1180: 0x00900FD9, 0x1184: 0x068C0FDA, 0x1188: 0x8188CE2A, 0x118C: 0x8180006A,
+    0x1190: 0x8FFFE810, 0x1194: 0x820003A8, 0x1198: 0x00006000, 0x119C: 0x02104058,
+    0x11A0: 0x01B40FDA, 0x11A4: 0x000C0362, 0x11A8: 0x00008000, 0x11C0: 0x00900FD9,
+    0x11C4: 0x068C0FDA, 0x11C8: 0x8188F02A, 0x11CC: 0x8180006A, 0x11D0: 0x00980FD8,
+    0x11D4: 0x8FFFE010, 0x11D8: 0x820003A8, 0x11DC: 0x00006000, 0x11E0: 0x02104058,
+    0x11E4: 0x01B40FDA, 0x11E8: 0x000C0362, 0x11EC: 0x00008000,
 }
 
 
@@ -55,7 +65,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x160)
+    image = bytearray(0x200)
     for address, word in WORDS.items():
         struct.pack_into(endian + "I", image, address - 0x1000, word)
     Path(sys.argv[1]).write_bytes(image)

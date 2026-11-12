@@ -26,9 +26,13 @@ public class C6000TailCallSlotsTest extends GhidraScript {
 		long[][] calls = { { 0x1024L, 0x102cL }, { 0x1038L, 0x1040L }, { 0x1054L, 0x105cL } };
 		for (long[] c : calls) {
 			Instruction call = getInstructionAt(toAddr(c[0]));
-			if (call == null || !call.getFlowType().isCall() || call.getFlowType().isTerminal() ||
-				call.getFallThrough() == null || getInstructionAt(toAddr(c[1])) == null) {
-				throw new AssertionError("call at " + toAddr(c[0]) + ": " + describe(call));
+			// A callee marked no-return keeps Ghidra's terminal call (docs/internals.md).
+			boolean noReturn = call != null && call.getFlowType().isTerminal() &&
+				java.util.Arrays.stream(call.getReferencesFrom()).anyMatch(r -> r.getReferenceType().isCall() &&
+					getFunctionAt(r.getToAddress()) != null && getFunctionAt(r.getToAddress()).hasNoReturn());
+			if (call == null || !call.getFlowType().isCall() || !noReturn && (call.getFlowType().isTerminal() ||
+				call.getFallThrough() == null || getInstructionAt(toAddr(c[1])) == null)) {
+				throw new AssertionError("call at " + toAddr(c[0]) + ": " + describe(call) + "; next " + describe(getInstructionAt(toAddr(c[0] + 4))));
 			}
 		}
 		// A B whose window sets B3, even past the window end, is a call, not a tail call.

@@ -187,10 +187,14 @@ public final class C6000DelaySlots {
                     if (branch == null) break;
                     Address at = branch.getAddress();
                     if (branch.getPrototype().getDelaySlotByteCount() <= parallelBytes(program, at)) break;
-                    release(program, branch, monitor);
+                    // Entered only where its slots idle: end the window there and keep every effect.
+                    Address idle = idleTail(program, branch);
+                    if (idle != null) release(program, branch, (int) idle.subtract(branch.getMaxAddress()) - 1, monitor);
+                    else release(program, branch, parallelBytes(program, at), monitor);
                     decompiler.flushCache();
                     program.getBookmarkManager().setBookmark(at, BookmarkType.ANALYSIS, RELEASED,
-                        "Native delay window released: " + function.getName() +
+                        (idle != null ? "Native delay window ended before its entered NOP slots at " + idle + ": "
+                            : "Native delay window released: ") + function.getName() +
                         " exceeded the decompiler's overlapping-instruction limit (issue #52)");
                     released++;
                 }
@@ -226,6 +230,31 @@ public final class C6000DelaySlots {
             if (laid > parallelBytes(program, at) && entered(program, at, branch.getMaxAddress().add(laid))) return branch;
         }
         return null;
+    }
+
+    /** First slot entered from outside the window when only NOPs follow to its end (they only idle), else null. */
+    private static Address idleTail(Program program, Instruction branch) {
+        Address at = branch.getAddress(), end = branch.getMaxAddress().add(branch.getPrototype().getDelaySlotByteCount());
+        Address first = null;
+        var references = program.getReferenceManager();
+        var targets = references.getReferenceDestinationIterator(new AddressSet(at.next(), end), true);
+        while (targets.hasNext()) {
+            Address target = targets.next();
+            for (var it = references.getReferencesTo(target); it.hasNext();) {
+                Reference r = it.next();
+                Address from = r.getFromAddress();
+                if (r.getReferenceType().isFlow() && (from.compareTo(at) < 0 || from.compareTo(end) > 0) &&
+                    (first == null || target.compareTo(first) < 0)) first = target;
+            }
+        }
+        if (first == null || first.compareTo(branch.getMaxAddress().add(parallelBytes(program, at))) <= 0) return null;
+        var listing = program.getListing();
+        for (Address cursor = first; cursor.compareTo(end) <= 0;) {
+            Instruction slot = listing.getInstructionAt(cursor);
+            if (slot == null || !C6000CallAnalyzer.baseName(slot).equals("NOP")) return null;
+            cursor = slot.getMaxAddress().next();
+        }
+        return first;
     }
 
     /** Control from outside [at, end] reaches one of the slots after at. */
@@ -274,15 +303,15 @@ public final class C6000DelaySlots {
     }
 
     /**
-     * Undo apply(): the slots become ordinary instructions again, lifted after
-     * the transfer as before issues #34 and #48. Keep the branch's override, the
-     * slots' annotations and every reference.
+     * Undo apply(): the slots past the first keep bytes become ordinary
+     * instructions again, lifted after the transfer as before issues #34 and #48.
+     * Keep the branch's override, the slots' annotations and every reference.
      */
-    private static Repair release(Program p, Instruction original, TaskMonitor monitor) throws Exception {
+    private static Repair release(Program p, Instruction original, int keep, TaskMonitor monitor) throws Exception {
         var listing = p.getListing();
         Address at = original.getAddress();
         Address end = original.getMaxAddress().add(original.getPrototype().getDelaySlotByteCount());
-        int oldDepth = original.getDelaySlotDepth(), keep = parallelBytes(p, at);
+        int oldDepth = original.getDelaySlotDepth();
         FlowOverride override = original.getFlowOverride();
         List<SavedInstruction> saved = snapshot(p, at, end);
         listing.clearCodeUnits(at, end, false);

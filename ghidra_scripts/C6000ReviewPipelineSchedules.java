@@ -45,7 +45,8 @@ public class C6000ReviewPipelineSchedules extends GhidraScript {
         List<C6000PipelineContracts.Review> plans = new ArrayList<>();
         List<Object> reports = new ArrayList<>();
         Map<Long, Map<String,Object>> rows = new HashMap<>();
-        Set<Long> seen = new HashSet<>();
+        Set<Long> seen = new HashSet<>(), batch = new HashSet<>();
+        for (var value : manifest.getAsJsonArray("functions")) batch.add(value.getAsJsonObject().get("entry").getAsLong());
         for (var value : manifest.getAsJsonArray("functions")) {
             monitor.checkCancelled();
             var item = value.getAsJsonObject();
@@ -63,7 +64,7 @@ public class C6000ReviewPipelineSchedules extends GhidraScript {
                     windows.add(JSON.fromJson(window, C6000PipelineContracts.SourceWindow.class));
                 }
                 var plan = C6000PipelineContracts.review(currentProgram, function,
-                    item.get("drained_entry_evidence").getAsString(), writes, windows, monitor);
+                    item.get("drained_entry_evidence").getAsString(), writes, windows, batch, monitor);
                 plans.add(plan);row.put("status", "eligible");row.put("review", plan);
             }
             catch (ghidra.util.exception.CancelledException cancelled) {
@@ -90,6 +91,27 @@ public class C6000ReviewPipelineSchedules extends GhidraScript {
                     " in this batch: covered code outside the body shares its fetch packets");
                 plans.removeIf(plan -> plan.entry() == absorber.getKey());
                 break;
+            }
+        }
+        // A batch entry refused above keeps its recorded review: judge the remaining enables against it.
+        for (boolean changed = true; changed;) {
+            changed = false;
+            Set<Long> kept = new HashSet<>();
+            for (var plan : plans) kept.add(plan.entry());
+            for (var plan : List.copyOf(plans)) {
+                if (footprints.get(plan.entry()).absorbed().isEmpty()) continue;
+                try {
+                    C6000PipelineContracts.keepsRecorded(currentProgram,
+                        currentProgram.getFunctionManager().getFunctionAt(toAddr(plan.entry())), plan, kept, monitor);
+                }
+                catch (ghidra.util.exception.CancelledException cancelled) { throw cancelled; }
+                catch (Exception refused) {
+                    var row = rows.get(plan.entry());
+                    row.put("status", "refused");row.remove("review");row.put("reason", refused.getMessage());
+                    plans.removeIf(p -> p.entry() == plan.entry());
+                    changed = true;
+                    break;
+                }
             }
         }
         if (before != currentProgram.getModificationNumber()) throw new AssertionError("report changed program");
@@ -119,12 +141,21 @@ public class C6000ReviewPipelineSchedules extends GhidraScript {
                     int transaction = program.startTransaction(getWorkerName());
                     boolean commit = false;
                     try {
+                        // Absorbers last, all recorded before any enables: each enable is judged against the batch's new reviews.
+                        List<C6000PipelineContracts.Review> absorbing = new ArrayList<>();
                         for (var plan : plans) {
                             task.checkCancelled();
                             var function = program.getFunctionManager().getFunctionAt(toAddr(plan.entry()));
                             if (function == null) throw new IllegalArgumentException("reviewed function disappeared");
+                            if (!footprints.get(plan.entry()).absorbed().isEmpty()) { absorbing.add(plan); continue; }
                             C6000PipelineContracts.record(program, function, plan, task);
                             if (args[2].equals("apply")) C6000PipelineContracts.activate(program, function, task);
+                        }
+                        for (var plan : absorbing)
+                            C6000PipelineContracts.record(program, program.getFunctionManager().getFunctionAt(toAddr(plan.entry())), plan, task);
+                        if (args[2].equals("apply")) for (var plan : absorbing) {
+                            task.checkCancelled();
+                            C6000PipelineContracts.activate(program, program.getFunctionManager().getFunctionAt(toAddr(plan.entry())), task);
                         }
                         commit = true;return true;
                     }

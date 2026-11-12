@@ -22,6 +22,7 @@ those cycles and then that call (SPRUFE8B 3.5, 4.2.6 B):
   11e0 callee    B B3 ; ADD A4,A4,A4 ; NOP 4
   1200 callee2   B B3 ; ADD 3,A4,A4 ; NOP 4
   1220 tailearly as tailbusy, with the loop's link written under [A1] before the jump's packet
+  1280 tailpar   as tailearly, with MVKH in the jump's packet (a parallel companion of the jump)
 """
 
 from pathlib import Path
@@ -49,6 +50,9 @@ WORDS = [
     0x068C0FDB, 0x05100FD9, 0x059806A0, 0x0FFFF810, 0x0189202A, 0x0180006A, 0x00002000, 0x022C0FD8,
     0x052BE058, 0x00A80FD8, 0x8189202A, 0x8180006A, 0x8FFFFF90, 0x8FFFF412, 0x85AC8078, 0x00004000,
     0x01B40FDA, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x068C0FDB, 0x05100FD9, 0x059806A0, 0x0FFFEC10, 0x0189502A, 0x0180006A, 0x00002000, 0x022C0FD8,
+    0x052BE058, 0x00A80FD8, 0x8189502A, 0x8FFFFF91, 0x8180006A, 0x8FFFE812, 0x85AC8078, 0x00004000,
+    0x01B40FDA, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 ]
 
 
@@ -56,7 +60,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x280)
+    image = bytearray(0x2e0)
     for index, word in enumerate(WORDS):
         struct.pack_into(endian + "I", image, 4 * index, word)
     Path(sys.argv[1]).write_bytes(image)

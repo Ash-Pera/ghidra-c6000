@@ -14,8 +14,8 @@ import ghidra.program.model.pcode.PcodeOp;
 import ghidra.program.model.pcode.Varnode;
 
 public class C6000SharedTailPacketTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x10c0L, 0x1000L, 0x1060L };
-	private static final String[] NAMES = { "callee", "pktowner", "pkttail" };
+	private static final long[] ENTRIES = { 0x1120L, 0x1140L, 0x1000L, 0x1060L, 0x10c0L, 0x1160L };
+	private static final String[] NAMES = { "callee", "callee2", "pktowner", "pkttail", "pktslot", "pktfw" };
 	private int checks;
 
 	@Override
@@ -45,8 +45,20 @@ public class C6000SharedTailPacketTest extends GhidraScript {
 		for (int i = 0; i < ops.length; i++) if (ops[i].getOpcode() == PcodeOp.CALL || ops[i].getOpcode() == PcodeOp.CALLIND) call = i;
 		if (a4 < 0 || call < a4) throw new AssertionError("carried call before its packet's commit of A4: " + pcode(carrier));
 		checks++;
+		// An inert call with a packet companion keeps the companion and its window's staged packet.
+		field(0x10f8L, "c_pkt_active", 1);
+		carried(0x10dcL, 0x10c8L, 0x10ecL, 0x10e8L);
+		for (long at : new long[] { 0x10f0L, 0x10f4L, 0x10f8L, 0x10fcL })
+			if (getInstructionAt(toAddr(at)) == null) throw new AssertionError("issuing call's window lost its instruction at " + toAddr(at));
+		checks++;
+		// The issuing call's packet companion, its only laid slot, is decoded again once the call is inert.
+		carried(0x117cL, 0x1168L, 0x1190L, 0x1188L);
+		if (getInstructionAt(toAddr(0x1194L)) == null) throw new AssertionError("inert call lost its packet companion");
+		checks++;
 		loopCalls(0x1000L);
 		loopCalls(0x1060L);
+		loopCalls(0x10c0L);
+		loopCalls(0x1160L);
 		println("C6000_SHARED_TAIL_PACKET_OK checks=" + checks);
 	}
 
@@ -77,7 +89,7 @@ public class C6000SharedTailPacketTest extends GhidraScript {
 	private void carried(long tail, long first, long second, long jump) {
 		Instruction t = getInstructionAt(toAddr(tail)), a = getInstructionAt(toAddr(first)), b = getInstructionAt(toAddr(second)),
 			j = getInstructionAt(toAddr(jump));
-		if (t == null || !t.getFlowType().isCall() || t.getFlows().length != 1 || !t.getFlows()[0].equals(toAddr(0x10c0L)))
+		if (t == null || !t.getFlowType().isCall() || t.getFlows().length != 1 || !t.getFlows()[0].equals(toAddr(0x1120L)))
 			throw new AssertionError("tail at " + toAddr(tail) + ": " + t + (t == null ? "" : " " + t.getFlowType()));
 		for (Instruction i : new Instruction[] { a, b })
 			if (i == null || i.getFlowType().isCall() || i.getFlowType().isJump() || i.getPrototype().getDelaySlotByteCount() != 0)

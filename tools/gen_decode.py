@@ -789,7 +789,7 @@ def main():
                                      if term not in {"Cond", "creg!=7", "(creg!=0 | z=0)"}]
                         plain_pat += ["creg=0", "z=0", "c_inert=0", "CFlowDelay"]
                         plain_disp = "B." + variant_ul + suffix[1:] + " BranchTarget"
-                        inert.append(":%s is %s { }" % (plain_disp, " & ".join(plain_pat[:-2] + ["c_inert=1"])))
+                        inert.append(":%s is %s { build PktInertCommit; }" % (plain_disp, " & ".join(plain_pat[:-2] + ["c_inert=1", "PktInertCommit"])))
                         w(":%s is %s { build CFlowDelay; goto BranchTarget; }" %
                           (plain_disp, " & ".join(plain_pat)))
                         n += 1
@@ -825,7 +825,7 @@ def main():
                     # issue predicate/target before the proven native byte window.
                     # CALLP supplies its NOP cycles and links to the next packet.
                     if mnem == "B" and ops and ops[0] == "BranchTarget":
-                        inert.append(":%s is %s { }" % (disp, " & ".join(pat + ["c_inert=1"])))
+                        inert.append(":%s is %s { build PktInertCommit; }" % (disp, " & ".join(pat + ["c_inert=1", "PktInertCommit"])))
                         pat += ["c_inert=0", "CFlowDelay"]
                         sem = "local take:1 = Cond; build CFlowDelay; if (take != 0) goto BranchTarget;"
                     elif mnem == "CALLP":
@@ -852,7 +852,7 @@ def main():
                                                  sem.replace("Src2Pair", "Src2PairDpsp")))
                         n += 1
         if inert:
-            w("# Local: a displacement branch whose call a shared tail carries (C6000DelaySlots.carryTails): no transfer.")
+            w("# Local: a displacement branch whose call a shared tail carries (C6000DelaySlots.carryTails): no transfer, but its packet's commit.")
             lines.extend(inert)
             n += len(inert)
         w("")

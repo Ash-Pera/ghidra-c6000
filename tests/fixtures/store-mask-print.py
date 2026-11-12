@@ -11,6 +11,10 @@ CASES = [
     ("record_word", None, "void f(R *p)",
      [" ZERO.L1 A5", " STW.D1 A5,*+A4[2]", " B.S2 B3", " NOP 5"],
      {"stores": [[4, 0xfffffffc]]}),
+    # Byte pointer: a zero word at a scaled offset stays one masked word store.
+    ("char_word", None, "void f(char *p)",
+     [" ZERO.L2 B5", " MV.L2X A4,B4", " STW.D2T2 B5,*+B4[30]", " B.S2 B3", " NOP 5"],
+     {"stores": [[4, 0xfffffffc]]}),
     ("param_half", None, None,
      [" STH.D1T2 B4,*+A4[3]", " B.S2 B3", " NOP 5"],
      {"stores": [[2, 0xfffffffe]]}),

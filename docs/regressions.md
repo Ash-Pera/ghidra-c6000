@@ -635,6 +635,18 @@ Windows` analyzer must release exactly one of them (bookmarked, depth 0, target 
 released. A second release pass must change nothing, and delay-window recovery must not
 lay a released window again.
 
+## Shared call tails (local)
+
+`shared-tail.py IMAGE [be]` and `C6000SharedTailTest.java` (with `prepare` as a pre-script)
+check `cl6x` 8.3.15 words of a jump into the last cycles of a call's window, with a call to
+the same function and link issued in the jump's own window under the jump's predicate
+(SPRUFE8B 3.5, 4.2.6 B). The tail runs and then that call, so no native window lifts
+both: the tail's last instruction carries the call (`c_carry`, target by reference) and
+both issuing branches stop transferring (`c_inert`). `tailidle` (idle tail) and `tailbusy`
+(the tail sets the argument) must call `callee` inside their loops and the jump must keep
+its window; `tailpred` (the owning call is predicated), `tailother` (another callee) and
+`tailentry` (a jump with no call pending also enters the tail) must stay native.
+
 ## Additional decoder accuracy checks
 
 The release runner includes compact stack offsets (`compact-dstk`), unscaled

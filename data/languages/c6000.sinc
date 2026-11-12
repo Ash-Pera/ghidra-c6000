@@ -92,7 +92,7 @@ define register offset=0x3000 size=4 [ contextreg ];
 # Synthetic execution address for Ghidra's p-code emulator.  C6000 exposes
 # PCE1 to instructions, while the emulator needs a distinct current PC.
 define register offset=0x3100 size=4 [ PC ];
-define register offset=0x3200 size=4 [ C6000_PIPE_RET C6000_PIPE_ILC C6000_PIPE_RILC ];
+define register offset=0x3200 size=4 [ C6000_PIPE_RET C6000_PIPE_ILC C6000_PIPE_RILC C6000_CARRY ];
 
 # Every field is `noflow`: each describes the fetch packet that physically
 # contains the slot, so it must never be inherited from the instruction that
@@ -111,6 +111,8 @@ define context contextreg
   c_pfollow = (10,13) noflow # instructions parallel after this compact branch
   c_flow_delay = (15,22) noflow # proven delay window in bytes, set by the late return pass
   c_schedule_entry = (23,23) noflow
+  c_inert = (24,24) noflow # local: a branch whose transfer a carried call replaces (C6000DelaySlots.carryTails)
+  c_carry = (25,25) noflow # local: last instruction of a shared call tail, then the call (target by reference)
   c_hdrpkt = (14,14) noflow # slot lies in a header-based (compact) fetch packet
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"
@@ -562,7 +564,9 @@ define pcodeop c6000_pipeline;
 # operand BEFORE the userop. The native return hides the physical CFG; dynamic
 # injection supplies the exact scheduled CFG and its captured return target.
 :^instruction is c_schedule_entry=1 & instruction [ c_schedule_entry=0; c_flow_delay=0; ] { c6000_pipeline(); return [C6000_PIPE_RET]; build instruction; }
-with : c_schedule_entry=0 {
+# Local: the shared tail's last instruction, then the call both of its issuing branches pended (SPRUFE8B 3.5, 4.2.6 B).
+:^instruction is c_schedule_entry=0 & c_carry=1 & instruction [ c_carry=0; ] { build instruction; call [C6000_CARRY]; }
+with : c_schedule_entry=0 & c_carry=0 {
 # Figure F-8 pointer branches use op=110 (IRP) or 111 (NRP).
 # The op field overlaps the five-bit register field of Figure F-7; match
 # these fully encoded forms before the general B-register constructors.

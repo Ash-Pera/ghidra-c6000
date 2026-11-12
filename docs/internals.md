@@ -89,14 +89,21 @@ same execute packet, including across fetch boundaries.
 `C6000ParallelReadScheduler` analyzes raw p-code for each physical packet and selects
 only GPRs with an intra-packet read-after-write. The SLEIGH root wrapper saves each
 selected architectural register, builds the instruction, copies its output to a hidden
-`C6000_PKT_*` shadow, then restores the architectural register. The final member commits
-the mask-selected shadows; if a branch is last, `CFlowDelay` commits after its operands
-are read and before its delay slots. Instruction operands and register names remain the
-architectural A/B registers.
+`C6000_PKT_*` shadow, then restores the architectural register. A later writer of the same
+register (complementary predicates) starts from the shadow (`c_pkt_chainN`), so a writer
+whose predicate is false leaves the earlier value in place. The final member copies back
+the one or two shadows named in its `c_pkt_commitN` fields; if a branch is last,
+`CFlowDelay` commits after its operands are read and before its delay slots. Every choice
+is made by context-selected tables, so staging adds no p-code branches and writes no
+register outside the packet's own; a run-time mask that conditionally committed all 64
+registers kept the decompiler from resolving B15 until after dead-code removal, which
+lost stack stores. Instruction operands and register names remain the architectural A/B
+registers.
 
 Packets with opaque semantics, unsupported predicates or control transfers, more than
-two deferred outputs per writer, or incoming targets into the staged packet interior are
-left unstaged. Prime-time references are checked before disassembly; the post-analysis
+two deferred outputs per writer or per packet, a terminal branch that writes a deferred
+register, a continuing writer predicated on its own register, or incoming targets into
+the staged packet interior are left unstaged. Prime-time references are checked before disassembly; the post-analysis
 audit also checks newly discovered targets, clears deferral, and re-decodes listed
 members. Exact pipeline-schedule p-code parsing normalizes these context fields to zero,
 so native staging is not applied a second time. Ordinary result latencies are still not

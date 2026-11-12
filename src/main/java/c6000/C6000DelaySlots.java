@@ -56,12 +56,14 @@ public final class C6000DelaySlots {
         List<Repair> result = new ArrayList<>();
         int preempted = neutralise(program, cuts, result, monitor);
         if (preempted > 0) log.appendMsg("C6000 Delay Slots", "continued " + preempted + " preempted jump(s)");
+        int carried = carryTails(program, monitor);
+        if (carried > 0) log.appendMsg("C6000 Delay Slots", "carried " + carried + " shared call tail(s)");
         List<Address> candidates = new ArrayList<>(), stale = new ArrayList<>();
         var it = program.getListing().getInstructions(true);
         while (it.hasNext()) {
             var ins = it.next();
             String full = ins.getMnemonicString(), name = C6000CallAnalyzer.baseName(ins);
-            if (full.startsWith("_")) continue;
+            if (full.startsWith("_") || flag(program, ins.getAddress(), "c_inert")) continue;
             if (!(name.equals("B.S1") || name.equals("B.S2") || name.equals("BNOP.S1") ||
                     name.equals("BNOP.S2") || name.equals("CALLP.S1") || name.equals("CALLP.S2"))) continue;
             var override = ins.getFlowOverride();
@@ -430,6 +432,117 @@ public final class C6000DelaySlots {
                 break;
             }
         }
+    }
+
+    /** Whether the context field (c_inert, c_carry) is set at at. */
+    static boolean flag(Program program, Address at, String field) {
+        BigInteger v = program.getProgramContext().getValue(program.getRegister(field), at, false);
+        return v != null && v.signum() != 0;
+    }
+
+    /**
+     * Local: a jump into the last cycles of a call's window, with a call to the
+     * same function and link issued in its own window and taken exactly when
+     * the jump is (C6000CallAnalyzer.SharedTail), runs the tail and then that
+     * call: the compiler shares one call tail between two call sites (SPRUFE8B
+     * 3.5, 4.2.6 B). No native window can lift both, so the tail's last
+     * instruction carries the call (c_carry, target by reference) and both
+     * issuing branches stop transferring (c_inert). The owning call must be
+     * unconditional and every other entry into its window refused.
+     */
+    private static int carryTails(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        var walker = new C6000CallAnalyzer.Walker(program);
+        var reader = new Reader(program);
+        Map<Address, List<C6000CallAnalyzer.SharedTail>> tails = new LinkedHashMap<>();
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            var jump = it.next();
+            monitor.checkCancelled();
+            if (!C6000CallAnalyzer.Walker.displacementJump(jump) || continues(program, jump)) continue;
+            var tail = walker.sharedTail(jump);
+            if (tail != null && jump.getPrototype().getDelaySlotByteCount() == 0 && !tail.transfer().isInDelaySlot() && !flag(program, tail.last(), "c_carry")) tails.computeIfAbsent(tail.last(), k -> new ArrayList<>()).add(tail);
+        }
+        int count = 0;
+        for (var entry : tails.entrySet()) {
+            monitor.checkCancelled();
+            var group = entry.getValue();
+            Address tailStart = group.get(0).tail(), callee = group.get(0).callee();
+            Instruction owner = tailOwner(program, reader, walker, group.get(0), monitor);
+            if (owner == null) continue;
+            boolean same = true;
+            for (var t : group) same &= t.tail().equals(tailStart) && t.callee().equals(callee);
+            if (!same || !onlyEntries(program, owner, entry.getKey(), group)) continue;
+            Address last = entry.getKey();
+            Address end = owner.getMaxAddress().add(owner.getPrototype().getDelaySlotByteCount());
+            redecode(program, owner.getAddress(), end, "c_inert", monitor);
+            for (var t : group) redecode(program, t.transfer().getAddress(), t.transfer().getMaxAddress(), "c_inert", monitor);
+            Instruction carrier = listing.getInstructionAt(last);
+            if (carrier == null) throw new IllegalStateException("shared tail lost its last instruction at " + last);
+            redecode(program, last, carrier.getMaxAddress(), "c_carry", monitor);
+            var r = program.getReferenceManager().addMemoryReference(last, callee, RefType.CALL_OVERRIDE_UNCONDITIONAL,
+                SourceType.ANALYSIS, Reference.MNEMONIC);
+            program.getReferenceManager().setPrimary(r, true);
+            count++;
+        }
+        return count;
+    }
+
+    /** The unconditional call whose window ends at the tail's last instruction, to the same callee and link, or null. */
+    private static Instruction tailOwner(Program program, Reader reader, C6000CallAnalyzer.Walker walker,
+            C6000CallAnalyzer.SharedTail tail, TaskMonitor monitor) throws CancelledException {
+        Instruction last = program.getListing().getInstructionAt(tail.last());
+        if (last == null) return null;
+        for (int back = 4; back <= MAX_BYTES; back += 4) {
+            Instruction d = program.getListing().getInstructionAt(tail.tail().subtract(back));
+            if (d == null || d.isInDelaySlot() || flag(program, d.getAddress(), "c_inert")) continue;
+            String name = C6000CallAnalyzer.baseName(d);
+            if (!(name.equals("B.S1") || name.equals("B.S2")) || d.getRegister(0) != null || d.getLength() != 4 ||
+                d.getMnemonicString().startsWith("[")) continue;
+            if (d.getDefaultFlows().length != 1 || !d.getDefaultFlows()[0].equals(tail.callee())) continue;
+            Window w = reader.window(d, monitor);
+            if (w == null || !w.end().equals(last.getMaxAddress())) continue;
+            if (walker.recognize(d) == null || !resume(program, w.end()).equals(tail.landing())) continue;
+            return d;
+        }
+        return null;
+    }
+
+    /** No flow enters the owner's slots except the group's jumps, at the tail's start. */
+    private static boolean onlyEntries(Program program, Instruction owner, Address last,
+            List<C6000CallAnalyzer.SharedTail> group) {
+        Set<Address> jumps = new HashSet<>();
+        for (var t : group) jumps.add(t.jump().getAddress());
+        Instruction tailEnd = program.getListing().getInstructionAt(last);
+        var refs = program.getReferenceManager();
+        for (var to = refs.getReferenceDestinationIterator(new AddressSet(owner.getMaxAddress().next(), tailEnd.getMaxAddress()), true); to.hasNext();) {
+            Address at = to.next();
+            for (var it = refs.getReferencesTo(at); it.hasNext();) {
+                Reference r = it.next();
+                if (!r.getReferenceType().isFlow()) continue;
+                Address from = r.getFromAddress();
+                if (from.compareTo(owner.getAddress()) >= 0 && from.compareTo(tailEnd.getMaxAddress()) <= 0) continue;
+                if (!jumps.contains(from) || !at.equals(group.get(0).tail())) return false;
+            }
+        }
+        return true;
+    }
+
+    /** Re-decode [at, end] with the context field set at at; a branch made inert keeps no flow references. */
+    private static void redecode(Program p, Address at, Address end, String field, TaskMonitor monitor) throws Exception {
+        List<SavedInstruction> saved = snapshot(p, at, end);
+        p.getListing().clearCodeUnits(at, end, false);
+        p.getProgramContext().setValue(p.getRegister("c_flow_delay"), at, at, BigInteger.ZERO);
+        p.getProgramContext().setValue(p.getRegister(field), at, at, BigInteger.ONE);
+        Disassembler disassembler = Disassembler.getDisassembler(p, monitor, null);
+        for (Address cursor = at; cursor.compareTo(end) <= 0;) {
+            if (p.getListing().getInstructionContaining(cursor) == null)
+                disassembler.disassemble(cursor, new AddressSet(cursor, end), false);
+            var ins = p.getListing().getInstructionContaining(cursor);
+            if (ins == null) throw new IllegalStateException("Could not re-decode shared call tail at " + cursor);
+            cursor = ins.getMaxAddress().next();
+        }
+        // The issuing branch's own fall-through override went with its window.
+        restore(p, at, saved, true, saved.get(0).fallThrough());
     }
 
     /**

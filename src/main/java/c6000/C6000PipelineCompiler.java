@@ -257,7 +257,7 @@ public final class C6000PipelineCompiler {
     private Instruction entryEvidenceInstruction(long pc,TraceWindow window)throws Exception {
         var at=entry.getNewAddress(pc);int length=closedPhysicalLength(at);var context=new ProcessorContextImpl(program.getLanguage());
         for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
-        context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
+        context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_inert"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_carry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
         for(String name:C6000PacketContext.PACKET_FIELDS)context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         var memory=new DumbMemBufferImpl(program.getMemory(),at);var prototype=program.getLanguage().parse(memory,context,false);var instruction=new PseudoInstruction(program,at,prototype,memory,context);
         if(instruction.getLength()!=length)throw fail("caller-entry width conflicts with physical layout at "+at);validateWindowInstruction(instruction,window);return instruction;
@@ -578,7 +578,7 @@ public final class C6000PipelineCompiler {
         if(strictScope())for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
         if(callerPc(pc)&&callerTail==null)for(String name:List.of("c_is16","c_rs","c_dsz","c_sat","c_br","c_prot","c_isheader","c_pfollow","c_hdrpkt"))context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));
-        context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));
+        context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_inert"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_carry"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
         for(String name:C6000PacketContext.PACKET_FIELDS)context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         var memory=new DumbMemBufferImpl(program.getMemory(),at);

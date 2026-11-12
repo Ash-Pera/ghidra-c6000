@@ -55,6 +55,7 @@ CORE = [
                            ("RegisterCallSchedule", [], "C6000_REGISTER_CALL_SCHEDULE_OK")], True),
     case("link-copy-return", "LinkCopyReturn", "C6000_LINK_COPY_RETURN_OK", None, analysis=True),
     case("wide-call-window", "WideCallWindow", "C6000_WIDE_CALL_WINDOW_OK", None, analysis=True),
+    case("shared-tail", "SharedTail", "C6000_SHARED_TAIL_OK", None, analysis=True),
     case("merge-call-window", "MergeCallWindow", "C6000_MERGE_CALL_WINDOW_OK", None),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
     case("abi-pairs", "AbiPairs", "C6000_ABI_PAIRS_OK", None, analysis=True),
@@ -318,6 +319,8 @@ def main():
                     command += ["-preScript", "C6000LinkCopyReturnTest.java", "prepare"]
                 elif fixture == "wide-call-window":
                     command += ["-preScript", "C6000WideCallWindowTest.java", "prepare"]
+                elif fixture == "shared-tail":
+                    command += ["-preScript", "C6000SharedTailTest.java", "prepare"]
                 elif fixture not in ELF:
                     command += ["-preScript", "C6000SetEntry.java", "1000"]
                 for script, script_args, _ in scripts:

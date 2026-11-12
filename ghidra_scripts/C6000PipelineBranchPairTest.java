@@ -29,6 +29,6 @@ public class C6000PipelineBranchPairTest extends GhidraScript {
             for(var expected:row.getAsJsonObject("expected").entrySet())equal(expected.getValue().getAsLong(),value(state,expected.getKey()),row.get("name")+" "+expected.getKey());
             count++;
         }
-        equal(9,count,"pair truth table");equal(2,refused,"non-exclusive pairs");println("C6000_PIPELINE_BRANCH_PAIR_OK cases="+count+" refused="+refused);
+        equal(13,count,"pair truth table");equal(2,refused,"non-exclusive pairs");println("C6000_PIPELINE_BRANCH_PAIR_OK cases="+count+" refused="+refused);
     }
 }

@@ -1134,7 +1134,7 @@ public final class C6000PipelineCompiler {
                 span=Math.max(span,i.span());
                 if(Set.of("B","BNOP","BDEC","BPOS","CALLP").contains(i.name())){
                     // Local: two B on complementary predicates of one register; exactly one is taken (SPRUFE8B 3.7).
-                    if(issueBranch!=null&&!pairs.containsKey(issueBranch.instruction().getAddress().getOffset())&&complementary(issueBranch,i)){pairs.put(issueBranch.instruction().getAddress().getOffset(),i);continue;}
+                    if(issueBranch!=null&&complementary(issueBranch,i)&&pairs.getOrDefault(issueBranch.instruction().getAddress().getOffset(),i)==i){pairs.put(issueBranch.instruction().getAddress().getOffset(),i);continue;}
                     if(issueBranch!=null)throw fail("multiple branches in a packet");
                     if(i.name().equals("CALLP")&&(!s.branches().isEmpty()||s.returns().activeCall()!=NO_CALL||loop!=null))throw fail("CALLP requires no pending branch or nested invocation");
                     issueBranch=i;

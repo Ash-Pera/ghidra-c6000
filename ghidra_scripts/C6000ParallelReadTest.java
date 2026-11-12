@@ -24,6 +24,7 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.address.AddressSet;
 import ghidra.program.model.lang.ProcessorContextImpl;
 import ghidra.program.model.lang.Register;
+import ghidra.program.model.lang.RegisterValue;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.mem.DumbMemBufferImpl;
 import ghidra.program.model.pcode.PcodeOp;
@@ -191,6 +192,67 @@ public class C6000ParallelReadTest extends GhidraScript {
 			" delayWrite=" + delayWrite);
 	}
 
+	private Instruction unstaged(long offset) throws Exception {
+		Address at = address(offset);
+		var processor = new ProcessorContextImpl(currentProgram.getLanguage());
+		var registerValue = currentProgram.getProgramContext().getRegisterValue(
+			currentProgram.getLanguage().getContextBaseRegister(), at);
+		if (registerValue != null) processor.setRegisterValue(registerValue);
+		for (Register field : currentProgram.getLanguage().getContextBaseRegister().getChildRegisters()) {
+			if (field.getName().startsWith("c_pkt_")) {
+				processor.setRegisterValue(new RegisterValue(field, BigInteger.ZERO));
+			}
+		}
+		var memory = new DumbMemBufferImpl(currentProgram.getMemory(), at);
+		var prototype = currentProgram.getLanguage().parse(memory, processor, false);
+		return new PseudoInstruction(currentProgram, at, prototype, memory, processor);
+	}
+
+	private List<String> gprWrites(Instruction instruction) {
+		List<String> result = new ArrayList<>();
+		for (PcodeOp op : instruction.getPcode(false)) {
+			for (String bank : List.of("A", "B")) {
+				for (int index = 0; index < 32; index++) {
+					String name = bank + index;
+					if (!result.contains(name) &&
+						overlaps(currentProgram.getRegister(name), op.getOutput())) result.add(name);
+				}
+			}
+		}
+		return result;
+	}
+
+	private int branches(Instruction instruction) {
+		int count = 0;
+		for (PcodeOp op : instruction.getPcode(false)) {
+			if (op.getOpcode() == PcodeOp.BRANCH || op.getOpcode() == PcodeOp.CBRANCH) count++;
+		}
+		return count;
+	}
+
+	// Staging adds no p-code branches and writes no register the scheduler did not name.
+	private void checkStagingShape(JsonObject row) throws Exception {
+		String name = row.get("name").getAsString();
+		for (var element : row.getAsJsonArray("sequence")) {
+			long pc = element.getAsLong();
+			Instruction staged = instruction(pc);
+			Instruction plain = unstaged(pc);
+			check(branches(staged) == branches(plain), name + "@" + Long.toHexString(pc) +
+				" staging adds p-code branches: " + branches(staged) + " vs " + branches(plain));
+			List<String> allowed = new ArrayList<>(gprWrites(plain));
+			for (String field : List.of("c_pkt_write0", "c_pkt_write1", "c_pkt_commit0", "c_pkt_commit1")) {
+				BigInteger selector = context(field, pc);
+				if (selector == null || selector.signum() == 0) continue;
+				int index = selector.intValue() - 1;
+				allowed.add((index < 32 ? "A" : "B") + (index % 32));
+			}
+			List<String> extra = new ArrayList<>(gprWrites(staged));
+			extra.removeAll(allowed);
+			check(extra.isEmpty(), name + "@" + Long.toHexString(pc) +
+				" staging writes unnamed registers " + extra);
+		}
+	}
+
 	private void addJumpReference(JsonObject jump) {
 		Address source = address(jump.get("source").getAsLong());
 		Address target = address(jump.get("target").getAsLong());
@@ -251,7 +313,10 @@ public class C6000ParallelReadTest extends GhidraScript {
 		int packets = C6000PacketContext.prime(currentProgram, monitor);
 		arithmetic = BytesPcodeArithmetic.forLanguage(currentProgram.getLanguage());
 		checkJump(jumps.get(0).getAsJsonObject(), false);
-		for (var element : cases.getAsJsonArray("runs")) runLinear(element.getAsJsonObject());
+		for (var element : cases.getAsJsonArray("runs")) {
+			runLinear(element.getAsJsonObject());
+			checkStagingShape(element.getAsJsonObject());
+		}
 		checkBranchDelay(cases.getAsJsonObject("branch"));
 		JsonObject late = jumps.get(1).getAsJsonObject();
 		instruction(late.get("source").getAsLong());

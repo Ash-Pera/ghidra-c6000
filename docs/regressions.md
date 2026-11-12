@@ -644,6 +644,10 @@ case checks that a terminal `[B1] ADD || [B1] B` reads B1 before the packet
 commit and that the commit precedes its delay-slot write. Prime-time and
 post-analysis interior-target cases must clear deferral; the latter also checks
 that audit re-decodes already-listed instructions without packet-shadow p-code.
+Each staged member of the linear cases must have as many p-code branches as its
+unstaged decode and write no general register beyond the unstaged decode's and the
+ones its `c_pkt_write`/`c_pkt_commit` fields name; a run-time commit mask over all 64
+registers fails both.
 The baseline and a deferral-disabled mutant both produce stale swap, predicate,
 and multi-cycle reads in LE and BE.
 

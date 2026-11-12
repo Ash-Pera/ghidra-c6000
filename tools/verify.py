@@ -147,6 +147,8 @@ TI = [
          "json", ["cases.json", "results.json"]),
     case("pipeline-postloop", "PostLoopDispatch", "C6000_POSTLOOP_OK", "json"),
     case("pipeline-predicated-collision", "PredicatedCollision", "C6000_PREDICATED_COLLISION_OK", "json"),
+    # Local: execute-packet completion (docs/execute-packet-recovery.md) under packet staging.
+    case("parallel-peers", "ParallelPeerAnalyzer", "C6000_PARALLEL_PEER_ANALYZER_OK", "json", ["cases.json", "peers.out"]),
 ]
 
 

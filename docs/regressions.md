@@ -675,6 +675,16 @@ ones its `c_pkt_write`/`c_pkt_commit` fields name; a run-time commit mask over a
 registers fails both.
 The baseline and a deferral-disabled mutant both produce stale swap, predicate,
 and multi-cycle reads in LE and BE.
+
+## Execute-packet completion under packet staging (local)
+
+`tools/verify.py --with-ti --only parallel-peers` runs the focused check of
+[execute-packet completion](execute-packet-recovery.md) (`parallel-peers.py`,
+`C6000ParallelPeerAnalyzerTest.java`). Packet staging cleared the packet fields in the
+proof's stored context unconditionally, so a created peer's context gained those bits
+in its mask and never matched the proof; the analyzer refused every peer. Only fields
+that are set are cleared now.
+
 ## Shared call tails (local)
 
 `shared-tail.py IMAGE [be]` and `C6000SharedTailTest.java` (with `prepare` as a pre-script)

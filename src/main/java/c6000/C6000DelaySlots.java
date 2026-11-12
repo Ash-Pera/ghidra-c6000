@@ -911,6 +911,8 @@ public final class C6000DelaySlots {
                         monitor.checkCancelled();if(++packetInstructions>8)return null;var next=next(current);if(next==null||++count>MAX_INSTRUCTIONS)return null;
                         if(next.getAddress().subtract(issue.getMaxAddress())>MAX_BYTES)return null;
                         if(next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal())return null;
+                        // A call's window over an inert branch hides the slots past it from flow (Ghidra counts slots by parsing them): refuse it, as before the branch was carried.
+                        if(flag(program,next.getAddress(),"c_inert")&&(issue.getFlowType().isCall()||issue.getFlowOverride()==FlowOverride.CALL))return null;
                         var other=program.getFunctionManager().getFunctionContaining(next.getAddress());
                         if(other!=null&&!other.equals(owner))return null;
                         if(program.getFunctionManager().getFunctionAt(next.getAddress())!=null)return null;

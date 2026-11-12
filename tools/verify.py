@@ -159,6 +159,7 @@ TI = [
     case("same-packet-hazard", "SamePacketHazard", "C6000_SAME_PACKET_HAZARD_OK", "json", analysis=True),
     case("parallel-peers", "ParallelPeerAnalyzer", "C6000_PARALLEL_PEER_ANALYZER_OK", "json", ["cases.json", "peers.out"]),
     case("store-mask-print", "StoreMaskPrint", "C6000_STORE_MASK_PRINT_OK", "json"),
+    case("store-mask-schedule", "StoreMaskSchedule", "C6000_STORE_MASK_SCHEDULE_OK", "json"),
 ]
 
 

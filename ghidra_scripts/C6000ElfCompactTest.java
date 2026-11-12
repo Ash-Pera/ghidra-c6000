@@ -31,9 +31,9 @@ public class C6000ElfCompactTest extends GhidraScript {
 		}
 		var bad = currentProgram.getBookmarkManager().getBookmarksIterator(BookmarkType.ERROR);
 		while (bad.hasNext()) failures.add("error bookmark " + bad.next());
-		// "upgraded": a saved version 1 program, so BE must have migrated to version 2.
+		// "upgraded": saved version 1 programs migrate to the current language version.
 		if (getScriptArgs().length > 0 && getScriptArgs()[0].equals("upgraded")) {
-			int expected = currentProgram.getLanguage().isBigEndian() ? 2 : 1;
+			int expected = currentProgram.getLanguage().isBigEndian() ? 3 : 2;
 			if (currentProgram.getLanguage().getVersion() != expected) {
 				failures.add("language version " + currentProgram.getLanguage().getVersion() + " expected " + expected);
 			}

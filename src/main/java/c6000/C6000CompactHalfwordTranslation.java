@@ -9,14 +9,10 @@ import ghidra.program.model.listing.Program;
 import ghidra.program.util.LanguageTranslatorAdapter;
 import ghidra.util.task.TaskMonitor;
 
-/**
- * Big-endian language version 1 to 2 (issue #31). Version 2 decodes each compact
- * slot from its halfword in context; version 1 read the slot's own address, which
- * holds the other instruction of the word. Context fields carry over by name.
- */
+/** Re-decodes C6000 instructions after a language context-layout upgrade. */
 abstract class C6000CompactHalfwordTranslation extends LanguageTranslatorAdapter {
-	C6000CompactHalfwordTranslation(String id) {
-		super(new LanguageID(id), 1, new LanguageID(id), 2);
+	C6000CompactHalfwordTranslation(String id, int oldVersion, int newVersion) {
+		super(new LanguageID(id), oldVersion, new LanguageID(id), newVersion);
 	}
 
 	@Override
@@ -34,11 +30,7 @@ abstract class C6000CompactHalfwordTranslation extends LanguageTranslatorAdapter
 	@Override
 	public void fixupInstructions(Program program, Language oldLanguage, TaskMonitor monitor)
 			throws Exception {
-		// Ghidra has re-decoded without c_h16. Prime it, then re-decode in place,
-		// which keeps references, overrides and comments. Context is unlocked
-		// during the upgrade.
-		if (C6000PacketContext.prime(program, monitor) > 0) {
-			((ProgramDB) program).getCodeManager().reDisassembleAllInstructions(monitor);
-		}
+		C6000PacketContext.prime(program, monitor);
+		((ProgramDB) program).getCodeManager().reDisassembleAllInstructions(monitor);
 	}
 }

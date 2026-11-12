@@ -259,6 +259,10 @@ public final class C6000PipelineContracts {
                 var normalized = new ProcessorContextImpl(program.getLanguage());
                 if (value != null) normalized.setRegisterValue(value);
                 normalized.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"), BigInteger.ZERO));
+                for (String name : C6000PacketContext.PACKET_FIELDS) {
+                    normalized.setRegisterValue(new RegisterValue(program.getRegister(name),
+                        BigInteger.ZERO));
+                }
                 text.append(':').append(normalized.getRegisterValue(base)).append('\n');
                 if (!at.equals(entry) && schedule.covered().contains(at) &&
                     BigInteger.ONE.equals(context.getValue(program.getRegister("c_schedule_entry"), at, false))) {

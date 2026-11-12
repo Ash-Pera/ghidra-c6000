@@ -64,6 +64,27 @@ define register offset=0x1000 size=8
   [ B1_B0 B3_B2 B5_B4 B7_B6 B9_B8 B11_B10 B13_B12 B15_B14
     B17_B16 B19_B18 B21_B20 B23_B22 B25_B24 B27_B26 B29_B28 B31_B30 ];
 
+# Packet staging is hidden p-code state; architectural operands remain A/B registers.
+define register offset=0x4000 size=4
+  [ C6000_PKT_A0 C6000_PKT_A1 C6000_PKT_A2 C6000_PKT_A3
+    C6000_PKT_A4 C6000_PKT_A5 C6000_PKT_A6 C6000_PKT_A7
+    C6000_PKT_A8 C6000_PKT_A9 C6000_PKT_A10 C6000_PKT_A11
+    C6000_PKT_A12 C6000_PKT_A13 C6000_PKT_A14 C6000_PKT_A15
+    C6000_PKT_A16 C6000_PKT_A17 C6000_PKT_A18 C6000_PKT_A19
+    C6000_PKT_A20 C6000_PKT_A21 C6000_PKT_A22 C6000_PKT_A23
+    C6000_PKT_A24 C6000_PKT_A25 C6000_PKT_A26 C6000_PKT_A27
+    C6000_PKT_A28 C6000_PKT_A29 C6000_PKT_A30 C6000_PKT_A31 ];
+define register offset=0x4100 size=4
+  [ C6000_PKT_B0 C6000_PKT_B1 C6000_PKT_B2 C6000_PKT_B3
+    C6000_PKT_B4 C6000_PKT_B5 C6000_PKT_B6 C6000_PKT_B7
+    C6000_PKT_B8 C6000_PKT_B9 C6000_PKT_B10 C6000_PKT_B11
+    C6000_PKT_B12 C6000_PKT_B13 C6000_PKT_B14 C6000_PKT_B15
+    C6000_PKT_B16 C6000_PKT_B17 C6000_PKT_B18 C6000_PKT_B19
+    C6000_PKT_B20 C6000_PKT_B21 C6000_PKT_B22 C6000_PKT_B23
+    C6000_PKT_B24 C6000_PKT_B25 C6000_PKT_B26 C6000_PKT_B27
+    C6000_PKT_B28 C6000_PKT_B29 C6000_PKT_B30 C6000_PKT_B31 ];
+define register offset=0x4200 size=4 [ C6000_PKT_OLD0 C6000_PKT_OLD1 ];
+
 # ---------------------------------------------------------------------------
 # Control registers
 #
@@ -84,9 +105,9 @@ define register offset=0x2000 size=4
 # instruction.  Big-endian adds a second word holding each compact slot's
 # halfword (issue #31).
 @if ENDIAN == "big"
-define register offset=0x3000 size=8 [ contextreg ];
+define register offset=0x3000 size=12 [ contextreg ];
 @else
-define register offset=0x3000 size=4 [ contextreg ];
+define register offset=0x3000 size=8 [ contextreg ];
 @endif
 
 # Synthetic execution address for Ghidra's p-code emulator.  C6000 exposes
@@ -112,6 +133,23 @@ define context contextreg
   c_flow_delay = (15,22) noflow # proven delay window in bytes, set by the late return pass
   c_schedule_entry = (23,23) noflow
   c_hdrpkt = (14,14) noflow # slot lies in a header-based (compact) fetch packet
+  c_pkt_active = (24,24) noflow
+  c_pkt_start = (25,25) noflow
+  c_pkt_end = (26,26) noflow
+  c_pkt_branch_end = (27,27) noflow
+  c_pkt_chain0 = (28,28) noflow # write0 continues an earlier member's write of the register
+  c_pkt_chain1 = (29,29) noflow
+@if ENDIAN == "big"
+  c_pkt_write0 = (48,54) noflow
+  c_pkt_write1 = (55,61) noflow
+  c_pkt_commit0 = (64,70) noflow
+  c_pkt_commit1 = (71,77) noflow
+@else
+  c_pkt_write0 = (32,38) noflow
+  c_pkt_write1 = (39,45) noflow
+  c_pkt_commit0 = (46,52) noflow
+  c_pkt_commit1 = (53,59) noflow
+@endif
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"
 @endif
@@ -555,6 +593,9 @@ define pcodeop c6000_tsch_read;
 @if FP_MODEL == "analysis"
 define pcodeop c6000_fp_status;
 @endif
+@include "c6000_packet_registers.sinc"
+PktCommit: is c_pkt_branch_end=1 { }
+PktCommit: is c_pkt_branch_end=0 & PktCommit0 & PktCommit1 { build PktCommit0; build PktCommit1; }
 @include "c6000_flow_delay.sinc"
 @include "c6000_semantics.sinc"
 define pcodeop c6000_pipeline;
@@ -562,6 +603,16 @@ define pcodeop c6000_pipeline;
 # operand BEFORE the userop. The native return hides the physical CFG; dynamic
 # injection supplies the exact scheduled CFG and its captured return target.
 :^instruction is c_schedule_entry=1 & instruction [ c_schedule_entry=0; c_flow_delay=0; ] { c6000_pipeline(); return [C6000_PIPE_RET]; build instruction; }
+:^instruction is c_pkt_active=1 & c_schedule_entry=0 & PktIn0 & PktIn1 & PktOut0 & PktOut1 &
+  PktCommit & instruction [ c_pkt_active=0; ]
+{
+  build PktIn0;
+  build PktIn1;
+  build instruction;
+  build PktOut0;
+  build PktOut1;
+  build PktCommit;
+}
 with : c_schedule_entry=0 {
 # Figure F-8 pointer branches use op=110 (IRP) or 111 (NRP).
 # The op field overlaps the five-bit register field of Figure F-7; match

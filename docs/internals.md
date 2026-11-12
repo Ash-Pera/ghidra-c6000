@@ -86,9 +86,28 @@ Bit 0 of a full32 opcode is its p-bit. Compact instructions take their p-bits fr
 13–0 of the fetch-packet header. A set p-bit chains the following instruction into the
 same execute packet, including across fetch boundaries.
 
-Default lifting handles instructions individually. A reader may therefore see a parallel
-writer's value too early, and ordinary result latencies are not scheduled. Supported
-functions can instead use an explicitly enabled
+`C6000ParallelReadScheduler` analyzes raw p-code for each physical packet and selects
+only GPRs with an intra-packet read-after-write. The SLEIGH root wrapper saves each
+selected architectural register, builds the instruction, copies its output to a hidden
+`C6000_PKT_*` shadow, then restores the architectural register. A later writer of the same
+register (complementary predicates) starts from the shadow (`c_pkt_chainN`), so a writer
+whose predicate is false leaves the earlier value in place. The final member copies back
+the one or two shadows named in its `c_pkt_commitN` fields; if a branch is last,
+`CFlowDelay` commits after its operands are read and before its delay slots. Every choice
+is made by context-selected tables, so staging adds no p-code branches and writes no
+register outside the packet's own; a run-time mask that conditionally committed all 64
+registers kept the decompiler from resolving B15 until after dead-code removal, which
+lost stack stores. Instruction operands and register names remain the architectural A/B
+registers.
+
+Packets with opaque semantics, unsupported predicates or control transfers, more than
+two deferred outputs per writer or per packet, a terminal branch that writes a deferred
+register, a continuing writer predicated on its own register, or incoming targets into
+the staged packet interior are left unstaged. Prime-time references are checked before disassembly; the post-analysis
+audit also checks newly discovered targets, clears deferral, and re-decodes listed
+members. Exact pipeline-schedule p-code parsing normalizes these context fields to zero,
+so native staging is not applied a second time. Ordinary result latencies are still not
+scheduled by this native path; supported functions can instead use an explicitly enabled
 [exact packet schedule](pipeline-schedules.md), with a proved entry contract.
 
 ### Native delay windows
@@ -335,19 +354,16 @@ assume every bit 12 is a cross selector.
 
 ### Language prototype migration
 
-Big-endian languages are version 2.0 (issue #31). `data/languages/old/` describes the
-version 1 `default` and `analysis` languages, and `C6000BeDefaultLanguageTranslator` /
-`C6000BeAnalysisLanguageTranslator` carry each context field over by name. After
-Ghidra's re-disassembly they prime `c_h16` and re-disassemble again, which keeps
-references, overrides and comments. Re-run auto-analysis afterwards so delay windows and
-calls are recovered from the corrected order. The C67x variants were never released at
-version 1.
+Little-endian languages are version 2.0; big-endian languages are version 3.0. The
+little-endian version 1 and big-endian version 1 programs migrate directly to the current
+definition, while big-endian version 2 programs migrate to version 3. Translators carry
+context fields by name, prime compact halfwords and packet schedules, and re-decode
+instructions. Re-run auto-analysis afterwards so delay windows and calls are recovered.
 
-The 1.2 language minor version forces Ghidra's native re-disassembly upgrade. This is
-necessary when a corrected compact operand partition distinguishes bits that an older
-shared persisted prototype ignored. Updating the extension alone can leave old programs
-with stale operand text and p-code. Preserve a packed backup and annotation inventory
-before upgrade. Native migration can remove existing Bad Instruction error bookmarks;
-retain/restore those from the backup if preserving every annotation is required. Audit
-actual processor context and instruction extents as well as symbols, functions and
-references.
+The version bumps resize the context register for parallel-read packet fields and force
+Ghidra's native re-disassembly upgrade. Updating the extension alone can leave old
+programs with stale operand text and p-code. Preserve a packed backup and annotation
+inventory before upgrade. Native migration can remove existing Bad Instruction error
+bookmarks; retain/restore those from the backup if preserving every annotation is
+required. Audit actual processor context and instruction extents as well as symbols,
+functions and references.

@@ -27,7 +27,7 @@ interrupt and exceptional-loop limitations are detailed in [limitations](limitat
 |---|---|
 | Repository release | `v1.2.1-hotfix` |
 | Ghidra compatibility matrix | 12.1.4 / JDK 21; 12.2 / JDK 25 |
-| Language version | 1.2 for the four little-endian definitions; 2.0 for the four big-endian ones (issue #31) |
+| Language version | 2.0 for the four little-endian definitions; 3.0 for the four big-endian ones |
 | Archive naming | `ghidra_<Ghidra version>_PUBLIC_<build date>_C6000.zip` |
 | Extension-property version | Ghidra compatibility version, substituted from `@extversion@` during build |
 
@@ -35,10 +35,10 @@ Keep the `extension.properties` version token. That field identifies the
 compatible Ghidra version, rather than the repository release. Each release
 archive must match the Ghidra installation used to build it.
 
-Big-endian version 1 programs migrate through `C6000BeDefaultLanguageTranslator` and
-`C6000BeAnalysisLanguageTranslator`, which re-decode compact packets; re-run
-auto-analysis afterwards. The language minor version triggers native re-disassembly of
-existing programs.
+Version 1 programs migrate directly to the current language version; big-endian version
+2 programs migrate to version 3. Translators re-decode compact packets and prime packet
+schedules; re-run auto-analysis afterwards. Language version changes trigger native
+re-disassembly of existing programs.
 Keep a packed backup and annotation inventory before upgrading; existing Bad
 Instruction bookmarks may be removed. Preserve and, where required, restore their
 recorded addresses, types, categories and comments before saving. See

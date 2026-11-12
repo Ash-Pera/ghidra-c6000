@@ -544,7 +544,7 @@ public final class C6000DelaySlots {
             monitor.checkCancelled();
             if (!C6000CallAnalyzer.Walker.displacementJump(jump) || continues(program, jump)) continue;
             var tail = walker.sharedTail(jump);
-            if (tail != null && jump.getPrototype().getDelaySlotByteCount() == 0 && !tail.transfer().isInDelaySlot() && !flag(program, tail.last(), "c_carry")) tails.computeIfAbsent(tail.last(), k -> new ArrayList<>()).add(tail);
+            if (tail != null && jump.getPrototype().getDelaySlotByteCount() <= parallelBytes(program, jump.getAddress()) && !tail.transfer().isInDelaySlot() && !flag(program, tail.last(), "c_carry")) tails.computeIfAbsent(tail.last(), k -> new ArrayList<>()).add(tail);
         }
         int count = 0;
         for (var entry : tails.entrySet()) {

@@ -474,7 +474,7 @@ public final class C6000PipelineCompiler {
     // SPRUFE8B ANDN pp.145-146: .L/.S/.D read both inputs and write dst in E1.
     // SPRUFE8B PACK2 pp.397-398 / PACKL4 pp.407-408: E1 source reads and dst write.
     // SPRUFE8B ADDU pp.135-136, SUBC pp.539-540, SUBU pp.546-547, RCPSP pp.411-412, RSQRSP pp.420-421: single-cycle.
-    private static final Set<String> SINGLE=Set.of("ADD","ADDK","ADDAW","ADDAD","ADDAH","ADDAB","SUBAW","SUBAH","SUBAB","SUB","AND","ANDN","OR","XOR","NOT","MV","MVK","MVKH","MVKL","MVKLH","SHL","SHR","SHRU","EXT","EXTU","SET","CLR","CMPEQ","CMPGT","CMPLT","CMPEQSP","CMPGTSP","CMPLTSP","CMPGTU","CMPLTU","ZERO","NEG","ABS","NORM","LMBD","ABSSP","DINT","RINT","PACK2","PACKL4","ADDU","SUBU","SUBC","RCPSP","RSQRSP");
+    private static final Set<String> SINGLE=Set.of("ADD","ADDK","ADDAW","ADDAD","ADDAH","ADDAB","SUBAW","SUBAH","SUBAB","SUB","AND","ANDN","OR","XOR","NOT","MV","MVK","MVKH","MVKL","MVKLH","SHL","SHR","SHRU","EXT","EXTU","SET","CLR","CMPEQ","CMPGT","CMPLT","CMPEQSP","CMPGTSP","CMPLTSP","CMPGTU","CMPLTU","ZERO","NEG","ABS","NORM","LMBD","ABSSP","DINT","RINT","PACK2","PACKL4","ADDU","SUBU","SUBC","RCPSP","RSQRSP","SAT");
     // SPRUFE8B MPYH..MPYLUHS pp.320-350: Multiply (16 x 16), E1 reads, dst in E2.
     private static final Set<String> MULTIPLY16=Set.of("MPY","MPYSU","MPYU","MPYUS","MPYH","MPYHU","MPYHUS","MPYHSU","MPYHL","MPYHLU","MPYHULS","MPYHSLU","MPYLH","MPYLHU","MPYLUHS","MPYLSHU");
 
@@ -635,7 +635,7 @@ public final class C6000PipelineCompiler {
             if(out!=null&&out.isRegister()){
                 var reg=program.getRegister(out.getAddress(),out.getSize());
                 if(reg==null)throw fail("unknown architectural output at "+at);
-                boolean flags=(Set.of("FADCR","FAUCR","FMCR").contains(reg.getName())&&!name.equals("MVC")) || (name.equals("ABS")&&Set.of("CSR","SSR").contains(reg.getName()));
+                boolean flags=(Set.of("FADCR","FAUCR","FMCR").contains(reg.getName())&&!name.equals("MVC")) || (Set.of("ABS","SAT").contains(name)&&Set.of("CSR","SSR").contains(reg.getName()));
                 int phase=load||store?(loadWrites.contains(rawIndex)?5:1):latency;
                 var destination=new Dest(out.getOffset(),out.getSize(),flags,phase,out.getOffset(),-1,load||store?rawIndex:-1);
                 if(load&&phase==5&&!isLoadData(ins,destination))throw fail("load-derived non-destination write at "+at);

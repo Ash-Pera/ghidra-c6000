@@ -797,6 +797,10 @@ its window; `tailpred` (the owning call is predicated), `tailother` (another cal
 whose commit it holds, and the tail's last instruction ends a packet that commits the
 call's argument. The inert call must still commit its packet, and the carried call must
 follow its packet's commit; before `PktInertCommit` the inert branch dropped the commit.
+`pktfw` gives the jump and the issuing call each a packet companion, laid as their only
+slots: the inert call must re-decode its companion. Before, carryTails left it undefined
+for C6000CompactPacketTailAnalyzer, whose proof fails on staging-era context (the
+created peer's context mask gains the packet fields) and rolls back the whole analysis.
 
 ## Additional decoder accuracy checks
 

@@ -558,8 +558,12 @@ public final class C6000DelaySlots {
             if (!same || !onlyEntries(program, owner, entry.getKey(), group)) continue;
             Address last = entry.getKey();
             Address end = owner.getMaxAddress().add(owner.getPrototype().getDelaySlotByteCount());
+            // Clearing a branch clears its laid slots (packet companions included): re-decode them with it.
+            List<Address[]> transfers = new ArrayList<>();
+            for (var t : group) transfers.add(new Address[] { t.transfer().getAddress(),
+                t.transfer().getMaxAddress().add(t.transfer().getPrototype().getDelaySlotByteCount()) });
             redecode(program, owner.getAddress(), end, "c_inert", monitor);
-            for (var t : group) redecode(program, t.transfer().getAddress(), t.transfer().getMaxAddress(), "c_inert", monitor);
+            for (var range : transfers) redecode(program, range[0], range[1], "c_inert", monitor);
             Instruction carrier = listing.getInstructionAt(last);
             if (carrier == null) throw new IllegalStateException("shared tail lost its last instruction at " + last);
             redecode(program, last, carrier.getMaxAddress(), "c_carry", monitor);

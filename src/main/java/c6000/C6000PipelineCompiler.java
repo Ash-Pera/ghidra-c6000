@@ -55,6 +55,7 @@ public final class C6000PipelineCompiler {
     private static final long REGISTER_CALL=-0x2000L; // Branch target: an opaque call through the register read at E1
     private static final long REG_CONST=-0x3000L; // ReturnFlow key REG_CONST-offset: a call register's exact constant
     private static final long LINK_STALE=-0x1001L; // ReturnFlow key: B3 still holds the last opaque call's continuation
+    private static final long LINK_GUARD=-0x1002L,LINK_IF=-0x1003L,LINK_ELSE=-0x1004L; // Local: B3 written under an unresolved predicate (2*index+inverted), its values when true and false
     private final List<StoreTailBoundary> storeTailBoundaries=new ArrayList<>();
 
     public StoreTailResult compileStoreTail(StoreTailContract contract)throws Exception {
@@ -1437,14 +1438,41 @@ public final class C6000PipelineCompiler {
         for(long reg:constantRegisters()){
             long key=reg==linkOffset()?LINK_CONST:REG_CONST-reg;
             Long value=source.returns().links().get(key);
-            for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesAt(decodeKnown(flight.pc()),flight.age()+1,reg))value=null;
+            var guard=key==LINK_CONST&&ordinarySchedule()?resolveGuard(source.returns().links(),facts):null;
+            if(guard!=null&&guard.length==1){value=guard[0];guard=null;}
+            for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesAt(decodeKnown(flight.pc()),flight.age()+1,reg)){value=null;guard=null;}
+            if(guard!=null)for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesAt(decodeKnown(flight.pc()),flight.age()+1,guardRegister(guard[0])))guard=null;
             boolean wrote=false;
-            for(var flight:source.flights())if(flight.predicateTruth()!=0&&writesAt(decodeKnown(flight.pc()),flight.age()+1,reg))wrote=true;
-            for(var instruction:pack){int truth=predicateTruth(instruction,facts);if(truth!=0&&writesAt(instruction,1,reg)){wrote=true;value=truth<0?null:constantWrite(instruction,value,truth,reg);}}
+            for(var instruction:pack){int truth=predicateTruth(instruction,facts);if(truth!=0&&writesAt(instruction,1,reg)){wrote=true;
+                if(guard!=null){guard=guardedWrite(instruction,truth,guard);if(guard!=null&&guard.length==1){value=guard[0];guard=null;}else value=null;}
+                else if(truth<0&&key==LINK_CONST&&ordinarySchedule()){guard=guardedWrite(instruction,truth,new Long[]{null,value,value});value=null;}
+                else value=truth<0?null:constantWrite(instruction,value,truth,reg);}}
+            // The guard names the predicate the packet read; a write to it now ends the guard.
+            if(guard!=null)for(var instruction:pack)if(predicateTruth(instruction,facts)!=0&&writesAt(instruction,1,guardRegister(guard[0])))guard=null;
             if(value==null)after.remove(key);else after.put(key,value);
             if(key==LINK_CONST&&(wrote||value==null))after.remove(LINK_STALE);
+            if(key==LINK_CONST){after.remove(LINK_GUARD);after.remove(LINK_IF);after.remove(LINK_ELSE);
+                if(guard!=null){after.put(LINK_GUARD,guard[0]);after.put(LINK_IF,guard[1]);if(guard[2]!=null)after.put(LINK_ELSE,guard[2]);}}
         }
         return new ReturnFlow(flow.activeCall(),Map.copyOf(after));
+    }
+    /** Local: a guarded B3 link as {guard, if true, if false}; {value} once the facts decide its predicate; null if none. */
+    private Long[] resolveGuard(Map<Long,Long> links,PredicateFacts facts){
+        Long guard=links.get(LINK_GUARD);if(guard==null)return null;
+        int truth=facts.values().get((int)(guard>>1)).truth();
+        if(truth<0)return new Long[]{guard,links.get(LINK_IF),links.get(LINK_ELSE)};
+        return new Long[]{(truth^(int)(guard&1))==1?links.get(LINK_IF):links.get(LINK_ELSE)};
+    }
+    private long guardRegister(long guard){int index=(int)(guard>>1);return program.getRegister((index<3?"A":"B")+(index%3)).getAddress().getOffset();}
+    /** Local: B3 after a write to a guarded link; {guard, if true, if false}, {value} when both paths agree, or null. Guard null: a new one. */
+    private Long[] guardedWrite(Insn instruction,int truth,Long[] guard){
+        if(truth>0){Long yes=constantWrite(instruction,guard[1],1,linkOffset()),no=constantWrite(instruction,guard[2],1,linkOffset());
+            if(yes!=null&&yes.equals(no))return new Long[]{yes};return yes==null?null:new Long[]{guard[0],yes,no};}
+        int index=predicateIndex(instruction.predicate().getAddress().getOffset());if(index<0)return null;
+        long mine=2L*index+(instruction.inverted()?1:0);
+        if(guard[0]!=null&&guard[0]!=mine)return null;
+        Long yes=constantWrite(instruction,guard[1],1,linkOffset());
+        return yes==null?null:new Long[]{mine,yes,guard[2]};
     }
     /** B3, plus every register a register B of the function reads: their exact E1 constants are tracked. */
     private List<Long> constantRegisters(){

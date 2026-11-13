@@ -52,6 +52,10 @@ public final class C6000DelaySlots {
 
     private static List<Repair> recoverWindows(Program program, TaskMonitor monitor, MessageLog log)
             throws Exception {
+        int quiet = inertJumps(program, monitor);
+        if (quiet > 0) log.appendMsg("C6000 Delay Slots", "made " + quiet + " in-sequence jump(s) inert");
+        List<Address[]> pairs = pairJumps(program, monitor);
+        if (!pairs.isEmpty()) log.appendMsg("C6000 Delay Slots", "paired " + pairs.size() + " complementary jump(s)");
         int preempted = neutralise(program, monitor);
         if (preempted > 0) log.appendMsg("C6000 Delay Slots", "continued " + preempted + " preempted jump(s)");
         int carried = carryTails(program, monitor);
@@ -131,6 +135,17 @@ public final class C6000DelaySlots {
                 now.setFallThrough(resume);
                 if(nativeReady)result.add(new Repair(at.toString(),window.end().toString(),bytes,
                     branch.getDelaySlotDepth(),branch.getDelaySlotDepth(),0));
+            }
+        }
+        // The complement's transfer is the window owner's not-taken path; without a window, undo it.
+        for (Address[] pair : pairs) {
+            Instruction x = program.getListing().getInstructionAt(pair[0]);
+            if (x != null && x.getPrototype().getDelaySlotByteCount() > parallelBytes(program, pair[0])) {
+                if (!pair[1].equals(x.getFallThrough())) x.setFallThrough(pair[1]);
+            }
+            else {
+                Instruction y = program.getListing().getInstructionAt(pair[2]);
+                if (y != null) setInert(program, y, false, monitor);
             }
         }
         if (!result.isEmpty()) Msg.info(C6000DelaySlots.class, "C6000 Delay Slots> recovered " + result.size() + " proven window(s)");
@@ -407,6 +422,118 @@ public final class C6000DelaySlots {
             }
         }
         return count;
+    }
+
+    /**
+     * Local: a displacement B that lands on the execute packet sequential issue
+     * reaches in that cycle, issued with no other branch pending, transfers
+     * nowhere: execution runs on in sequence either way (SPRUFE8B 3.5, 4.2.6 B;
+     * DSP/BIOS issues such branches to hold off interrupts). Make it inert
+     * (c_inert), so the packets it seemed to skip are lifted and the windows
+     * holding it can be proven. Repeats until no further jump qualifies.
+     */
+    private static int inertJumps(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        int count = 0;
+        for (boolean again = true; again;) {
+            again = false;
+            List<Address> found = new ArrayList<>();
+            Reader reader = new Reader(program);
+            for (var it = listing.getInstructions(true); it.hasNext();) {
+                var ins = it.next();
+                monitor.checkCancelled();
+                if (reader.inSequence(ins, monitor)) found.add(ins.getAddress());
+            }
+            for (Address at : found) {
+                Instruction jump = listing.getInstructionAt(at);
+                // An earlier jump made inert changed the listing: prove this one again.
+                if (jump == null || !new Reader(program).inSequence(jump, monitor)) continue;
+                Address landing = jump.getDefaultFlows()[0];
+                Address end = setInert(program, jump, true, monitor);
+                Disassembler disassembler = Disassembler.getDisassembler(program, monitor, null);
+                // The packets it seemed to skip: decode them in sequence.
+                Address gap = end.next();
+                while (listing.getInstructionAt(gap) != null && gap.compareTo(landing) < 0) gap = listing.getInstructionAt(gap).getMaxAddress().next();
+                if (listing.getInstructionContaining(gap) == null) disassembler.disassemble(gap, null, true);
+                // The packets it skipped run on every path through it: its function owns them.
+                Function owner = program.getFunctionManager().getFunctionContaining(at);
+                var span = new AddressSet(at, landing.previous());
+                if (owner != null && !owner.getBody().contains(span)) {
+                    boolean free = true;
+                    for (var f = program.getFunctionManager().getFunctionsOverlapping(span); f.hasNext();)
+                        if (!f.next().equals(owner)) free = false;
+                    if (free) {
+                        try { owner.setBody(new AddressSet(owner.getBody()).union(span)); }
+                        catch (ghidra.program.database.function.OverlappingFunctionException e) { }
+                    }
+                }
+                count++;
+                again = true;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Local: two branches in one execute packet on complementary predicates of
+     * one register land in the same cycle after the same window (SPRUFE8B 3.5,
+     * 4.2.6 B). When one is a displacement B and the other's window can be
+     * proven with it as an ordinary companion, the B becomes inert and, once the
+     * window is recovered, the other's not-taken fall-through is its target.
+     * @return {owner, target, inert B} per pair
+     */
+    private static List<Address[]> pairJumps(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        List<Address[]> pairs = new ArrayList<>();
+        List<Instruction[]> found = new ArrayList<>();
+        Reader reader = new Reader(program);
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            var y = it.next();
+            monitor.checkCancelled();
+            Instruction x = reader.complement(y);
+            if (x == null) continue;
+            reader.ignore = y.getAddress();
+            Window w = reader.window(x, monitor);
+            reader.ignore = null;
+            if (w != null && w.end().compareTo(x.getMaxAddress()) > 0) found.add(new Instruction[] { x, y });
+        }
+        for (var pair : found) {
+            Address target = pair[1].getDefaultFlows()[0];
+            setInert(program, pair[1], true, monitor);
+            pairs.add(new Address[] { pair[0].getAddress(), target, pair[1].getAddress() });
+        }
+        return pairs;
+    }
+
+    /** Re-decode a branch with c_inert set or cleared, with any packet companion that lays it as a slot; the end of the re-decoded range. */
+    private static Address setInert(Program program, Instruction jump, boolean on, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        Address at = jump.getAddress();
+        Address end = jump.getMaxAddress().add(jump.getPrototype().getDelaySlotByteCount());
+        Address start = at;
+        for (Address prior : C6000ExecutionPackets.issuePrefix(program, at)) {
+            Instruction q = listing.getInstructionAt(prior);
+            int laid = q == null ? 0 : q.getPrototype().getDelaySlotByteCount();
+            if (laid > 0 && q.getMaxAddress().add(laid).compareTo(at) >= 0) {
+                start = prior;
+                if (q.getMaxAddress().add(laid).compareTo(end) > 0) end = q.getMaxAddress().add(laid);
+                break;
+            }
+        }
+        List<SavedInstruction> saved = snapshot(program, start, end);
+        listing.clearCodeUnits(start, end, false);
+        program.getProgramContext().setValue(program.getRegister("c_flow_delay"), at, at, BigInteger.ZERO);
+        program.getProgramContext().setValue(program.getRegister("c_inert"), at, at, on ? BigInteger.ONE : BigInteger.ZERO);
+        Disassembler disassembler = Disassembler.getDisassembler(program, monitor, null);
+        for (Address cursor = start; cursor.compareTo(end) <= 0;) {
+            if (listing.getInstructionContaining(cursor) == null)
+                disassembler.disassemble(cursor, new AddressSet(cursor, end), false);
+            var ins = listing.getInstructionContaining(cursor);
+            if (ins == null) throw new IllegalStateException("Could not re-decode branch at " + cursor);
+            cursor = ins.getMaxAddress().next();
+        }
+        restore(program, at, saved, on, saved.get((int) at.subtract(start)).fallThrough());
+        return end;
     }
 
     /** Whether the context field (c_inert, c_carry) is set at at. */
@@ -737,6 +864,8 @@ public final class C6000DelaySlots {
     private static final class Reader {
         private final Program program;private final Listing listing;private final PseudoDisassembler pseudo;
         private final C6000CallAnalyzer.Walker walker;
+        /** A branch window() treats as an ordinary companion (pairJumps' complement). */
+        Address ignore;
         Reader(Program p){program=p;listing=p.getListing();pseudo=new PseudoDisassembler(p);walker=new C6000CallAnalyzer.Walker(p);}
         Instruction decode(Address at) {
             if (at == null) return null;
@@ -775,7 +904,7 @@ public final class C6000DelaySlots {
                     if(issuePacket)for(var priorAt:C6000ExecutionPackets.issuePrefix(program,issue.getAddress())) {
                         if(++packetInstructions>8)return null;
                         var prior=decode(priorAt);if(prior==null)return null;
-                        if(prior.getFlowType().isJump()||prior.getFlowType().isCall()||prior.getFlowType().isTerminal())return null;
+                        if(!priorAt.equals(ignore)&&(prior.getFlowType().isJump()||prior.getFlowType().isCall()||prior.getFlowType().isTerminal()))return null;
                         var priorOwner=program.getFunctionManager().getFunctionContaining(priorAt);
                         // A physical predecessor's p bit does not prove that
                         // an alternate entry executed it. The prefix must share
@@ -798,7 +927,7 @@ public final class C6000DelaySlots {
                     while(!issuePacket||C6000ExecutionPackets.parallelWithNext(program,current)) {
                         monitor.checkCancelled();if(++packetInstructions>8)return null;var next=next(current);if(next==null||++count>MAX_INSTRUCTIONS)return null;
                         if(next.getAddress().subtract(issue.getMaxAddress())>MAX_BYTES)return null;
-                        if((next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal())&&!next.getAddress().equals(tolerate))return null;
+                        if(!next.getAddress().equals(ignore)&&!next.getAddress().equals(tolerate)&&(next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal()))return null;
                         // A call's window over an inert branch hides the slots past it from flow (Ghidra counts slots by parsing them): refuse it, as before the branch was carried.
                         if(flag(program,next.getAddress(),"c_inert")&&(issue.getFlowType().isCall()||issue.getFlowOverride()==FlowOverride.CALL))return null;
                         var other=program.getFunctionManager().getFunctionContaining(next.getAddress());
@@ -819,6 +948,254 @@ public final class C6000DelaySlots {
                 return new Window(issue,current.getMaxAddress(),owner);
             }catch(MemoryAccessException e){return null;}
         }
+        /** pairJumps: the one other branch in y's packet, on y's complementary predicate, when y is a displacement B. */
+        Instruction complement(Instruction y) {
+            String name = C6000CallAnalyzer.baseName(y);
+            if (!(name.equals("B.S1") || name.equals("B.S2")) || y.getLength() != 4 || y.getRegister(0) != null ||
+                    y.isInDelaySlot() || y.getFlowOverride() != FlowOverride.NONE || y.getDefaultFlows().length != 1) return null;
+            if (flag(program, y.getAddress(), "c_inert") || flag(program, y.getAddress(), "c_carry") || continues(program, y)) return null;
+            try {
+                var own = packet(y.getAddress());
+                if (own == null) return null;
+                Instruction x = null;
+                for (Instruction i : own) {
+                    if (i.getAddress().equals(y.getAddress()) || !transfer(i)) continue;
+                    if (x != null || !complementary(i, y)) return null;
+                    x = i;
+                }
+                if (x == null || x.isInDelaySlot() || flag(program, x.getAddress(), "c_carry")) return null;
+                String xn = C6000CallAnalyzer.baseName(x);
+                var o = x.getFlowOverride();
+                if (!(xn.equals("B.S1") || xn.equals("B.S2")) || x.getLength() != 4 || x.getFlowType().isCall() ||
+                        !(o == FlowOverride.NONE || o == FlowOverride.RETURN)) return null;
+                return x;
+            }
+            catch (MemoryAccessException e) {
+                return null;
+            }
+        }
+
+        /** inertJumps: an unconditional-or-not displacement B landing where sequential issue is, with nothing else pending. */
+        boolean inSequence(Instruction x, TaskMonitor monitor) throws CancelledException {
+            String name = C6000CallAnalyzer.baseName(x);
+            var override = x.getFlowOverride();
+            // A jump to a seeded entry may be taken as a tail call; landing in sequence, it is neither.
+            if (!(name.equals("B.S1") || name.equals("B.S2")) || x.getLength() != 4 || x.getRegister(0) != null || x.isInDelaySlot() ||
+                    !(override == FlowOverride.NONE || override == FlowOverride.BRANCH || override == FlowOverride.CALL_RETURN)) return false;
+            Address at = x.getAddress();
+            if (flag(program, at, "c_inert") || flag(program, at, "c_carry") || continues(program, x)) return false;
+            if (x.getDefaultFlows().length != 1) return false;
+            Address target = x.getDefaultFlows()[0];
+            try {
+                List<Instruction> own = packet(at);
+                if (own == null) return false;
+                for (Instruction y : own) if (y != null && !y.getAddress().equals(at) && transfer(y) && !complementary(y, x)) return false;
+                // Forward: the packet issuing in the landing cycle is the target.
+                int remaining = 5 - (cycles(own) - 1);
+                List<List<Instruction>> walked = new ArrayList<>();
+                Instruction last = own.get(own.size() - 1);
+                while (remaining > 0) {
+                    monitor.checkCancelled();
+                    Instruction first = next(last);
+                    if (first == null || walked.size() > 8) return false;
+                    var p = packet(first.getAddress());
+                    if (p == null || !p.get(0).getAddress().equals(first.getAddress())) return false;
+                    int c = cycles(p);
+                    if (c < 0) return false;
+                    remaining -= c; last = p.get(p.size() - 1); walked.add(p);
+                }
+                if (remaining < 0 || !resume(program, last.getMaxAddress()).equals(target)) return false;
+                for (var p : walked) if (!onlyJumpedTo(p.get(0).getAddress(), null)) return false;
+                // A window entered from outside keeps its native treatment (issue #52 relief): only x's own run reaches it.
+                for (var p : walked) for (Instruction m : p)
+                    for (var it = program.getReferenceManager().getReferencesTo(m.getAddress()); it.hasNext();) {
+                        Reference r = it.next();
+                        Address from = r.getFromAddress();
+                        if (r.getReferenceType().isFlow() && !r.getReferenceType().isFallthrough() &&
+                                (from.compareTo(at) < 0 || from.compareTo(target) >= 0)) return false;
+                    }
+                if (!onlyJumpedTo(target, at)) return false;
+                // Backward: no branch issued in the five cycles before is still pending, nor one a jump in brought along.
+                // A complementary one is never taken with x while its predicate register holds (writes up to 4 cycles earlier may land).
+                List<List<Instruction>> before = new ArrayList<>();
+                List<Integer> distance = new ArrayList<>();
+                List<Instruction> pending = new ArrayList<>();
+                List<Integer> pendingAt = new ArrayList<>();
+                before.add(own); distance.add(0);
+                Address start = own.get(0).getAddress();
+                for (int back = 0; back <= 15 && program.getFunctionManager().getFunctionAt(start) == null;) {
+                    monitor.checkCancelled();
+                    Address prior = packetBefore(start);
+                    if (prior == null) { if (back <= 5) return false; break; }
+                    var p = packet(prior);
+                    if (p == null || cycles(p) < 0) { if (back <= 5) return false; break; }
+                    back += cycles(p);
+                    if (back <= 5) for (Instruction y : p) if (transfer(y)) {
+                        if (!complementary(y, x)) return false;
+                        pending.add(y); pendingAt.add(back);
+                    }
+                    before.add(p); distance.add(back); start = p.get(0).getAddress();
+                }
+                // A write issued d cycles before x lands (latency) cycles later; one landing after y read the predicate and by x's issue changes it.
+                for (int k = 0; k < pending.size(); k++) {
+                    var reg = predicate(pending.get(k));
+                    for (int q = 1; q < before.size(); q++) {
+                        for (Instruction w : before.get(q)) {
+                            int v = distance.get(q) - latency(w);
+                            if (v < 0 || v >= pendingAt.get(k)) continue;
+                            for (Object o : C6000PacketContext.architecturalResults(program, w))
+                                if (o instanceof ghidra.program.model.lang.Register r && (reg == null || r.contains(reg) || reg.contains(r))) return false;
+                        }
+                    }
+                }
+                while (before.size() > 1 && distance.get(before.size() - 1) > 5) { before.remove(before.size() - 1); distance.remove(distance.size() - 1); }
+                var references = program.getReferenceManager();
+                for (var p : before) for (Instruction m : p) {
+                    // A function is entered drained, as the lookback above assumes: its callers are its own concern.
+                    if (program.getFunctionManager().getFunctionAt(m.getAddress()) != null) continue;
+                    for (var it = references.getReferencesTo(m.getAddress()); it.hasNext();) {
+                        Reference r = it.next();
+                        if (!r.getReferenceType().isFlow() || r.getReferenceType().isFallthrough()) continue;
+                        Instruction j = listing.getInstructionAt(r.getFromAddress());
+                        if (j == null || !quiet(j, monitor)) return false;
+                    }
+                }
+                return true;
+            }
+            catch (MemoryAccessException e) {
+                return false;
+            }
+        }
+
+        /** No function starts at at, or only jumps (and any flow from from) reach it: nothing else calls it or points to it. */
+        private boolean onlyJumpedTo(Address at, Address from) {
+            if (program.getFunctionManager().getFunctionAt(at) == null) return true;
+            for (var it = program.getReferenceManager().getReferencesTo(at); it.hasNext();) {
+                Reference r = it.next();
+                if (!r.getReferenceType().isJump() && !(r.getFromAddress().equals(from) && r.getReferenceType().isFlow())) return false;
+            }
+            return !program.getSymbolTable().isExternalEntryPoint(at);
+        }
+
+        /** No branch but j itself, or one never taken with it, issues in j's packet or the five cycles after it. */
+        private boolean quiet(Instruction j, TaskMonitor monitor) throws CancelledException, MemoryAccessException {
+            var own = packet(j.getAddress());
+            if (own == null) return false;
+            for (Instruction y : own) if (!y.getAddress().equals(j.getAddress()) && transfer(y) && !complementary(y, j)) return false;
+            // A branch complementary to j is not taken with it while their predicate register holds.
+            List<Instruction> between = new ArrayList<>(own);
+            Address start = own.get(0).getAddress();
+            for (int back = 0; back < 5 && program.getFunctionManager().getFunctionAt(start) == null;) {
+                Address prior = packetBefore(start);
+                var p = prior == null ? null : packet(prior);
+                if (p == null || cycles(p) < 0) return false;
+                back += cycles(p); start = p.get(0).getAddress();
+                for (Instruction w : p) if (latency(w) > back) between.add(w);
+            }
+            int remaining = 5 - (cycles(own) - 1);
+            Instruction last = own.get(own.size() - 1);
+            for (int n = 0; remaining > 0; n++) {
+                monitor.checkCancelled();
+                Instruction first = next(last);
+                if (first == null || n > 8) return false;
+                var p = packet(first.getAddress());
+                if (p == null) return false;
+                int c = cycles(p);
+                if (c < 0) return false;
+                for (Instruction y : p) if (transfer(y) && (!complementary(y, j) || writes(between, predicate(y)))) return false;
+                between.addAll(p);
+                remaining -= c; last = p.get(p.size() - 1);
+            }
+            return true;
+        }
+
+        /** Whether any of the instructions writes reg (or reg is unknown). */
+        private boolean writes(List<Instruction> list, ghidra.program.model.lang.Register reg) {
+            if (reg == null) return true;
+            for (Instruction w : list) for (Object o : C6000PacketContext.architecturalResults(program, w))
+                if (o instanceof ghidra.program.model.lang.Register r && (r.contains(reg) || reg.contains(r))) return true;
+            return false;
+        }
+
+        /** The whole execute packet holding at, decoded; null for compact or undecodable code. */
+        private List<Instruction> packet(Address at) throws MemoryAccessException {
+            List<Address> prefix = C6000ExecutionPackets.issuePrefix(program, at);
+            Address start = prefix.isEmpty() ? at : prefix.get(0);
+            List<Instruction> members = new ArrayList<>();
+            for (Address a : C6000ExecutionPackets.packetMembers(program, start)) {
+                Instruction i = decode(a);
+                if (i == null || i.getLength() != 4 || flag(program, a, "c_hdrpkt")) return null;
+                members.add(i);
+            }
+            return members.contains(null) || members.stream().noneMatch(i -> i.getAddress().equals(at)) ? null : members;
+        }
+
+        /** Start of the execute packet before the one starting at start, in full-width code. */
+        private Address packetBefore(Address start) throws MemoryAccessException {
+            if (start.getOffset() < 4) return null;
+            Address prior = start.subtract(4);
+            if (!program.getMemory().contains(prior) || (program.getMemory().getInt(prior) >>> 28) == 0xe &&
+                    (prior.getOffset() & 31) == 28) return null;
+            List<Address> prefix = C6000ExecutionPackets.issuePrefix(program, prior);
+            return prefix.isEmpty() ? prior : prefix.get(0);
+        }
+
+        /** Cycles the packet occupies; -1 for a member whose timing this walk does not model. */
+        private int cycles(List<Instruction> packet) throws MemoryAccessException {
+            int c = 1;
+            for (Instruction i : packet) {
+                String name = C6000CallAnalyzer.baseName(i);
+                if (name.startsWith("BNOP") || name.startsWith("CALLP") || name.startsWith("SPMASK")) return -1;
+                int n = packetCycles(i);
+                if (n < 0) return -1;
+                c = Math.max(c, n);
+            }
+            return c;
+        }
+
+        /** Any branch still to land, except one made inert. */
+        private boolean transfer(Instruction i) {
+            if (flag(program, i.getAddress(), "c_inert")) return false;
+            if (flag(program, i.getAddress(), "c_carry")) return true;
+            String name = C6000CallAnalyzer.baseName(i);
+            var flow = i.getFlowType();
+            return name.startsWith("B.") || name.startsWith("BNOP") || name.startsWith("CALLP") || name.startsWith("BDEC") ||
+                name.startsWith("BPOS") || flow.isJump() || flow.isCall() || flow.isTerminal();
+        }
+
+        /** Cycles until a write is visible: 1, 5 for a load, and a conservative 10 for multiplies and floating point (SPRUFE8B Table 3-8). */
+        private static int latency(Instruction w) {
+            String n = C6000CallAnalyzer.baseName(w);
+            if (n.startsWith("LD")) return 5;
+            String op = n.contains(".") ? n.substring(0, n.indexOf('.')) : n;
+            if (op.startsWith("MPY") || op.startsWith("INT") || op.contains("SP") || op.contains("DP") || op.startsWith("SMPY")) return 10;
+            return 1;
+        }
+
+        /** The predicate register of a full-width instruction (SPRUFE8B Table 3-9), or null. */
+        private ghidra.program.model.lang.Register predicate(Instruction i) {
+            try {
+                String[] names = { null, "B0", "B1", "B2", "A1", "A2", "A0", null };
+                String n = names[program.getMemory().getInt(i.getAddress()) >>> 29];
+                return n == null ? null : program.getRegister(n);
+            }
+            catch (MemoryAccessException e) {
+                return null;
+            }
+        }
+
+        /** Same predicate register, opposite sense: never both taken. */
+        private boolean complementary(Instruction y, Instruction x) {
+            try {
+                int a = program.getMemory().getInt(y.getAddress()), b = program.getMemory().getInt(x.getAddress());
+                int ca = a >>> 29, cb = b >>> 29;
+                return ca != 0 && ca != 7 && ca == cb && ((a >>> 28) & 1) != ((b >>> 28) & 1);
+            }
+            catch (MemoryAccessException e) {
+                return false;
+            }
+        }
+
         int packetCycles(Instruction i)throws MemoryAccessException {String name=C6000CallAnalyzer.baseName(i);
             // Loop control / asynchronous wakeup needs a pipeline model.
             if(name.equals("IDLE")||name.startsWith("SPLOOP")||name.startsWith("SPKERNEL")||name.startsWith("SPMASK")||name.equals("SWE")||name.equals("SWENR"))return -1;

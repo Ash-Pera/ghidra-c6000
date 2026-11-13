@@ -1072,6 +1072,14 @@ public final class C6000DelaySlots {
                 }
                 if (remaining < 0 || !resume(program, last.getMaxAddress()).equals(target)) return false;
                 for (var p : walked) if (!onlyJumpedTo(p.get(0).getAddress(), null)) return false;
+                // A window entered from outside keeps its native treatment (issue #52 relief): only x's own run reaches it.
+                for (var p : walked) for (Instruction m : p)
+                    for (var it = program.getReferenceManager().getReferencesTo(m.getAddress()); it.hasNext();) {
+                        Reference r = it.next();
+                        Address from = r.getFromAddress();
+                        if (r.getReferenceType().isFlow() && !r.getReferenceType().isFallthrough() &&
+                                (from.compareTo(at) < 0 || from.compareTo(target) >= 0)) return false;
+                    }
                 if (!onlyJumpedTo(target, at)) return false;
                 // Backward: no branch issued in the five cycles before is still pending, nor one a jump in brought along.
                 // A complementary one is never taken with x while its predicate register holds (writes up to 4 cycles earlier may land).

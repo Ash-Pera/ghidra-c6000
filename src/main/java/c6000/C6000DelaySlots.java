@@ -56,6 +56,8 @@ public final class C6000DelaySlots {
         if (preempted > 0) log.appendMsg("C6000 Delay Slots", "continued " + preempted + " preempted jump(s)");
         int carried = carryTails(program, monitor);
         if (carried > 0) log.appendMsg("C6000 Delay Slots", "carried " + carried + " shared call tail(s)");
+        int jumpTails = carryJumpTails(program, monitor);
+        if (jumpTails > 0) log.appendMsg("C6000 Delay Slots", "carried " + jumpTails + " jump call tail(s)");
         int landed = landJumps(program, monitor);
         if (landed > 0) log.appendMsg("C6000 Delay Slots", "made " + landed + " landed jump(s) inert");
         List<Address> candidates = new ArrayList<>();
@@ -413,6 +415,68 @@ public final class C6000DelaySlots {
     static boolean flag(Program program, Address at, String field) {
         BigInteger v = program.getProgramContext().getValue(program.getRegister(field), at, false);
         return v != null && v.signum() != 0;
+    }
+
+    /**
+     * Local: a call issued in a jump's window, taken exactly with it, whose link the
+     * jump's target code sets (C6000CallAnalyzer Walker.jumpTail) runs after that code:
+     * as carryTails, the code's last instruction carries the call (c_carry) and the
+     * issuing call stops transferring (c_inert). Only the jump may enter that code, and
+     * nothing may fall into it (SPRUFE8B 3.5, 4.2.6 B).
+     */
+    private static int carryJumpTails(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        var walker = new C6000CallAnalyzer.Walker(program);
+        List<C6000CallAnalyzer.SharedTail> tails = new ArrayList<>();
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            var jump = it.next();
+            monitor.checkCancelled();
+            if (!C6000CallAnalyzer.Walker.displacementJump(jump) || continues(program, jump)) continue;
+            var tail = walker.jumpTail(jump);
+            if (tail == null || flag(program, tail.last(), "c_carry") || flag(program, tail.transfer().getAddress(), "c_inert") ||
+                !onlyJump(program, tail)) continue;
+            tails.add(tail);
+        }
+        int count = 0;
+        for (var tail : tails) {
+            Instruction transfer = listing.getInstructionAt(tail.transfer().getAddress());
+            Instruction carrier = listing.getInstructionAt(tail.last());
+            if (carrier == null || carrier.isInDelaySlot() || (transfer != null && transfer.isInDelaySlot())) continue;
+            if (transfer != null) redecode(program, transfer.getAddress(),
+                transfer.getMaxAddress().add(transfer.getPrototype().getDelaySlotByteCount()), "c_inert", monitor);
+            else if (listing.getInstructionContaining(tail.transfer().getAddress()) == null)
+                program.getProgramContext().setValue(program.getRegister("c_inert"), tail.transfer().getAddress(), tail.transfer().getAddress(), BigInteger.ONE);
+            else continue;
+            redecode(program, tail.last(), carrier.getMaxAddress(), "c_carry", monitor);
+            var r = program.getReferenceManager().addMemoryReference(tail.last(), tail.callee(),
+                RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
+            program.getReferenceManager().setPrimary(r, true);
+            count++;
+        }
+        return count;
+    }
+
+    /** Flow reaches the tail's code only from its jump, at its start, and nothing falls into it. */
+    private static boolean onlyJump(Program program, C6000CallAnalyzer.SharedTail tail) {
+        var listing = program.getListing();
+        var refs = program.getReferenceManager();
+        Instruction last = listing.getInstructionAt(tail.last());
+        if (last == null) return false;
+        for (var to = refs.getReferenceDestinationIterator(new AddressSet(tail.tail(), last.getMaxAddress()), true); to.hasNext();) {
+            Address at = to.next();
+            for (var it = refs.getReferencesTo(at); it.hasNext();) {
+                Reference r = it.next();
+                if (!r.getReferenceType().isFlow()) continue;
+                if (!at.equals(tail.tail()) || !r.getFromAddress().equals(tail.jump().getAddress())) return false;
+            }
+        }
+        Instruction before = listing.getInstructionContaining(tail.tail().previous());
+        if (before == null) return true;
+        Instruction issuer = before;
+        while (issuer != null && issuer.isInDelaySlot()) issuer = listing.getInstructionBefore(issuer.getAddress());
+        if (issuer == null) return false;
+        Address falls = issuer.getFallThrough();
+        return issuer == before ? falls == null || !falls.equals(tail.tail()) : falls == null;
     }
 
     /**

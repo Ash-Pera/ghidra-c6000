@@ -133,6 +133,7 @@ CORE = [
     case("mvc-tscl", "MvcControl", "C6000_MVC_CONTROL_OK"),
     case("circular-addressing", "CircularAddress", "C6000_CIRCULAR_ADDRESS_OK"),
     case("nonalign-circular", "NonalignedCircular", "C6000_NONALIGNED_CIRCULAR_OK"),
+    case("store-alignment", "StoreAlignment", "C6000_STORE_ALIGNMENT_OK"),
     case("elf-local-label", "ElfLocalLabel", "C6000_ELF_LOCAL_LABEL_OK", None, analysis=True),
     case("elf-compact", "ElfCompact", "C6000_ELF_COMPACT_OK", None, analysis=True),
 ]
@@ -149,6 +150,8 @@ TI = [
     case("pipeline-predicated-collision", "PredicatedCollision", "C6000_PREDICATED_COLLISION_OK", "json"),
     # Local: execute-packet completion (docs/execute-packet-recovery.md) under packet staging.
     case("parallel-peers", "ParallelPeerAnalyzer", "C6000_PARALLEL_PEER_ANALYZER_OK", "json", ["cases.json", "peers.out"]),
+    case("store-mask-print", "StoreMaskPrint", "C6000_STORE_MASK_PRINT_OK", "json"),
+    case("store-mask-schedule", "StoreMaskSchedule", "C6000_STORE_MASK_SCHEDULE_OK", "json"),
 ]
 
 

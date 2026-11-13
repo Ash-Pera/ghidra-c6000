@@ -58,6 +58,7 @@ CORE = [
     case("low-half-reference", "LowHalfReference", "C6000_LOW_HALF_REFERENCE_OK", None, analysis=True),
     case("preempted-jump", "PreemptedJump", "C6000_PREEMPTED_JUMP_OK", None, analysis=True),
     case("shared-tail", "SharedTail", "C6000_SHARED_TAIL_OK", None, analysis=True),
+    case("in-sequence-jump", "InSequenceJump", "C6000_IN_SEQUENCE_JUMP_OK", None, analysis=True),
     case("shared-tail-packet", "SharedTailPacket", "C6000_SHARED_TAIL_PACKET_OK", None, analysis=True),
     case("merge-call-window", "MergeCallWindow", "C6000_MERGE_CALL_WINDOW_OK", None),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
@@ -336,6 +337,8 @@ def main():
                     command += ["-preScript", "C6000PreemptedJumpTest.java", "prepare"]
                 elif fixture == "shared-tail":
                     command += ["-preScript", "C6000SharedTailTest.java", "prepare"]
+                elif fixture == "in-sequence-jump":
+                    command += ["-preScript", "C6000InSequenceJumpTest.java", "prepare"]
                 elif fixture == "shared-tail-packet":
                     command += ["-preScript", "C6000SharedTailPacketTest.java", "prepare"]
                 elif fixture not in ELF:

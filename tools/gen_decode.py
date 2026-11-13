@@ -826,8 +826,13 @@ def main():
                     # CALLP supplies its NOP cycles and links to the next packet.
                     if mnem == "B" and ops and ops[0] == "BranchTarget":
                         inert.append(":%s is %s { build PktInertCommit; }" % (disp, " & ".join(pat + ["c_inert=1", "PktInertCommit"])))
-                        pat += ["c_inert=0", "CFlowDelay"]
                         sem = "local take:1 = Cond; build CFlowDelay; if (take != 0) goto BranchTarget;"
+                        # Local: a call-arm jump's context (c_arm, C6000DelaySlots.carryCallArms) parses its opposite-sense slot B inert, so Ghidra counts the slots past it.
+                        armed = [term for term in pat if term != "(creg!=0 | z=0)"]  # creg!=0 holds; a fixed z would duplicate its disjuncts
+                        for arm, z in (("1", "1"), ("2", "0")):
+                            inert.append(":%s is %s { build PktInertCommit; }" % (disp, " & ".join(armed + ["c_inert=0", "c_arm=" + arm, "z=" + z, "PktInertCommit"])))
+                            inert.append(":%s is %s { %s }" % (disp, " & ".join(armed + ["c_inert=0", "c_arm=" + arm, "z=" + str(1 - int(z)), "CFlowDelay"]), sem))
+                        pat += ["c_inert=0", "c_arm=0", "CFlowDelay"]
                     elif mnem == "CALLP":
                         pat.append("CFlowDelay")
                         link = "A3" if suffix == ".1" else "B3"

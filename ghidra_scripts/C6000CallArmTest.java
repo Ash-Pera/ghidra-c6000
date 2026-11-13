@@ -42,6 +42,12 @@ public class C6000CallArmTest extends GhidraScript {
 				!carrier.getFlows()[0].equals(toAddr(0x1180L)) || !toAddr(0x1030L).equals(carrier.getFallThrough()))
 			throw new AssertionError("carrier: " + carrier + (carrier == null ? "" : " " + carrier.getFlowType()));
 		checks += 3;
+		// Ghidra counts the jump's five slots past the inert call, so a body recomputed from flow keeps them.
+		Function f = getFunctionAt(toAddr(0x1000L));
+		var body = ghidra.app.cmd.function.CreateFunctionCmd.getFunctionBody(currentProgram, toAddr(0x1000L));
+		if (jump.getDelaySlotDepth() != 5 || !body.contains(toAddr(0x101cL), toAddr(0x102bL)) || !f.getBody().contains(toAddr(0x101cL), toAddr(0x102bL)))
+			throw new AssertionError("slots outside armcall: depth " + jump.getDelaySlotDepth() + " flow body " + body + " body " + f.getBody());
+		checks++;
 		// Known-bads: the call keeps its transfer and its last slot does not call.
 		for (long[] k : new long[][] { { 0x107cL, 0x108cL }, { 0x10dcL, 0x10ecL }, { 0x1140L, 0x1150L } }) {
 			Instruction b = getInstructionAt(toAddr(k[0])), last = getInstructionAt(toAddr(k[1]));

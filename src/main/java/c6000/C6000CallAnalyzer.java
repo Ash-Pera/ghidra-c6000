@@ -556,6 +556,62 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				last.getAddress(), p.landing());
 		}
 
+		/**
+		 * Local: the jump issued in {@code jump}'s window, taken only with it, that lands
+		 * where {@code jump}'s target code runs to by then, past NOP-only packets; else
+		 * null. It transfers nothing (C6000DelaySlots.landJumps; SPRUFE8B 3.5, 4.2.6 B).
+		 */
+		Instruction landedJump(Instruction jump) {
+			if (!displacementJump(jump)) return null;
+			try {
+				for (Address at : C6000ExecutionPackets.issuePrefix(program, jump.getMinAddress())) {
+					Instruction prior = decode(at);
+					if (prior == null || prior.getLength() != 4 || transfer(prior)) return null;
+				}
+				List<Instruction> slots = window(jump);
+				if (slots == null || slots.isEmpty()) return null;
+				List<Instruction> execution = new ArrayList<>(lookBack(jump));
+				int at = execution.size();
+				execution.add(jump);
+				execution.addAll(slots);
+				int[] issue = issueCycles(execution);
+				int found = -1;
+				for (int i = at + 1; i < execution.size(); i++) {
+					Instruction slot = execution.get(i);
+					if (slot.getLength() != 4 || !untimed(slot)) return null;
+					if (issue[i] == issue[at] && extraCycles(program, slot) > 0) return null;
+					if (!transfer(slot)) continue;
+					if (issue[i] == issue[at] || found >= 0) return null;
+					found = i;
+				}
+				if (found < 0) return null;
+				Instruction inner = execution.get(found);
+				String op = baseName(inner);
+				if (!(op.equals("B.S1") || op.equals("B.S2")) || inner.getRegister(0) != null ||
+					inner.getFlowOverride() != FlowOverride.NONE || inner.getFlowType().isCall() ||
+					inner.getDefaultFlows().length != 1) return null;
+				// Taken only with the jump: the jump is unconditional, or both test one stable predicate.
+				String guard = predicate(jump);
+				if (guard != null && !(guard.equals(predicate(inner)) && stable(execution, found, at, guard, true))) return null;
+				int cycle = issue[found] - issue[at];
+				if (cycle < 1 || cycle > DELAY_CYCLES) return null;
+				Address target = jump.getDefaultFlows()[0];
+				Address windowEnd = execution.get(execution.size() - 1).getMaxAddress();
+				if (target.compareTo(jump.getMinAddress()) >= 0 && target.compareTo(windowEnd) <= 0) return null;
+				Address landing = idle(decode(target), cycle, true), land = inner.getDefaultFlows()[0];
+				for (int n = 0; landing != null && !landing.equals(land); n++) {
+					Instruction nop = decode(landing);
+					if (nop == null || n >= MAX_WINDOW || nop.getLength() != 4 || !baseName(nop).equals("NOP") ||
+						parallelWithNext(nop)) return null;
+					landing = nop.getMaxAddress().next();
+				}
+				return landing == null ? null : inner;
+			}
+			catch (MemoryAccessException e) {
+				return null;
+			}
+		}
+
 		/** Neither an unbounded wait nor loop-buffer control. */
 		private static boolean untimed(Instruction insn) {
 			String name = baseName(insn);

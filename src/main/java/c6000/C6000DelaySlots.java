@@ -56,6 +56,8 @@ public final class C6000DelaySlots {
         if (preempted > 0) log.appendMsg("C6000 Delay Slots", "continued " + preempted + " preempted jump(s)");
         int carried = carryTails(program, monitor);
         if (carried > 0) log.appendMsg("C6000 Delay Slots", "carried " + carried + " shared call tail(s)");
+        int landed = landJumps(program, monitor);
+        if (landed > 0) log.appendMsg("C6000 Delay Slots", "made " + landed + " landed jump(s) inert");
         List<Address> candidates = new ArrayList<>();
         var it = program.getListing().getInstructions(true);
         while (it.hasNext()) {
@@ -411,6 +413,42 @@ public final class C6000DelaySlots {
     static boolean flag(Program program, Address at, String field) {
         BigInteger v = program.getProgramContext().getValue(program.getRegister(field), at, false);
         return v != null && v.signum() != 0;
+    }
+
+    /**
+     * Local: a jump issued in another jump's window, taken only with it, that lands
+     * where the other jump's target code has run to by then (C6000CallAnalyzer
+     * Walker.landedJump) changes no path: it becomes inert (c_inert), so the outer
+     * window, which a nested transfer refused, lifts natively (SPRUFE8B 3.5, 4.2.6 B).
+     * Not when control enters the outer window up to it: there it issues alone.
+     */
+    private static int landJumps(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        var walker = new C6000CallAnalyzer.Walker(program);
+        List<Address> inner = new ArrayList<>();
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            var jump = it.next();
+            monitor.checkCancelled();
+            if (!C6000CallAnalyzer.Walker.displacementJump(jump) || continues(program, jump)) continue;
+            Instruction landed = walker.landedJump(jump);
+            if (landed == null || flag(program, landed.getAddress(), "c_inert") ||
+                entered(program, jump.getAddress(), landed.getMaxAddress())) continue;
+            inner.add(landed.getAddress());
+        }
+        int count = 0;
+        for (Address at : inner) {
+            Instruction decoded = listing.getInstructionAt(at);
+            if (decoded != null) {
+                if (decoded.isInDelaySlot()) continue;
+                redecode(program, at, decoded.getMaxAddress().add(decoded.getPrototype().getDelaySlotByteCount()), "c_inert", monitor);
+            }
+            else if (listing.getInstructionContaining(at) == null) {
+                program.getProgramContext().setValue(program.getRegister("c_inert"), at, at, BigInteger.ONE);
+            }
+            else continue;
+            count++;
+        }
+        return count;
     }
 
     /**

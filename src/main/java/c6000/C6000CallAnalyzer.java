@@ -557,41 +557,6 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		}
 
 		/**
-		 * Local: a call issued in {@code jump}'s window, taken exactly with it, whose link
-		 * the jump's target code sets to where that code has run when the call lands; else
-		 * null. No other call shares that code (C6000DelaySlots.carryJumpTails).
-		 */
-		SharedTail jumpTail(Instruction jump) {
-			Preemption p = preemption(jump, true);
-			if (p == null || !p.exclusive()) return null;
-			Instruction transfer = p.transfer();
-			if (transfer.getRegister(0) != null || transfer.getDefaultFlows().length != 1 ||
-				transfer.getFlowOverride() != FlowOverride.NONE) return null;
-			Register b3 = program.getRegister("B3");
-			List<Instruction> slots = window(jump);
-			if (slots == null) return null;
-			// A load still in flight could replace the link after the target code sets it.
-			for (Instruction slot : slots) {
-				Register load = loadDestination(slot);
-				if (load != null && overlaps(load, b3)) return null;
-			}
-			Address target = jump.getDefaultFlows()[0];
-			Map<Register, long[]> regs = new HashMap<>();
-			Instruction last = null;
-			for (Instruction insn = decode(target); insn != null && insn.getMinAddress().compareTo(p.landing()) < 0; insn = next(insn)) {
-				last = insn;
-				Register load = loadDestination(insn);
-				boolean link = (load != null && overlaps(load, b3)) || issueWrites(insn).stream().anyMatch(r -> overlaps(r, b3));
-				if (link && (load != null || predicate(insn) != null)) return null;
-				track(insn, regs);
-			}
-			if (last == null || !last.getMaxAddress().next().equals(p.landing())) return null;
-			long[] ret = regs.get(b3);
-			if (ret == null || ret[1] != FULL || (ret[0] & 0xffffffffL) != p.landing().getOffset()) return null;
-			return new SharedTail(jump, transfer, transfer.getDefaultFlows()[0], target, last.getAddress(), p.landing());
-		}
-
-		/**
 		 * Local: the jump issued in {@code jump}'s window, taken only with it, that lands
 		 * where {@code jump}'s target code runs to by then, past NOP-only packets; else
 		 * null. It transfers nothing (C6000DelaySlots.landJumps; SPRUFE8B 3.5, 4.2.6 B).

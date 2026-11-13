@@ -684,6 +684,24 @@ fails on staging-era context and rolls back the whole analysis), and the call to
 `callee2` must get no window over it: Ghidra counts a window's slots by parsing them,
 stops at the inert branch, and flow from the entry then skipped the slots past it.
 
+## Call arms in a jump's window (local)
+
+`call-arm.py IMAGE [be]` and `C6000CallArmTest.java` (with `prepare` as a pre-script)
+check `cl6x` 8.3.15 words of `[A1] B local` with `[!A1] B callee` issued one cycle later in
+its window, A1 unchanged between them, so exactly one transfers (SPRUFE8B 3.5, 4.2.6 B).
+The call's window outlasts the jump's by one cycle, so no native window lifts both:
+the jump's window was cut at the call and its later slots were lost on the jump's path.
+The call is now inert (`c_inert`), the jump lifts its whole window over it, and the
+call's last slot, reached only on the jump's fall-through, carries the call (`c_carry`,
+target by reference). Ghidra counts the jump's slots by parsing them in the jump's
+context, where the call is not inert: that parse stopped at the call (nested delay slot),
+so a body recomputed from flow dropped the slots. The jump's `c_arm` field makes the
+opposite-sense `B` parse inert there too; the slot depth must be 5 and the slots must stay
+in the body. `armcall` must decompile to both arms (8 from the jump's slots, or
+`callee(0)`); `armsame` (the call under the jump's own predicate), `armwrite` (the jump's
+packet rewrites A1 before the call reads it) and `armentry` (another jump enters the
+call's last slot) must keep the call's own window.
+
 ## Additional decoder accuracy checks
 
 The release runner includes compact stack offsets (`compact-dstk`), unscaled

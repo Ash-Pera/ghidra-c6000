@@ -249,6 +249,17 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	}
 
 	/**
+	 * Local: a predicated jump with a call issued in its window under the
+	 * opposite predicate of the same unchanged register, so exactly one of
+	 * them transfers, and the call's window outlasting the jump's ({@code jumpEnd},
+	 * its last byte). {@code last} is the call's last slot and {@code landing},
+	 * just past it, its link
+	 * (C6000DelaySlots.carryCallArms).
+	 */
+	record CallArm(Instruction jump, Instruction call, Address callee, Address jumpEnd, Address last, Address landing) {
+	}
+
+	/**
 	 * Walks the instructions around a branch, decoding bytes that the
 	 * listing does not yet hold, and tracks MVK/MVKH/ADDKPC constants.
 	 */
@@ -585,6 +596,58 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			if (last == null || !last.getMaxAddress().next().equals(p.landing())) return null;
 			return new SharedTail(jump, transfer, transfer.getDefaultFlows()[0], jump.getDefaultFlows()[0],
 				last.getAddress(), p.landing());
+		}
+
+		/** Local: the call arm issued in {@code jump}'s window, or null (C6000DelaySlots.carryCallArms). */
+		CallArm callArm(Instruction jump) {
+			if (!displacementJump(jump)) return null;
+			String guard = predicate(jump);
+			if (guard == null) return null;
+			try {
+				for (Address at : C6000ExecutionPackets.issuePrefix(program, jump.getMinAddress())) {
+					Instruction prior = decode(at);
+					if (prior == null || prior.getLength() != 4 || transfer(prior)) return null;
+				}
+			}
+			catch (MemoryAccessException e) {
+				return null;
+			}
+			List<Instruction> slots = window(jump);
+			if (slots == null || slots.isEmpty()) return null;
+			List<Instruction> execution = new ArrayList<>(lookBack(jump));
+			int at = execution.size();
+			execution.add(jump);
+			execution.addAll(slots);
+			int[] issue = issueCycles(execution);
+			int found = -1;
+			for (int i = at + 1; i < execution.size(); i++) {
+				Instruction slot = execution.get(i);
+				if (slot.getLength() != 4 || !untimed(slot)) return null;
+				if (!transfer(slot)) continue;
+				// One transfer, a later packet, the opposite sense of the jump's unchanged predicate.
+				if (found >= 0 || issue[i] == issue[at] || !complementary(jump, slot) ||
+					!stable(execution, i, at, guard, true)) return null;
+				found = i;
+			}
+			if (found < 0) return null;
+			Instruction call = execution.get(found);
+			String op = baseName(call);
+			if (!(op.equals("B.S1") || op.equals("B.S2")) || call.getRegister(0) != null ||
+				call.getDefaultFlows().length != 1) return null;
+			List<Instruction> tail = window(call);
+			if (tail == null || tail.isEmpty()) return null;
+			for (Instruction slot : tail) {
+				if (slot.getLength() != 4 || !untimed(slot) || transfer(slot)) return null;
+			}
+			Instruction last = tail.get(tail.size() - 1);
+			// The call's last slot runs only when the jump is not taken: past the jump's window.
+			if (last.getMaxAddress().compareTo(slots.get(slots.size() - 1).getMaxAddress()) <= 0) return null;
+			Address target = jump.getDefaultFlows()[0], landing = last.getMaxAddress().next();
+			if (target.compareTo(jump.getMinAddress()) >= 0 && target.compareTo(last.getMaxAddress()) <= 0) return null;
+			Call link = recognize(call, new Preemption(jump, call, 0, last.getMaxAddress(), landing, true, true));
+			if (link == null || !landing.equals(link.returnTo())) return null;
+			return new CallArm(jump, call, call.getDefaultFlows()[0], slots.get(slots.size() - 1).getMaxAddress(),
+				last.getAddress(), landing);
 		}
 
 		/** Neither an unbounded wait nor loop-buffer control. */

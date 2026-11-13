@@ -204,7 +204,9 @@ before the predicate query (SPRUFE8B 3.5, 3.6, 3.10.2.2, Tables 4-6/4-10/4-11).
 Target recovery walks preceding straight-line code, follows MV and ADD/OR of zero, and
 skips writes predicated opposite to the branch. Calls are revisited when preceding code
 becomes available. The analyzer also handles complementary if/else call pairs: only the
-call arm becomes a call when the other arm jumps to a local block. Terminal calls and
+call arm becomes a call when the other arm jumps to a local block. When that call is
+issued in the jump's window and its own window ends later, the call is made inert, the
+jump lifts its whole window, and the call's last slot carries the call (local). Terminal calls and
 callees marked no-return retain their existing treatment.
 
 The processor spec disables Ghidra's heuristic **Non-Returning Functions – Discovered**

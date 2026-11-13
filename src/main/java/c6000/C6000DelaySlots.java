@@ -61,6 +61,8 @@ public final class C6000DelaySlots {
         if (preempted > 0) log.appendMsg("C6000 Delay Slots", "continued " + preempted + " preempted jump(s)");
         int carried = carryTails(program, monitor);
         if (carried > 0) log.appendMsg("C6000 Delay Slots", "carried " + carried + " shared call tail(s)");
+        int arms = carryCallArms(program, monitor);
+        if (arms > 0) log.appendMsg("C6000 Delay Slots", "carried " + arms + " call arm(s)");
         List<Address> candidates = new ArrayList<>(), stale = new ArrayList<>(), uncut = new ArrayList<>();
         var it = program.getListing().getInstructions(true);
         while (it.hasNext()) {
@@ -575,6 +577,57 @@ public final class C6000DelaySlots {
         return count;
     }
 
+    /**
+     * Local: a predicated jump with a call issued in its window under the
+     * opposite predicate of the same unchanged register (C6000CallAnalyzer.CallArm)
+     * transfers exactly one way (SPRUFE8B 3.5, 4.2.6 B). The call's window
+     * outlasts the jump's, so no native window lifts both: the call stops
+     * transferring (c_inert), the jump takes its whole window, and the call's
+     * last slot, reached only on the jump's fall-through, carries the call
+     * (c_carry, target by reference). No other flow may enter either window.
+     */
+    private static int carryCallArms(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        var functions = program.getFunctionManager();
+        var walker = new C6000CallAnalyzer.Walker(program);
+        var reader = new Reader(program);
+        List<C6000CallAnalyzer.CallArm> arms = new ArrayList<>();
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            var jump = it.next();
+            monitor.checkCancelled();
+            if (!C6000CallAnalyzer.Walker.displacementJump(jump) || continues(program, jump) ||
+                jump.getPrototype().getDelaySlotByteCount() > parallelBytes(program, jump.getAddress())) continue;
+            var arm = walker.callArm(jump);
+            if (arm != null) arms.add(arm);
+        }
+        int count = 0;
+        for (var arm : arms) {
+            monitor.checkCancelled();
+            Instruction jump = listing.getInstructionAt(arm.jump().getAddress());
+            Instruction call = listing.getInstructionAt(arm.call().getAddress());
+            Instruction last = listing.getInstructionAt(arm.last());
+            if (jump == null || call == null || last == null || jump.isInDelaySlot() || call.isInDelaySlot() ||
+                flag(program, call.getAddress(), "c_inert") || flag(program, arm.last(), "c_carry")) continue;
+            Function owner = functions.getFunctionContaining(jump.getAddress());
+            if (!java.util.Objects.equals(owner, functions.getFunctionContaining(call.getAddress())) ||
+                !java.util.Objects.equals(owner, functions.getFunctionContaining(arm.last())) ||
+                entered(program, jump.getAddress(), last.getMaxAddress())) continue;
+            // The jump's native window must hold the call, once inert, and end where the walker's does.
+            Window w = reader.window(jump, monitor, call.getAddress());
+            if (w == null || !w.end().equals(arm.jumpEnd())) continue;
+            Address end = call.getMaxAddress().add(call.getPrototype().getDelaySlotByteCount());
+            redecode(program, call.getAddress(), end, "c_inert", monitor);
+            Instruction carrier = listing.getInstructionAt(arm.last());
+            if (carrier == null) throw new IllegalStateException("call arm lost its last slot at " + arm.last());
+            redecode(program, arm.last(), carrier.getMaxAddress(), "c_carry", monitor);
+            var r = program.getReferenceManager().addMemoryReference(arm.last(), arm.callee(),
+                RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
+            program.getReferenceManager().setPrimary(r, true);
+            count++;
+        }
+        return count;
+    }
+
     /** The unconditional call whose window ends at the tail's last instruction, to the same callee and link, or null. */
     private static Instruction tailOwner(Program program, Reader reader, C6000CallAnalyzer.Walker walker,
             C6000CallAnalyzer.SharedTail tail, TaskMonitor monitor) throws CancelledException {
@@ -857,17 +910,20 @@ public final class C6000DelaySlots {
         }
         Instruction next(Instruction i){var next=decode(i.getMaxAddress().next());
             while(next!=null&&C6000CallAnalyzer.baseName(next).equals("CPKT"))next=decode(next.getMaxAddress().next());return next;}
-        Window window(Instruction issue,TaskMonitor monitor)throws CancelledException {
+        Window window(Instruction issue,TaskMonitor monitor)throws CancelledException{return window(issue,monitor,(Address)null);}
+        /** tolerate: a branch in the window that carryCallArms is about to make inert. */
+        Window window(Instruction issue,TaskMonitor monitor,Address tolerate)throws CancelledException {
             C6000CallAnalyzer.Preemption preemption=null;
             if(preemptingTransfer(issue)){
                 if(cuts!=null)preemption=cuts.get(issue.getAddress());
                 else{preemption=new C6000CallAnalyzer.Walker(program).preempting(issue);
                     if(preemption!=null&&!(preemption.exact()&&continues(program,preemption.jump())))preemption=null;}
             }
-            return window(issue,monitor,preemption);
+            return window(issue,monitor,preemption,tolerate);
         }
+        Window window(Instruction issue,TaskMonitor monitor,C6000CallAnalyzer.Preemption preemption)throws CancelledException{return window(issue,monitor,preemption,null);}
         /** The window of issue, cut where preemption's jump lands when it is non-null. */
-        Window window(Instruction issue,TaskMonitor monitor,C6000CallAnalyzer.Preemption preemption)throws CancelledException {
+        Window window(Instruction issue,TaskMonitor monitor,C6000CallAnalyzer.Preemption preemption,Address tolerate)throws CancelledException {
             int remaining=5;
             String name=C6000CallAnalyzer.baseName(issue);
             if(name.startsWith("CALLP"))remaining=0;
@@ -910,7 +966,7 @@ public final class C6000DelaySlots {
                     while(!issuePacket||C6000ExecutionPackets.parallelWithNext(program,current)) {
                         monitor.checkCancelled();if(++packetInstructions>8)return null;var next=next(current);if(next==null||++count>MAX_INSTRUCTIONS)return null;
                         if(next.getAddress().subtract(issue.getMaxAddress())>MAX_BYTES)return null;
-                        if(next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal())return null;
+                        if((next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal())&&!next.getAddress().equals(tolerate))return null;
                         // A call's window over an inert branch hides the slots past it from flow (Ghidra counts slots by parsing them): refuse it, as before the branch was carried.
                         if(flag(program,next.getAddress(),"c_inert")&&(issue.getFlowType().isCall()||issue.getFlowOverride()==FlowOverride.CALL))return null;
                         var other=program.getFunctionManager().getFunctionContaining(next.getAddress());

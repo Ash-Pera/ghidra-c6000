@@ -148,11 +148,13 @@ define context contextreg
   c_pkt_write1 = (55,61) noflow
   c_pkt_commit0 = (64,70) noflow
   c_pkt_commit1 = (71,77) noflow
+  c_arm = (78,79) noflow # local: in this call-arm jump's window, a B with z=1 (1) or z=0 (2) is inert (C6000DelaySlots.carryCallArms)
 @else
   c_pkt_write0 = (32,38) noflow
   c_pkt_write1 = (39,45) noflow
   c_pkt_commit0 = (46,52) noflow
   c_pkt_commit1 = (53,59) noflow
+  c_arm = (60,61) noflow # local: in this call-arm jump's window, a B with z=1 (1) or z=0 (2) is inert (C6000DelaySlots.carryCallArms)
 @endif
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"

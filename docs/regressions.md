@@ -824,7 +824,11 @@ The call's window outlasts the jump's by one cycle, so no native window lifts bo
 the jump's window was cut at the call and its later slots were lost on the jump's path.
 The call is now inert (`c_inert`), the jump lifts its whole window over it, and the
 call's last slot, reached only on the jump's fall-through, carries the call (`c_carry`,
-target by reference). `armcall` must decompile to both arms (8 from the jump's slots, or
+target by reference). Ghidra counts the jump's slots by parsing them in the jump's
+context, where the call is not inert: that parse stopped at the call (nested delay slot),
+so a body recomputed from flow dropped the slots. The jump's `c_arm` field makes the
+opposite-sense `B` parse inert there too; the slot depth must be 5 and the slots must stay
+in the body. `armcall` must decompile to both arms (8 from the jump's slots, or
 `callee(0)`); `armsame` (the call under the jump's own predicate), `armwrite` (the jump's
 packet rewrites A1 before the call reads it) and `armentry` (another jump enters the
 call's last slot) must keep the call's own window.

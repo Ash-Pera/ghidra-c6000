@@ -623,6 +623,10 @@ public final class C6000DelaySlots {
             var r = program.getReferenceManager().addMemoryReference(arm.last(), arm.callee(),
                 RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
             program.getReferenceManager().setPrimary(r, true);
+            // Ghidra counts the jump's slots by parsing them in the jump's context: there the call must parse inert too.
+            jump = listing.getInstructionAt(arm.jump().getAddress());
+            redecode(program, jump.getAddress(), jump.getMaxAddress().add(jump.getPrototype().getDelaySlotByteCount()), "c_arm",
+                jump.getMnemonicString().startsWith("[!") ? 2 : 1, monitor);
             count++;
         }
         return count;
@@ -670,10 +674,15 @@ public final class C6000DelaySlots {
 
     /** Re-decode [at, end] with the context field set at at; a branch made inert keeps no flow references. */
     private static void redecode(Program p, Address at, Address end, String field, TaskMonitor monitor) throws Exception {
+        redecode(p, at, end, field, 1, monitor);
+    }
+
+    /** Re-decode [at, end] with the context field set to value at at. */
+    private static void redecode(Program p, Address at, Address end, String field, long value, TaskMonitor monitor) throws Exception {
         List<SavedInstruction> saved = snapshot(p, at, end);
         p.getListing().clearCodeUnits(at, end, false);
         p.getProgramContext().setValue(p.getRegister("c_flow_delay"), at, at, BigInteger.ZERO);
-        p.getProgramContext().setValue(p.getRegister(field), at, at, BigInteger.ONE);
+        p.getProgramContext().setValue(p.getRegister(field), at, at, BigInteger.valueOf(value));
         Disassembler disassembler = Disassembler.getDisassembler(p, monitor, null);
         for (Address cursor = at; cursor.compareTo(end) <= 0;) {
             if (p.getListing().getInstructionContaining(cursor) == null)

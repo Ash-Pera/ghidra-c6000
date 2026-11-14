@@ -84,8 +84,9 @@ public final class C6000DelaySlots {
             // Predicated register B: a call, a cut return, or no override (analysis-dev3; gate 0x200).
             if (full.startsWith("[") && !displacement && override != FlowOverride.CALL &&
                     override != FlowOverride.NONE && !cuts.containsKey(ins.getAddress())) {
-                // Only a cut gives a predicated return a window: without one this pass, it is stale.
-                if (preemptingTransfer(ins) && ins.getPrototype().getDelaySlotByteCount() > parallelBytes(program, ins.getAddress()))
+                // A cut window no cut supports this pass is stale; a full one was laid without an override (local).
+                if (preemptingTransfer(ins) && ins.getPrototype().getDelaySlotByteCount() > parallelBytes(program, ins.getAddress()) &&
+                        !fullWindow(program, ins, monitor))
                     stale.add(ins.getAddress());
                 continue;
             }
@@ -112,6 +113,12 @@ public final class C6000DelaySlots {
         }
         if (!result.isEmpty()) Msg.info(C6000DelaySlots.class, "C6000 Delay Slots> recovered " + result.size() + " proven window(s)");
         return result;
+    }
+
+    /** Whether the branch's laid window is its whole proven window, not a cut one. */
+    private static boolean fullWindow(Program program, Instruction branch, TaskMonitor monitor) throws CancelledException {
+        Window window = new Reader(program, Map.of()).window(branch, monitor, (C6000CallAnalyzer.Preemption) null);
+        return window != null && window.end().equals(branch.getMaxAddress().add(branch.getPrototype().getDelaySlotByteCount()));
     }
 
     /** Lay the branch's proven window, cut where preemption's jump lands if non-null; true once it is laid. */

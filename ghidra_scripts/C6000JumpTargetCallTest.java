@@ -42,7 +42,7 @@ public class C6000JumpTargetCallTest extends GhidraScript {
 		has(0x1100L, "\\bh\\)?\\(", "\\bg\\(", "\\+ 0x10\\b");
 		has(0x1180L, "\\bh\\(", "\\+ 7\\b", "\\+ 2\\b");
 		// Known-bads: the call keeps its transfer, the target's last NOP does not call.
-		for (long[] k : new long[][] { { 0x1200L, 0x1218L }, { 0x125cL, 0x1274L }, { 0x12bcL, 0x12c4L }, { 0x12fcL, 0x1314L }, { 0x135cL, 0x1374L } }) {
+		for (long[] k : new long[][] { { 0x1200L, 0x1218L }, { 0x125cL, 0x1274L }, { 0x12bcL, 0x12c4L }, { 0x12fcL, 0x1318L }, { 0x135cL, 0x1374L } }) {
 			Instruction b = getInstructionAt(toAddr(k[0])), last = getInstructionAt(toAddr(k[1]));
 			if (b != null && !(b.getFlowType().isCall() || b.getFlowType().isJump()) || last != null && last.getFlowType().isCall())
 				throw new AssertionError("known-bad at " + toAddr(k[0]) + ": " + b + " / " + last);

@@ -284,6 +284,11 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			return recognize(branch, null);
 		}
 
+		/** Whether {@code branch} is a call whose link is its window's end, or its loop/preempted return (C6000DelaySlots.pairCalls). */
+		boolean recognized(Instruction branch) {
+			return recognize(branch) != null;
+		}
+
 		/** {@code forced}: the call is the transfer of this exclusive preemption, predicated or not. */
 		private Call recognize(Instruction branch, Preemption forced) {
 			Map<Register, long[]> regs = new HashMap<>();

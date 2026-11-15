@@ -143,11 +143,9 @@ public final class C6000AssumedSchedules {
     }
 
     private static int nopCycles(Instruction instruction) {
-        if (!instruction.getMnemonicString().equals("NOP")) return 1;
-        Object[] operands = instruction.getOpObjects(0);
-        if (operands.length == 1 && operands[0] instanceof ghidra.program.model.scalar.Scalar s) {
-            return (int) s.getUnsignedValue();
-        }
-        return 1;
+        if (!C6000CallAnalyzer.baseName(instruction).trim().equals("NOP")) return 1;
+        // NOP n's count is its scalar operand, as C6000ExecutionPackets.startsMulticycleNop reads it.
+        var count = instruction.getScalar(0);
+        return count != null && count.getUnsignedValue() > 1 ? (int) count.getUnsignedValue() : 1;
     }
 }

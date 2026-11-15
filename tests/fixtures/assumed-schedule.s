@@ -1,7 +1,7 @@
 ; Own code (assumed-schedule.py): int pipe(const int *s, int n), n >= 5, sums n words; a one-packet loop that
 ; issues a branch to itself every cycle with loads in flight across the back edge.
         .text
-        .global pipe, entered, branchy, plain, proved, ldread
+        .global pipe, entered, branchy, plain, proved, ldread, tail, follows
 pipe:   MV      .L1     A4,A5
 ||      ZERO    .S1     A4
 ||      SUB     .L2     B4,5,B0
@@ -54,5 +54,12 @@ proved: MVK     .S1     5,A4
 ldread: LDW     .D1T1   *A4,A3
         NOP     2
         ADD     .L1     A3,A3,A4
+        B       .S2     B3
+        NOP     5
+; follows: issued six cycles after tail's return, whose window a NOP 5 fills; not in it.
+        .align  32
+tail:   B       .S2     B3
+        NOP     5
+follows: MVK    .S1     4,A4
         B       .S2     B3
         NOP     5

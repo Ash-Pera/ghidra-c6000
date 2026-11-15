@@ -1005,3 +1005,17 @@ return point in the caller, and their C must call `f`. `late` (`BNOP f,5`, then 
 that never runs), `elsewhere` (B3 set in the window to another address) and `tail` (B3
 untouched) must not be calls. Counting five delay cycles after a `BNOP`'s NOPs makes `late`
 a call; admitting only `BNOP.S1` leaves `register` a jump. Both endians.
+
+## Assumed-drained schedules and inexact-native warnings
+
+`assumed-schedule.py IMAGE [be]` with `C6000AssumedScheduleTest.java` (and its `prepare`
+pre-script) checks `cl6x` 8.3.15 words of `assumed-schedule.s`. `pipe` (1000) sums `n`
+words in a one-packet loop that issues `[B0] B loop` every cycle with loads in flight
+across the back edge (SPRUFE8B 3.5, 4.2.6). With the `C6000 Assumed-Drained Schedules`
+analyzer off (its default), `pipe` and `ldread` (10e0, a load result read three cycles
+early) carry an `C6000 Inexact Native Pipeline` warning; the straight-line functions do
+not. Enabled, the analyzer schedules `pipe`, bookmarks it, and the schedule's p-code
+returns the sum for `n` of 5, 6, 9 and 16; the warning then clears. It must refuse
+`entered` (1088, issued in `plain`'s return window) and `branchy` (10a0, a branch in its
+entry packet), leave `proved` (10c0) on the review the test records first, and keep an
+unchanged schedule on a second run. Known-bads are in `mutants.sh` (local).

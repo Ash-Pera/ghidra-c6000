@@ -40,6 +40,7 @@ CORE = [
     case("reserved-predicate", "ReservedPredicate", "C6000_RESERVED_PREDICATE_OK"),
     case("return-delay", "ReturnDelay", "C6000_RETURN_DELAY_OK"),
     case("preempted-jump", "PreemptedJump", "C6000_PREEMPTED_JUMP_OK", None, analysis=True),
+    case("preempted-link-copy", "PreemptedLinkCopy", "C6000_PREEMPTED_LINK_COPY_OK", None, analysis=True),
     case("parallel-read", "ParallelRead", "C6000_PARALLEL_READ_OK", "json"),
     case("packet-call", "PacketCall", "C6000_PACKET_CALL_OK"),
     # The refusal script constructs its own memory blocks outside this small image.
@@ -343,6 +344,8 @@ def main():
                     command += ["-preScript", "C6000SharedTailPacketTest.java", "prepare"]
                 elif fixture == "call-arm":
                     command += ["-preScript", "C6000CallArmTest.java", "prepare"]
+                elif fixture == "preempted-link-copy":
+                    command += ["-preScript", "C6000PreemptedLinkCopyTest.java", "prepare"]
                 elif fixture == "shared-tail-arm":
                     command += ["-preScript", "C6000SharedTailArmTest.java", "prepare"]
                 elif fixture not in ELF:

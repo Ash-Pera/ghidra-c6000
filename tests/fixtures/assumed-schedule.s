@@ -1,7 +1,7 @@
 ; Own code (assumed-schedule.py): int pipe(const int *s, int n), n >= 5, sums n words; a one-packet loop that
 ; issues a branch to itself every cycle with loads in flight across the back edge.
         .text
-        .global pipe, entered, branchy, plain, proved
+        .global pipe, entered, branchy, plain, proved, ldread
 pipe:   MV      .L1     A4,A5
 ||      ZERO    .S1     A4
 ||      SUB     .L2     B4,5,B0
@@ -47,5 +47,12 @@ branchy: B      .S2     B3
 ; proved returns 5; the test records a review with its own evidence for it.
         .align  32
 proved: MVK     .S1     5,A4
+        B       .S2     B3
+        NOP     5
+; ldread: a load result read three cycles later, in straight-line code (SPRUFE8B 3.5): inexact natively.
+        .align  32
+ldread: LDW     .D1T1   *A4,A3
+        NOP     2
+        ADD     .L1     A3,A3,A4
         B       .S2     B3
         NOP     5

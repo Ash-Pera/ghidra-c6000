@@ -103,9 +103,23 @@ def main():
             mv(4, 4, side=2, cross=True),
         ], endian)
 
+    # A control-transfer member that is not last in its packet, beside a
+    # read-after-write between two data members. The reader must still see the
+    # old value; the branch neither reads nor writes the staged register.
+    branch_mid = 0x1600
+    put(image, base, branch_mid, [
+        branch(8, side=1) | 1,
+        add_rr(4, 5, 6, p=1),
+        add_imm5(8, 6, 7),
+        0, 0, 0, 0,
+    ], endian)
+
     runs = [
         dict(name="swap", sequence=[swap, swap + 4, swap + 8, swap + 12],
              input={"A4": 3, "B4": 9}, expected={"A4": 15, "B4": 3}),
+        dict(name="branch_not_last", sequence=[branch_mid + 4, branch_mid + 8],
+             input={"A4": 3, "A5": 4, "A6": 100},
+             expected={"A6": 7, "A7": 108}),
         dict(name="predicate_true", sequence=[predicated, predicated + 4,
              predicated + 8], input={"A4": 5, "B0": 1},
              expected={"A4": 0x1234, "B5": 5}),

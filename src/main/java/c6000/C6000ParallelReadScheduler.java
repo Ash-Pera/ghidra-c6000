@@ -139,7 +139,9 @@ final class C6000ParallelReadScheduler {
             if (members.get(i).predicate() < 0 && writerCount != 0) {
                 return zeroPlan(addresses, true);
             }
-            if (members.get(i).control() && i != members.size() - 1) {
+            // A non-terminal control member cannot host a shadow (its transfer would skip the
+            // restore), but staging the other members is safe when it writes no deferred register.
+            if (members.get(i).control() && i != members.size() - 1 && writerCount != 0) {
                 return zeroPlan(addresses, true);
             }
         }

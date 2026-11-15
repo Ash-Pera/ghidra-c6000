@@ -20,8 +20,8 @@ import java.util.List;
 import java.util.Set;
 
 public class C6000AssumedScheduleTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x1000L, 0x1080L, 0x1088L, 0x10a0L, 0x10c0L, 0x10e0L };
-	private static final String[] NAMES = { "pipe", "plain", "entered", "branchy", "proved", "ldread" };
+	private static final long[] ENTRIES = { 0x1000L, 0x1080L, 0x1088L, 0x10a0L, 0x10c0L, 0x10e0L, 0x1100L, 0x1108L };
+	private static final String[] NAMES = { "pipe", "plain", "entered", "branchy", "proved", "ldread", "tail", "follows" };
 	private int checks;
 
 	private void check(boolean ok, String message) {
@@ -119,6 +119,8 @@ public class C6000AssumedScheduleTest extends GhidraScript {
 			!bookmarked(0x10c0L) && !active(0x10c0L), "proved's own review replaced or activated");
 		check(!active(0x1088L) && !bookmarked(0x1088L) && !C6000PipelineContracts.isRecorded(currentProgram, entered) &&
 			log.toString().contains("delay window"), "entered in a return window scheduled: " + log);
+		// A multicycle NOP fills tail's return window: follows issues after it and is scheduled.
+		check(active(0x1108L) && bookmarked(0x1108L), "follows refused after a NOP-filled window: " + log);
 		check(!active(0x10a0L) && !C6000PipelineContracts.isRecorded(currentProgram, branchy) &&
 			log.toString().contains("entry packet"), "branch in the entry packet scheduled: " + log);
 		// The schedule sums n words with every branch and load in flight.

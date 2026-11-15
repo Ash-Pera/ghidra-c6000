@@ -15,6 +15,8 @@ linked at 0x1000), listed by dis6x:
   10a0 branchy  known-bad: B B3 || MVK 3,A4 ; NOP 5: a branch in the entry packet
   10c0 proved   MVK 5,A4 ; B B3 ; NOP 5: the test records its own review first
   10e0 ldread   LDW *A4,A3 ; NOP 2 ; ADD A3,A3,A4 ; B B3 ; NOP 5: reads the load 3 cycles early
+  1100 tail     B B3 ; NOP 5, then follows (1108) MVK 4,A4 ; B B3 ; NOP 5: follows issues six
+                cycles after tail's return, past its window, so it is scheduled
 """
 
 from pathlib import Path
@@ -30,6 +32,7 @@ WORDS = [
     0x000C0363, 0x020001A8, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x020002A8, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x01900264, 0x00002000, 0x020C6078, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000,
+    0x000C0362, 0x00008000, 0x02000228, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000,
 ]
 
 

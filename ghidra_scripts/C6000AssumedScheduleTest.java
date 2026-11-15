@@ -105,8 +105,8 @@ public class C6000AssumedScheduleTest extends GhidraScript {
 		var proof = C6000PipelineContracts.review(currentProgram, proved, "test caller proof", Set.of(),
 			List.of(new C6000PipelineContracts.SourceWindow(0x10c0L, 32,
 				C6000PipelineContracts.sha256(getBytes(toAddr(0x10c0L), 32)))), monitor);
+		// Recorded, not activated: activating another owner's review is not this analyzer's job.
 		C6000PipelineContracts.record(currentProgram, proved, proof, monitor);
-		C6000PipelineContracts.activate(currentProgram, proved, monitor);
 		// The analyzer, as an explicit opt-in.
 		var log = new MessageLog();
 		new C6000AssumedScheduleAnalyzer().added(currentProgram, currentProgram.getMemory(), monitor, log);
@@ -116,7 +116,7 @@ public class C6000AssumedScheduleTest extends GhidraScript {
 		// With a schedule active, the default-path warning no longer applies.
 		check(hazard(pipe) == null, "pipe still warned after its schedule activated");
 		check(C6000PipelineContracts.recordedReview(currentProgram, proved).evidence().equals("test caller proof") &&
-			!bookmarked(0x10c0L), "proved's own review replaced");
+			!bookmarked(0x10c0L) && !active(0x10c0L), "proved's own review replaced or activated");
 		check(!active(0x1088L) && !bookmarked(0x1088L) && !C6000PipelineContracts.isRecorded(currentProgram, entered) &&
 			log.toString().contains("delay window"), "entered in a return window scheduled: " + log);
 		check(!active(0x10a0L) && !C6000PipelineContracts.isRecorded(currentProgram, branchy) &&

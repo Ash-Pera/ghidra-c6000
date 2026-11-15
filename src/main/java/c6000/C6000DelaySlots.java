@@ -35,7 +35,8 @@ public final class C6000DelaySlots {
     private record SavedRef(Reference reference, boolean primary, long symbolId) { }
     private record SavedInstruction(Address at, FlowOverride override, String[] comments,
             List<SavedRef> references, boolean fallThroughOverridden, Address fallThrough) { }
-    private record Window(Instruction branch, Address end, Function owner) { }
+    /** arm: the c_arm value the issue needs so its window's inert branches parse inert there too (0: none). */
+    private record Window(Instruction branch, Address end, Function owner, int arm) { }
 
     /** B/BNOP or CALLP; nested transfers and ownership conflicts are refused. */
     public static List<Repair> recover(Program program, TaskMonitor monitor, MessageLog log)
@@ -142,7 +143,7 @@ public final class C6000DelaySlots {
         BigInteger old = program.getProgramContext().getValue(
             program.getRegister("c_flow_delay"), at, false);
         boolean nativeReady = old != null && old.intValue() == bytes &&
-            branch.getPrototype().getDelaySlotByteCount() == bytes;
+            branch.getPrototype().getDelaySlotByteCount() == bytes && (window.arm() == 0 || flagValue(program, at, "c_arm") == window.arm());
         if (nativeReady) {
             var last = program.getListing().getInstructionContaining(window.end());
             nativeReady = last != null && last.isInDelaySlot();
@@ -649,6 +650,12 @@ public final class C6000DelaySlots {
         return end;
     }
 
+    /** The context field's value at at, 0 when unset. */
+    private static int flagValue(Program program, Address at, String field) {
+        BigInteger v = program.getProgramContext().getValue(program.getRegister(field), at, false);
+        return v == null ? 0 : v.intValue();
+    }
+
     /** Whether the context field (c_inert, c_carry) is set at at. */
     static boolean flag(Program program, Address at, String field) {
         BigInteger v = program.getProgramContext().getValue(program.getRegister(field), at, false);
@@ -876,6 +883,7 @@ public final class C6000DelaySlots {
         if (context == null) context = new RegisterValue(base);
         context = context.combineValues(new RegisterValue(p.getRegister("c_flow_delay"),
             BigInteger.valueOf(bytes)));
+        if (window.arm() != 0) context = context.combineValues(new RegisterValue(p.getRegister("c_arm"), BigInteger.valueOf(window.arm())));
         if (issue.getRegister(0) != null && !issue.getMnemonicString().startsWith("CALLP")) {
             context = context.combineValues(new RegisterValue(p.getRegister("c_branch_terminal"),
                 BigInteger.ONE));
@@ -917,6 +925,7 @@ public final class C6000DelaySlots {
         listing.clearCodeUnits(at,end,false);
         try {
             p.getProgramContext().setValue(p.getRegister("c_flow_delay"),at,at,BigInteger.valueOf(bytes));
+            if(window.arm()!=0)p.getProgramContext().setValue(p.getRegister("c_arm"),at,at,BigInteger.valueOf(window.arm()));
             if(registerBranch)
                 p.getProgramContext().setValue(p.getRegister("c_branch_terminal"),at,at,BigInteger.ONE);
             // Never polled: a cancel here would leave the window half decoded.
@@ -1072,7 +1081,7 @@ public final class C6000DelaySlots {
             Address cut=null;
             if(preemption!=null){remaining=5-preemption.cycle();cut=preemption.windowEnd();}
             var owner=program.getFunctionManager().getFunctionContaining(issue.getAddress());
-            Instruction current=issue;int count=0;
+            Instruction current=issue;int count=0,arm=0;
             try {
                 boolean issuePacket=true;
                 do {
@@ -1107,8 +1116,9 @@ public final class C6000DelaySlots {
                         monitor.checkCancelled();if(++packetInstructions>8)return null;var next=next(current);if(next==null||++count>MAX_INSTRUCTIONS)return null;
                         if(next.getAddress().subtract(issue.getMaxAddress())>MAX_BYTES)return null;
                         if(!next.getAddress().equals(ignore)&&!next.getAddress().equals(tolerate)&&(next.getFlowType().isJump()||next.getFlowType().isCall()||next.getFlowType().isTerminal()))return null;
-                        // A call's window over an inert branch hides the slots past it from flow (Ghidra counts slots by parsing them): refuse it, as before the branch was carried.
-                        if(flag(program,next.getAddress(),"c_inert")&&(issue.getFlowType().isCall()||issue.getFlowOverride()==FlowOverride.CALL))return null;
+                        // A call's window over an inert branch hides the slots past it from flow (Ghidra counts slots by parsing them) unless c_arm makes it parse inert there too.
+                        if(flag(program,next.getAddress(),"c_inert")&&(issue.getFlowType().isCall()||issue.getFlowOverride()==FlowOverride.CALL)){
+                            int sense=armSense(issue,next);if(sense==0||arm!=0&&arm!=sense)return null;arm=sense;}
                         var other=program.getFunctionManager().getFunctionContaining(next.getAddress());
                         if(other!=null&&!other.equals(owner))return null;
                         if(program.getFunctionManager().getFunctionAt(next.getAddress())!=null)return null;
@@ -1124,12 +1134,26 @@ public final class C6000DelaySlots {
                     issuePacket=false;
                 }while(remaining>0);
                 if(cut!=null&&!cut.equals(current.getMaxAddress()))return null;
-                return new Window(issue,current.getMaxAddress(),owner);
+                return new Window(issue,current.getMaxAddress(),owner,arm);
             }catch(MemoryAccessException e){return null;}
         }
         int packetCycles(Instruction i)throws MemoryAccessException {
             Integer cycles=C6000ExecutionPackets.cycles(program,i);
             return cycles==null?-1:cycles;}
+        /** c_arm value parsing inert, in issue's context, the conditional displacement B inert, or 0 when none can (C6000_decode c_arm). */
+        private static int armSense(Instruction issue,Instruction inert){
+            String name=C6000CallAnalyzer.baseName(inert),own=inert.getMnemonicString();
+            if(!(name.equals("B.S1")||name.equals("B.S2"))||inert.getLength()!=4||inert.getRegister(0)!=null||!own.startsWith("["))return 0;
+            int sense=own.startsWith("[!")?1:2;
+            String in=C6000CallAnalyzer.baseName(issue),mine=issue.getMnemonicString();
+            // A conditional displacement issue of that sense would parse inert itself.
+            if((in.equals("B.S1")||in.equals("B.S2"))&&issue.getRegister(0)==null&&mine.startsWith("[")&&(mine.startsWith("[!")?1:2)==sense)return 0;
+            var p=issue.getProgram();
+            BigInteger set=p.getProgramContext().getValue(p.getRegister("c_arm"),issue.getAddress(),false);
+            if(set!=null&&set.signum()!=0&&set.intValue()!=sense)return 0;
+            return sense;
+        }
+
         /** pairJumps: the one other branch in y's packet, on y's complementary predicate, when y is a displacement B. */
         Instruction complement(Instruction y) {
             String name = C6000CallAnalyzer.baseName(y);

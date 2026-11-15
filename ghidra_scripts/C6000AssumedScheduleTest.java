@@ -20,8 +20,8 @@ import java.util.List;
 import java.util.Set;
 
 public class C6000AssumedScheduleTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x1000L, 0x1080L, 0x1088L, 0x10a0L, 0x10c0L };
-	private static final String[] NAMES = { "pipe", "plain", "entered", "branchy", "proved" };
+	private static final long[] ENTRIES = { 0x1000L, 0x1080L, 0x1088L, 0x10a0L, 0x10c0L, 0x10e0L };
+	private static final String[] NAMES = { "pipe", "plain", "entered", "branchy", "proved", "ldread" };
 	private int checks;
 
 	private void check(boolean ok, String message) {
@@ -37,6 +37,10 @@ public class C6000AssumedScheduleTest extends GhidraScript {
 	private boolean bookmarked(long entry) {
 		return currentProgram.getBookmarkManager().getBookmark(toAddr(entry), BookmarkType.WARNING,
 			C6000AssumedSchedules.BOOKMARK) != null;
+	}
+
+	private c6000.C6000NativeHazardWarning.Finding hazard(Function function) throws Exception {
+		return c6000.C6000NativeHazardWarning.scan(currentProgram, function);
 	}
 
 	private long sum(Function function, int n) throws Exception {
@@ -83,11 +87,20 @@ public class C6000AssumedScheduleTest extends GhidraScript {
 		Function entered = getFunctionAt(toAddr(0x1088L));
 		Function branchy = getFunctionAt(toAddr(0x10a0L));
 		Function proved = getFunctionAt(toAddr(0x10c0L));
-		check(pipe != null && plain != null && entered != null && branchy != null && proved != null, "fixture functions missing");
+		Function ldread = getFunctionAt(toAddr(0x10e0L));
+		check(pipe != null && plain != null && entered != null && branchy != null && proved != null &&
+			ldread != null, "fixture functions missing");
 		// Off by default: auto-analysis applied nothing.
 		check(!new C6000AssumedScheduleAnalyzer().getDefaultEnablement(currentProgram) ||
 			Boolean.getBoolean("c6000.assumeDrainedSchedules"), "analyzer enabled by default");
 		for (long entry : ENTRIES) if (entry != 0x10c0L) check(!active(entry) && !bookmarked(entry), "schedule before opt-in at " + entry);
+		// The default path warns where native lifting is inexact, and stays silent where it is exact.
+		check(hazard(pipe) != null && hazard(pipe).reason().contains("delay window"),
+			"pipe branch-in-flight not warned");
+		check(hazard(ldread) != null && hazard(ldread).reason().contains("before the load"),
+			"ldread result latency not warned");
+		check(hazard(plain) == null && hazard(entered) == null && hazard(proved) == null,
+			"a straight-line function warned");
 		// A review with its own evidence stays as recorded.
 		var proof = C6000PipelineContracts.review(currentProgram, proved, "test caller proof", Set.of(),
 			List.of(new C6000PipelineContracts.SourceWindow(0x10c0L, 32,
@@ -100,6 +113,8 @@ public class C6000AssumedScheduleTest extends GhidraScript {
 		check(active(0x1000L) && bookmarked(0x1000L), "pipe not scheduled: " + log);
 		check(C6000PipelineContracts.recordedReview(currentProgram, pipe).evidence().equals(C6000AssumedSchedules.EVIDENCE),
 			"pipe evidence");
+		// With a schedule active, the default-path warning no longer applies.
+		check(hazard(pipe) == null, "pipe still warned after its schedule activated");
 		check(C6000PipelineContracts.recordedReview(currentProgram, proved).evidence().equals("test caller proof") &&
 			!bookmarked(0x10c0L), "proved's own review replaced");
 		check(!active(0x1088L) && !bookmarked(0x1088L) && !C6000PipelineContracts.isRecorded(currentProgram, entered) &&

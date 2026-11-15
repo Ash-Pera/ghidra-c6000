@@ -805,8 +805,11 @@ def main():
                         # the next time this generator runs.
                         terminal_pat = [term for term in pat
                                         if term not in {"Cond", "creg!=7", "(creg!=0 | z=0)"}]
-                        terminal_pat += ["creg=0", "z=0", "c_branch_terminal=1", "CFlowDelay"]
                         terminal_disp = "B." + variant_ul + suffix[1:] + " " + ops[0]
+                        # Local: a register call carried into its jump's target (C6000DelaySlots.carryTargetCalls) keeps the target it read at issue.
+                        inert.append(":%s is %s { C6000_CARRY = %s; build PktInertCommit; }" % (terminal_disp, " & ".join(terminal_pat + ["creg=0", "z=0", "c_inert=1", "PktInertCommit"]), ops[0]))
+                        inert.append(":%s is %s { C6000_CARRY = %s; build PktInertCommit; }" % (disp, " & ".join(pat + ["creg!=0", "c_inert=1", "PktInertCommit"]), ops[0]))
+                        terminal_pat += ["creg=0", "z=0", "c_inert=0", "c_branch_terminal=1", "CFlowDelay"]
                         w(":%s is %s { local target:4 = %s; build CFlowDelay; goto [target]; }" %
                           (terminal_disp, " & ".join(terminal_pat), ops[0]))
                         n += 1
@@ -816,11 +819,11 @@ def main():
                         # scheduler explicitly requests terminal=1 even for
                         # predicated returns. The patterns must be disjoint.
                         pred_terminal_pat = [term for term in pat]
-                        pred_terminal_pat += ["creg!=0", "c_branch_terminal=1", "CFlowDelay"]
+                        pred_terminal_pat += ["creg!=0", "c_inert=0", "c_branch_terminal=1", "CFlowDelay"]
                         w(":%s is %s { local take:1 = Cond; local target:4 = %s; build CFlowDelay; if (take == 0) goto inst_next; goto [target]; }" %
                           (disp, " & ".join(pred_terminal_pat), ops[0]))
                         n += 1
-                        pat.append("c_branch_terminal=0")
+                        pat += ["c_inert=0", "c_branch_terminal=0"]
                     # SPRUFE8B 3.5 / 4.2.6 and CALLP execution: sample the
                     # issue predicate/target before the proven native byte window.
                     # CALLP supplies its NOP cycles and links to the next packet.

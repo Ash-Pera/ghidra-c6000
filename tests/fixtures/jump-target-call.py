@@ -21,6 +21,8 @@ the call's link is the address just past it (SPRUFE8B 3.5, 4.2.6 B):
   11e0 tcindep  the call is under [B0], independent of the jump's [!A1]
   1240 tclink   the link is one packet past the target's NOPs
   12a0 tcfall   the target's NOPs are also reached in sequence
+  12e0 tcuncond the call is unconditional, so taken on the jump's fall-through too
+  1340 tcentry  as tcdir, with 13a0 tcenter jumping into its target's NOPs
 """
 
 from pathlib import Path
@@ -50,7 +52,14 @@ WORDS = [
     0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058, 0x01BC52E6,
     0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x90000490, 0x0189642A, 0x0180006A, 0x00002000, 0x9FFFAC10,
-    0x0210E058, 0x00008000, 0x02102058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000
+    0x0210E058, 0x00008000, 0x02102058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x90000690, 0x01898C2A, 0x0180006A, 0x00002000, 0x0FFFA410,
+    0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058, 0x01BC52E6,
+    0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x90000690, 0x0189BC2A, 0x0180006A, 0x00002000, 0x9FFF9810,
+    0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058, 0x01BC52E6,
+    0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x0FFFFA90, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
 ]
 
 
@@ -58,7 +67,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x300)
+    image = bytearray(0x3c0)
     for index, word in enumerate(WORDS):
         struct.pack_into(endian + "I", image, 4 * index, word)
     Path(sys.argv[1]).write_bytes(image)

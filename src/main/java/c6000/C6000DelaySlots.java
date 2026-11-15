@@ -317,12 +317,14 @@ public final class C6000DelaySlots {
         return null;
     }
 
-    /** A return through B3. */
+    /** A return through B3, or through the entry's copy of B3 (C6000ReturnAnalyzer.entryLinkCopy). */
     static boolean preemptingTransfer(Instruction transfer) {
         var register = transfer.getRegister(0);
         var override = transfer.getFlowOverride();
-        return register != null && register.getName().equals("B3") && !transfer.getFlowType().isCall() &&
-            override != FlowOverride.CALL && override != FlowOverride.CALL_RETURN;
+        if (register == null || transfer.getFlowType().isCall() || override == FlowOverride.CALL ||
+            override == FlowOverride.CALL_RETURN) return false;
+        return register.getName().equals("B3") || override == FlowOverride.RETURN &&
+            C6000ReturnAnalyzer.entryLinkCopy(transfer.getProgram(), transfer);
     }
 
     /** Whether the jump's branch is overridden to continue (see neutralise). */

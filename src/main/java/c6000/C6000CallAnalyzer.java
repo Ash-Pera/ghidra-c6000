@@ -816,6 +816,11 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			return recognize(branch, null);
 		}
 
+		/** Whether {@code branch} is a call whose link is its window's end, or its loop/preempted return (C6000DelaySlots.pairCalls). */
+		boolean recognized(Instruction branch) {
+			return recognize(branch) != null;
+		}
+
 		/** Local: the transfer of a shared tail's preemption (sharedTail); its window ends where the jump lands. */
 		private Preemption forced;
 

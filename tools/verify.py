@@ -59,6 +59,7 @@ CORE = [
     case("in-sequence-jump", "InSequenceJump", "C6000_IN_SEQUENCE_JUMP_OK", None, analysis=True),
     case("shared-tail-packet", "SharedTailPacket", "C6000_SHARED_TAIL_PACKET_OK", None, analysis=True),
     case("call-arm", "CallArm", "C6000_CALL_ARM_OK", None, analysis=True),
+    case("shared-tail-arm", "SharedTailArm", "C6000_SHARED_TAIL_ARM_OK", None, analysis=True),
     case("merge-call-window", "MergeCallWindow", "C6000_MERGE_CALL_WINDOW_OK", None),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
     case("abi-pairs", "AbiPairs", "C6000_ABI_PAIRS_OK", None, analysis=True),
@@ -342,6 +343,8 @@ def main():
                     command += ["-preScript", "C6000SharedTailPacketTest.java", "prepare"]
                 elif fixture == "call-arm":
                     command += ["-preScript", "C6000CallArmTest.java", "prepare"]
+                elif fixture == "shared-tail-arm":
+                    command += ["-preScript", "C6000SharedTailArmTest.java", "prepare"]
                 elif fixture not in ELF:
                     command += ["-preScript", "C6000SetEntry.java", "1000"]
                 for script, script_args, _ in scripts:

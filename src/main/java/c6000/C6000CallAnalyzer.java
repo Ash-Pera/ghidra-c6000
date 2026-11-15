@@ -623,7 +623,8 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			for (int i = at + 1; i < execution.size(); i++) {
 				Instruction slot = execution.get(i);
 				if (slot.getLength() != 4 || !untimed(slot)) return null;
-				if (!transfer(slot)) continue;
+				// A branch carryTails made inert (a shared tail's call, taken only with the jump) transfers nothing.
+				if (!transfer(slot) || inert(slot)) continue;
 				// One transfer, a later packet, the opposite sense of the jump's unchanged predicate.
 				if (found >= 0 || issue[i] == issue[at] || !complementary(jump, slot) ||
 					!stable(execution, i, at, guard, true)) return null;
@@ -648,6 +649,12 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			if (link == null || !landing.equals(link.returnTo())) return null;
 			return new CallArm(jump, call, call.getDefaultFlows()[0], slots.get(slots.size() - 1).getMaxAddress(),
 				last.getAddress(), landing);
+		}
+
+		/** A listing branch decoded with c_inert. */
+		private boolean inert(Instruction insn) {
+			return insn.equals(listing.getInstructionAt(insn.getAddress())) &&
+				C6000DelaySlots.flag(program, insn.getAddress(), "c_inert");
 		}
 
 		/** Neither an unbounded wait nor loop-buffer control. */

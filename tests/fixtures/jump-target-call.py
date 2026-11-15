@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: Apache-2.0
+"""Build jumps whose target runs until a call issued in their window lands. Usage: IMAGE [be].
+
+Load at 0x1000 with auto-analysis; C6000JumpTargetCallTest.java prepare declares the
+functions, as ELF symbols would. Words are TI cl6x 8.3.15 output (-mv6740
+--no_compress, linked at 0x1000), listed by dis6x. The call is taken exactly when
+the jump is; the jump's target runs transfer-free code until the call lands, and
+the call's link is the address just past it (SPRUFE8B 3.5, 4.2.6 B):
+
+  1000 h        B B3 ; ADD A4,A4,A4 ; NOP 4
+  1020 g        B B3 ; ADD A4,3,A4 ; NOP 4
+  1040 tcdir    [!A1] B dn_nop ; MVKL/MVKH dn_ret,B3 ; NOP 2 ; [!A1] B h ; ADD 7,A4 ...
+                dn_nop: NOP 5 ; dn_ret: ADD 1,A4: c ? v + 7 : h(v) + 1
+  10a0 tcreg    as tcdir, the call [!A1] B A3 with A3 = h
+  1100 tcarm    [!A1] B an_nop, an [A1] B g call arm in its window and [!A1] B A3 in its
+                last slot: c ? g(v) + 16 : h(v) + 1
+  1180 tcbusy   [A1] B bu_tgt ; NOP 2 ; [A1] B h ; NOP 2 ; ... bu_tgt: MVKL/MVKH
+                bu_ret,B3 ; ADD 2,A4 ; bu_ret: ADD 1,A4: c ? h(v + 2) + 1 : v + 7
+  Known-bads, the call keeps its transfer:
+  11e0 tcindep  the call is under [B0], independent of the jump's [!A1]
+  1240 tclink   the link is one packet past the target's NOPs
+  12a0 tcfall   the target's NOPs are also reached in sequence
+"""
+
+from pathlib import Path
+import struct
+import sys
+
+WORDS = [
+    0x000C0362, 0x02108078, 0x00006000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x000C0362, 0x02106058, 0x00006000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x90000690, 0x01883C2A, 0x0180006A, 0x00002000, 0x9FFFF810,
+    0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058, 0x01BC52E6,
+    0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x90000710, 0x01886E2A, 0x0180006A, 0x01880028, 0x01800068,
+    0x900C1362, 0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x01880028, 0x01800068, 0x90000991, 0x9188A82A, 0x8FFFE411,
+    0x81889C2A, 0x8180006A, 0x00000000, 0x9180006A, 0x900C1362, 0x00000000, 0x02000850, 0x01BC52E6,
+    0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058, 0x01BC52E6, 0x00006000, 0x000C0362,
+    0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000610, 0x00002000, 0x8FFFD010, 0x00002000, 0x0210E058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x0188DE2A, 0x0180006A, 0x02104058, 0x02102058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD9, 0x00100FDA, 0x90000710, 0x01890E2A, 0x0180006A, 0x00002000,
+    0x2FFFC010, 0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x90000690, 0x01893E2A, 0x0180006A, 0x00002000, 0x9FFFB810,
+    0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00008000, 0x02102058, 0x01BC52E6,
+    0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x90000490, 0x0189642A, 0x0180006A, 0x00002000, 0x9FFFAC10,
+    0x0210E058, 0x00008000, 0x02102058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000
+]
+
+
+def main():
+    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
+        raise SystemExit(__doc__)
+    endian = ">" if len(sys.argv) == 3 else "<"
+    image = bytearray(0x300)
+    for index, word in enumerate(WORDS):
+        struct.pack_into(endian + "I", image, 4 * index, word)
+    Path(sys.argv[1]).write_bytes(image)
+
+
+if __name__ == "__main__":
+    main()

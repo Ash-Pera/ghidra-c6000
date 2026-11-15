@@ -260,6 +260,15 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	}
 
 	/**
+	 * Local: a jump whose target runs transfer-free code until a call issued
+	 * in its window, taken exactly when the jump is, lands; the call's link is
+	 * {@code landing}, just past {@code last} at the target. {@code callee} is
+	 * null for a register call (C6000DelaySlots.carryTargetCalls).
+	 */
+	record TargetCall(Instruction jump, Instruction call, Address callee, Address last, Address landing) {
+	}
+
+	/**
 	 * Walks the instructions around a branch, decoding bytes that the
 	 * listing does not yet hold, and tracks MVK/MVKH/ADDKPC constants.
 	 */
@@ -286,6 +295,11 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 
 		/** {@code forced}: the call is the transfer of this exclusive preemption, predicated or not. */
 		private Call recognize(Instruction branch, Preemption forced) {
+			return recognize(branch, forced, false);
+		}
+
+		/** {@code throughTarget}: the forced jump's target code runs before the call lands and may set its link (targetCall). */
+		private Call recognize(Instruction branch, Preemption forced, boolean throughTarget) {
 			Map<Register, long[]> regs = new HashMap<>();
 			Instruction partner = null;
 			List<Instruction> path = lookBack(branch);
@@ -383,6 +397,29 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			}
 			catch (MemoryAccessException e) {
 				return null;
+			}
+			// The jump lands (DELAY_CYCLES + 1 after it issued) and its target runs until the call lands.
+			if (throughTarget && preempts != null) {
+				int cycle = issue[branchIndex] + DELAY_CYCLES + 1 - preempts.cycle(), owner = execution.size();
+				Instruction at = decode(preempts.jump().getDefaultFlows()[0]);
+				try {
+					while (at != null && at.getMinAddress().compareTo(preempts.landing()) < 0) {
+						int span = 1;
+						while (true) {
+							trace.before(cycle);
+							trace.instruction(at, Boolean.TRUE, cycle, owner++);
+							span = Math.max(span, 1 + extraCycles(program, at));
+							if (!parallelWithNext(at)) break;
+							at = next(at);
+							if (at == null) return null;
+						}
+						cycle += span;
+						at = next(at);
+					}
+				}
+				catch (MemoryAccessException e) {
+					return null;
+				}
 			}
 			// Retire every pending write, including idle cycles represented by
 			// ADDKPC/NOP/BNOP. A load's E5, or a later multi-cycle result
@@ -598,6 +635,20 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				last.getAddress(), p.landing());
 		}
 
+		/** Local: the call {@code jump}'s target runs into, or null (C6000DelaySlots.carryTargetCalls). */
+		TargetCall targetCall(Instruction jump) {
+			Preemption p = preemption(jump, true);
+			if (p == null || !p.exclusive()) return null;
+			Instruction call = p.transfer();
+			if (call.getRegister(0) == null && call.getDefaultFlows().length != 1) return null;
+			Call link = recognize(call, p, true);
+			if (link == null || !p.landing().equals(link.returnTo())) return null;
+			Instruction last = decode(p.landing().subtract(4));
+			if (last == null || last.getLength() != 4 || !last.getMaxAddress().next().equals(p.landing())) return null;
+			Address callee = call.getRegister(0) == null ? call.getDefaultFlows()[0] : null;
+			return new TargetCall(jump, call, callee, last.getMinAddress(), p.landing());
+		}
+
 		/** Local: the call arm issued in {@code jump}'s window, or null (C6000DelaySlots.carryCallArms). */
 		CallArm callArm(Instruction jump) {
 			if (!displacementJump(jump)) return null;
@@ -623,7 +674,8 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			for (int i = at + 1; i < execution.size(); i++) {
 				Instruction slot = execution.get(i);
 				if (slot.getLength() != 4 || !untimed(slot)) return null;
-				if (!transfer(slot)) continue;
+				// A call carried into the jump's target (carryTargetCalls) no longer transfers here.
+				if (!transfer(slot) || C6000DelaySlots.flag(program, slot.getMinAddress(), "c_inert")) continue;
 				// One transfer, a later packet, the opposite sense of the jump's unchanged predicate.
 				if (found >= 0 || issue[i] == issue[at] || !complementary(jump, slot) ||
 					!stable(execution, i, at, guard, true)) return null;
@@ -637,7 +689,8 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			List<Instruction> tail = window(call);
 			if (tail == null || tail.isEmpty()) return null;
 			for (Instruction slot : tail) {
-				if (slot.getLength() != 4 || !untimed(slot) || transfer(slot)) return null;
+				if (slot.getLength() != 4 || !untimed(slot) ||
+					transfer(slot) && !C6000DelaySlots.flag(program, slot.getMinAddress(), "c_inert")) return null;
 			}
 			Instruction last = tail.get(tail.size() - 1);
 			// The call's last slot runs only when the jump is not taken: past the jump's window.

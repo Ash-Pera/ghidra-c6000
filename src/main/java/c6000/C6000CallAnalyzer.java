@@ -266,10 +266,10 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	/**
 	 * Local: a jump whose target runs transfer-free code until a call issued
 	 * in its window, taken exactly when the jump is, lands; the call's link is
-	 * {@code landing}, just past {@code last} at the target. {@code callee} is
-	 * null for a register call (C6000DelaySlots.carryTargetCalls).
+	 * {@code landing}, just past {@code last} at the target. The call is a
+	 * register B (C6000DelaySlots.carryTargetCalls).
 	 */
-	record TargetCall(Instruction jump, Instruction call, Address callee, Address last, Address landing) {
+	record TargetCall(Instruction jump, Instruction call, Address last, Address landing) {
 	}
 
 	/**
@@ -1302,13 +1302,13 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Preemption p = preemption(jump, true);
 			if (p == null || !p.exclusive()) return null;
 			Instruction call = p.transfer();
-			if (call.getRegister(0) == null && call.getDefaultFlows().length != 1) return null;
+			// Ghidra counts the jump's slots in the jump's context, where a same-sense displacement B parses as a branch: register calls only.
+			if (call.getRegister(0) == null) return null;
 			Call link = recognize(call, p, true);
 			if (link == null || !p.landing().equals(link.link())) return null;
 			Instruction last = decode(p.landing().subtract(4));
 			if (last == null || last.getLength() != 4 || !last.getMaxAddress().next().equals(p.landing())) return null;
-			Address callee = call.getRegister(0) == null ? call.getDefaultFlows()[0] : null;
-			return new TargetCall(jump, call, callee, last.getMinAddress(), p.landing());
+			return new TargetCall(jump, call, last.getMinAddress(), p.landing());
 		}
 
 		/** Local: the call arm issued in {@code jump}'s window, or null (C6000DelaySlots.carryCallArms). */

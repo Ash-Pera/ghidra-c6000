@@ -714,14 +714,14 @@ public final class C6000DelaySlots {
     }
 
     /**
-     * Local: a jump whose target runs transfer-free code until a call issued
-     * in its window lands, the call taken exactly when the jump is and linked
-     * just past that code (C6000CallAnalyzer.TargetCall), calls from the
-     * target's last instruction (SPRUFE8B 3.5, 4.2.6 B). The call stops
-     * transferring (c_inert; a register call keeps the target it read at
-     * issue), so the jump takes its whole window, and the instruction before
-     * the link carries the call (c_carry, target by reference). Only the jump
-     * may reach the target's code: no other flow, and not sequential issue.
+     * Local: a jump whose target runs transfer-free code until a register
+     * call issued in its window lands, the call taken exactly when the jump is
+     * and linked just past that code (C6000CallAnalyzer.TargetCall), calls
+     * from the target's last instruction (SPRUFE8B 3.5, 4.2.6 B). The call
+     * stops transferring (c_inert) but keeps the target it read at issue
+     * (C6000_CARRY), so the jump takes its whole window, and the instruction
+     * before the link carries the call (c_carry). Only the jump may reach the
+     * target's code: no other flow, and not sequential issue.
      */
     private static int carryTargetCalls(Program program, TaskMonitor monitor) throws Exception {
         var listing = program.getListing();
@@ -757,11 +757,6 @@ public final class C6000DelaySlots {
             Instruction carrier = listing.getInstructionAt(t.last());
             if (carrier == null) throw new IllegalStateException("target call lost its carrier at " + t.last());
             redecode(program, t.last(), carrier.getMaxAddress(), "c_carry", monitor);
-            if (t.callee() != null) {
-                var r = program.getReferenceManager().addMemoryReference(t.last(), t.callee(),
-                    RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
-                program.getReferenceManager().setPrimary(r, true);
-            }
             // The target's code runs only after the jump: the jump's function owns it.
             var span = new AddressSet(target, t.last().add(3));
             if (owner != null && !owner.getBody().contains(span)) {

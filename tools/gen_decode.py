@@ -856,7 +856,9 @@ def main():
                         for arm, z in (("1", "1"), ("2", "0")):
                             inert.append(":%s is %s { build PktInertCommit; }" % (disp, " & ".join(armed + ["c_inert=0", "c_arm=" + arm, "z=" + z, "PktInertCommit"])))
                             inert.append(":%s is %s { %s }" % (disp, " & ".join(armed + ["c_inert=0", "c_arm=" + arm, "z=" + str(1 - int(z)), "CFlowDelay"]), sem))
-                        pat += ["c_inert=0", "c_arm=0", "CFlowDelay"]
+                        # Local: a jump that carries a same-sense displacement call into its target has no native window: it latches its predicate and target, and its last slot jumps (c_jcarry, C6000DelaySlots.carryTargetCalls).
+                        inert.append(":%s is %s { local take:1 = Cond; C6000_JCOND = zext(take); C6000_JTGT = &BranchTarget; build PktInertCommit; }" % (disp, " & ".join(pat + ["c_inert=0", "c_arm=0", "c_jcarry=1", "PktInertCommit"])))
+                        pat += ["c_inert=0", "c_arm=0", "c_jcarry=0", "CFlowDelay"]
                     elif mnem == "CALLP":
                         pat.append("CFlowDelay")
                         link = "A3" if suffix == ".1" else "B3"

@@ -35,9 +35,18 @@ public class C6000NestedReturnArmTest extends GhidraScript {
 		boolean callReference = false;
 		for (Reference reference : carrier.getReferencesFrom()) {
 			if (reference.getReferenceType().isCall() &&
-					reference.getToAddress().equals(callee.getEntryPoint())) callReference = true;
+					reference.getToAddress().equals(callee.getEntryPoint()) && reference.isPrimary()) callReference = true;
 		}
-		if (!callReference) throw new AssertionError("carrier lost its tail-call reference");
+		if (!callReference) throw new AssertionError("carrier lost its primary tail-call reference");
+		// The carried window joined the owner's body, proving the carry happened rather than a stray reference.
+		if (!entry.getBody().contains(toAddr(0x1018L)))
+			throw new AssertionError("owner body does not reach the carried window at 0x1018");
+		// The owner branch was made inert: it keeps no flow reference of its own.
+		var owner = currentProgram.getListing().getInstructionAt(toAddr(0x1004L));
+		if (owner == null) throw new AssertionError("missing owner branch at 0x1004");
+		for (Reference reference : owner.getReferencesFrom())
+			if (reference.getReferenceType().isFlow())
+				throw new AssertionError("owner branch kept a flow reference after carrying");
 
 		var decompiler = new DecompInterface();
 		try {

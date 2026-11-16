@@ -16,11 +16,7 @@ import ghidra.program.model.listing.Program;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 
-/**
- * Opt-in: exact schedules for functions no review covers, under an assumed drained entry.
- * Native lifting assumes the same and more (every write lands at once); nothing here proves
- * that a caller enters drained (SPRUFE8B 3.5, 4.2). Each applied schedule gets a warning bookmark.
- */
+/** Opt-in exact schedules under an assumed drained entry, not a caller proof (SPRUFE8B 3.5, 4.2); each is bookmarked. */
 public final class C6000AssumedSchedules {
     public static final String EVIDENCE =
         "assumed drained entry (C6000 Assumed-Drained Schedules option): no caller proof";

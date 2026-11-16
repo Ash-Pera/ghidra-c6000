@@ -16,13 +16,7 @@ import ghidra.program.model.pcode.Varnode;
 import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 
-/**
- * Finds functions whose default per-instruction lifting is inexact because it does not
- * schedule result latency or branch windows (SPRUFE8B 3.5, 4.2.6): a load result read
- * before it lands, or two branch windows in flight at once (software-pipelined loops,
- * nested windows). Reports a straight-line cycle timeline per packet; it follows fall-
- * through only, so it never asserts a hazard across an edge it cannot see.
- */
+/** Default lifting is inexact here: a load read before it lands, or overlapping branch windows (SPRUFE8B 3.5, 4.2.6). */
 public final class C6000NativeHazardWarning {
     private static final int LOAD_LATENCY = 5;   // result readable 5 cycles after issue
     private static final int BRANCH_WINDOW = 6;  // transfer 6 cycles after issue (Table 4-11)

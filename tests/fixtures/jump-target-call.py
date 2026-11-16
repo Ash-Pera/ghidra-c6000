@@ -31,6 +31,8 @@ takes it.
   12e0 tcuncond the call is unconditional, so taken on the jump's fall-through too,
                 past a NOP 5 that idles as the target does
   1340 tcentry  as tcreg, with 13a0 tcenter jumping into its target's NOPs
+  1480 tcmid    tcearly whose call lands inside the target's NOP 2
+  14e0 tcover   a direct call whose jump's last slot is a NOP 2 outlasting its window
 """
 
 from pathlib import Path
@@ -73,7 +75,13 @@ WORDS = [
     0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000810, 0x9FFF8010, 0x8FFF7C10, 0x918A242A, 0x9180006A,
     0x00000000, 0x00000000, 0x02000851, 0x00000000, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000,
-    0x018A362B, 0x02104058, 0x0180006A, 0x02102058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000
+    0x018A362B, 0x02104058, 0x0180006A, 0x02102058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000610, 0x8180006A, 0x8FFF7010, 0x00004000, 0x0210E058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x018A5E2B, 0x02104058, 0x00002000, 0x02102058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000710, 0x8FFF6410, 0x818A8E2A, 0x8180006A, 0x00000000,
+    0x00002000, 0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x02104058, 0x02102058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
 ]
 
 
@@ -81,7 +89,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x480)
+    image = bytearray(0x540)
     for index, word in enumerate(WORDS):
         struct.pack_into(endian + "I", image, 4 * index, word)
     Path(sys.argv[1]).write_bytes(image)

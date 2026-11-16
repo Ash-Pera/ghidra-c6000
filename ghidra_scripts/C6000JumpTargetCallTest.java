@@ -11,8 +11,8 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Instruction;
 
 public class C6000JumpTargetCallTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x1000L, 0x1020L, 0x1040L, 0x10a0L, 0x1100L, 0x1180L, 0x11e0L, 0x1240L, 0x12a0L, 0x12e0L, 0x1340L, 0x13a0L, 0x13c0L, 0x1420L };
-	private static final String[] NAMES = { "h", "g", "tcdir", "tcreg", "tcarm", "tcbusy", "tcindep", "tclink", "tcfall", "tcuncond", "tcentry", "tcenter", "tcearly", "tcboth" };
+	private static final long[] ENTRIES = { 0x1000L, 0x1020L, 0x1040L, 0x10a0L, 0x1100L, 0x1180L, 0x11e0L, 0x1240L, 0x12a0L, 0x12e0L, 0x1340L, 0x13a0L, 0x13c0L, 0x1420L, 0x1480L, 0x14e0L };
+	private static final String[] NAMES = { "h", "g", "tcdir", "tcreg", "tcarm", "tcbusy", "tcindep", "tclink", "tcfall", "tcuncond", "tcentry", "tcenter", "tcearly", "tcboth", "tcmid", "tcover" };
 	private int checks;
 
 	@Override
@@ -79,7 +79,8 @@ public class C6000JumpTargetCallTest extends GhidraScript {
 		has(0x13c0L, "\\bh\\)?\\(", "\\+ 7\\b", "\\+ 2\\b");
 		has(0x1420L, "\\bh\\)?\\(", "\\bg\\)?\\(", "\\+ 0x10\\b", "\\+ 2\\b");
 		// Known-bads: the call keeps its transfer, the target's last NOP does not call.
-		for (long[] k : new long[][] { { 0x1204L, 0x121cL }, { 0x1260L, 0x1278L }, { 0x12c0L, 0x12c8L }, { 0x1300L, 0x131cL }, { 0x1360L, 0x1378L } }) {
+		for (long[] k : new long[][] { { 0x1204L, 0x121cL }, { 0x1260L, 0x1278L }, { 0x12c0L, 0x12c8L }, { 0x1300L, 0x131cL }, { 0x1360L, 0x1378L },
+				{ 0x1494L, 0x14b8L }, { 0x14f0L, 0x1518L } }) {
 			Instruction b = getInstructionAt(toAddr(k[0])), last = getInstructionAt(toAddr(k[1]));
 			if (b != null && !(b.getFlowType().isCall() || b.getFlowType().isJump()) || last != null && last.getFlowType().isCall())
 				throw new AssertionError("known-bad at " + toAddr(k[0]) + ": " + b + " / " + last);

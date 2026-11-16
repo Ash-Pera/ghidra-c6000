@@ -794,6 +794,15 @@ def main():
                           (plain_disp, " & ".join(plain_pat)))
                         n += 1
                         pat.append("creg!=0")
+                        keyed = [term for term in pat if term not in {
+                            "Cond", "creg!=7", "(creg!=0 | z=0)", "creg!=0"
+                        }]
+                        for creg in range(1, 7):
+                            for z in range(2):
+                                arm = 3 + (creg - 1) * 2 + z
+                                inert.append(":%s is %s { build PktInertCommit; }" %
+                                    (disp.replace("^Cond^", ""), " & ".join(keyed + ["creg=" + str(creg), "z=" + str(z),
+                                        "c_inert=0", "c_arm=" + str(arm), "PktInertCommit"])))
                     elif mnem == "B" and ops and ops[0] != "BranchTarget" and \
                             any(term.startswith("i18=") for term in pat):
                         continue  # B IRP / B NRP (Figure F-8): hand-written in c6000.sinc
@@ -823,6 +832,18 @@ def main():
                         w(":%s is %s { local take:1 = Cond; local target:4 = %s; build CFlowDelay; if (take == 0) goto inst_next; goto [target]; }" %
                           (disp, " & ".join(pred_terminal_pat), ops[0]))
                         n += 1
+                        # Local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls).
+                        w(":%s is %s { local take:1 = Cond; local target:4 = %s; build CFlowDelay; if (take == 0) goto inst_next; goto [target]; c6000_pair_return(); }" %
+                          (disp, " & ".join(pred_terminal_pat[:-1] + ["c_pair=1", "CFlowDelay"]), ops[0]))
+                        n += 1
+                        # Local: a nested arm keyed by its inner transfer's predicate (C6000DelaySlots.carryNestedTransfers).
+                        keyed = [term for term in pat if term not in {"Cond", "creg!=7", "(creg!=0 | z=0)"}]
+                        for creg in range(1, 7):
+                            for z in range(2):
+                                arm = 3 + (creg - 1) * 2 + z
+                                inert.append(":%s is %s { build PktInertCommit; }" %
+                                    (disp.replace("^Cond^", ""), " & ".join(keyed + ["creg=" + str(creg), "z=" + str(z),
+                                        "c_branch_terminal=1", "c_inert=0", "c_arm=" + str(arm), "PktInertCommit"])))
                         pat += ["c_inert=0", "c_branch_terminal=0"]
                     # SPRUFE8B 3.5 / 4.2.6 and CALLP execution: sample the
                     # issue predicate/target before the proven native byte window.

@@ -1516,10 +1516,14 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Function caller = functions.getFunctionContaining(jump.getMinAddress());
 			Function callee = functions.getFunctionAt(target);
 			if (caller == null || callee == null || callee.equals(caller)) return null;
-			// A target the caller also reaches by other flow is the caller's own code split off, not a callee.
-			for (Reference r : program.getReferenceManager().getReferencesTo(target))
-				if (r.getReferenceType().isFlow() && !r.getFromAddress().equals(jump.getMinAddress()) &&
-					caller.getBody().contains(r.getFromAddress())) return null;
+			// A callee another function calls returns through its link; code the caller also reaches by other flow is the caller's own, split off.
+			boolean called = false;
+			for (Reference r : program.getReferenceManager().getReferencesTo(target)) {
+				boolean mine = caller.getBody().contains(r.getFromAddress());
+				if (r.getReferenceType().isFlow() && !r.getFromAddress().equals(jump.getMinAddress()) && mine) return null;
+				called |= r.getReferenceType().isCall() && !mine;
+			}
+			if (!called) return null;
 			try {
 				if (!C6000ExecutionPackets.issuePrefix(program, jump.getMinAddress()).isEmpty() || parallelWithNext(jump)) return null;
 			}

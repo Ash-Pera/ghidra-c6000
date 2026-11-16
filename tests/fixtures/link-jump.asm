@@ -1,6 +1,6 @@
 ; link-jump fixture (hand-written, firmware-free)
         .text
-        .global h, g, ljloop, ljonly, ljwrite, ljbusy, ljpred, ljclob, ljfrag, lf_tail
+        .global h, g, ljloop, ljonly, ljwrite, ljbusy, ljpred, ljclob, ljfrag, lf_tail, ljuse, ljnocall, nc_tail
 h:      B       .S2     B3
         ADD     .L1     A4,A4,A4
         NOP     4
@@ -101,5 +101,36 @@ lf_top: SUB     .L1     A2,1,A2
         NOP     5
         .align  32
 lf_tail: B      .S2     B3
+        ADD     .L1     A4,1,A4
+        NOP     4
+        .align  32
+; calls g and lf_tail, as another function would
+ljuse:  STW     .D2T2   B3,*B15--[2]
+        B       .S1     g
+        MVKL    .S2     lu_one,B3
+        MVKH    .S2     lu_one,B3
+        NOP     3
+lu_one: B       .S1     lf_tail
+        MVKL    .S2     lu_two,B3
+        MVKH    .S2     lu_two,B3
+        NOP     3
+lu_two: LDW     .D2T2   *++B15[2],B3
+        NOP     4
+        B       .S2     B3
+        NOP     5
+        .align  32
+; known-bad: no function calls the target
+ljnocall: MV    .L2     B3,B6
+||      MV      .L1X    B4,A2
+        MVKL    .S2     ln_top,B3
+        MVKH    .S2     ln_top,B3
+ln_top: SUB     .L1     A2,1,A2
+  [A2]  B       .S1     nc_tail
+  [!A2] MV      .L2     B6,B3
+        NOP     4
+        B       .S2     B3
+        NOP     5
+        .align  32
+nc_tail: B      .S2     B3
         ADD     .L1     A4,1,A4
         NOP     4

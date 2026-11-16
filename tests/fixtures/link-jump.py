@@ -5,9 +5,10 @@
 Load at 0x1000 with auto-analysis; C6000LinkJumpTest.java prepare declares the
 functions, as ELF symbols would. Words are TI cl6x 8.3.15 output (-mv6740
 --no_compress, linked at 0x1000), listed by dis6x. A displacement B to another
-function's entry is a call when B3 holds a link this function built: the callee
-returns to it (SPRUFE8B 3.5, 4.2.6 B). Where B3 may also be the caller's link the
-jump is a loop call on one path and a tail call on the other.
+function's entry, which another function calls, is a call when B3 holds a link
+this function built: the callee returns to it (SPRUFE8B 3.5, 4.2.6 B). Where B3
+may also be the caller's link the jump is a loop call on one path and a tail call
+on the other.
 
   1000 h        B B3 ; ADD A4,A4,A4 ; NOP 4: 2v
   1020 g        B B3 ; ADD A4,3,A4 ; NOP 4: v + 3
@@ -15,12 +16,14 @@ jump is a loop call on one path and a tail call on the other.
                 [A2] B g ; [!A2] MV B6,B3 ; NOP 4 ; B B3: n ? 2v + 3(n - 1) : g(v)
   1080 ljonly   B3 = lo_top ; lo_top: SUB A2,1,A2 ; [A2] B g ; [!A2] MV B6,B3 ; NOP 4 ;
                 B B3: v + 3(n - 1) for n >= 1
+  1220 ljuse    calls g and lf_tail, as another function would
   Known-bads, the jump keeps its transfer and its last slot carries nothing:
   10c0 ljwrite  the window builds the link past it: an ordinary call
   1100 ljbusy   the window holds another transfer
   1140 ljpred   the window rewrites the jump's predicate (upstream #66)
   1180 ljclob   the loop rewrites B3 between the link and the jump
   11c0 ljfrag   the caller also jumps to the target (1200 lf_tail), its own code split off
+  1260 ljnocall no function calls the target (12a0 nc_tail)
 """
 
 from pathlib import Path
@@ -44,6 +47,11 @@ WORDS = [
     0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x030C0FDB, 0x01101FD8, 0xB0000810, 0x00008000, 0x0188EC2A, 0x0180006A, 0x010BE058, 0xA0000810,
     0xB1980FDA, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x000C0362, 0x02102058, 0x00006000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F6, 0x0FFFC010, 0x01891A2A, 0x0180006A, 0x00004000, 0x0FFFFC10, 0x0189222A, 0x0180006A,
+    0x00004000, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000,
+    0x030C0FDB, 0x01101FD8, 0x0189382A, 0x0180006A, 0x010BE058, 0xA0000810, 0xB1980FDA, 0x00006000,
+    0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x000C0362, 0x02102058, 0x00006000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
 ]
 
@@ -52,7 +60,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x240)
+    image = bytearray(0x2c0)
     for index, word in enumerate(WORDS):
         struct.pack_into(endian + "I", image, 4 * index, word)
     Path(sys.argv[1]).write_bytes(image)

@@ -147,12 +147,14 @@ define context contextreg
   c_pkt_commit0 = (64,70) noflow
   c_pkt_commit1 = (71,77) noflow
   c_arm = (78,79) noflow # local: in this call-arm jump's window, a B with z=1 (1) or z=0 (2) is inert (C6000DelaySlots.carryCallArms)
+  c_pair = (80,80) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
 @else
   c_pkt_write0 = (32,38) noflow
   c_pkt_write1 = (39,45) noflow
   c_pkt_commit0 = (46,52) noflow
   c_pkt_commit1 = (53,59) noflow
   c_arm = (60,61) noflow # local: in this call-arm jump's window, a B with z=1 (1) or z=0 (2) is inert (C6000DelaySlots.carryCallArms)
+  c_pair = (62,62) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
 @endif
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"
@@ -589,6 +591,7 @@ macro c6000_wrap_address(base, delta, index, side, result) {
 @include "c6000_placeholders.sinc"
 define pcodeop c6000_idle;
 define pcodeop c6000_link_load;
+define pcodeop c6000_pair_return; # local: overridden to the call's return point (CALLOTHER_OVERRIDE_JUMP, C6000DelaySlots.pairCalls)
 define pcodeop c6000_link_store;
 define pcodeop c6000_link_commit;
 define pcodeop c6000_tsc_start;

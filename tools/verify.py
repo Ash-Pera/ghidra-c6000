@@ -40,6 +40,7 @@ CORE = [
     case("reserved-predicate", "ReservedPredicate", "C6000_RESERVED_PREDICATE_OK"),
     case("return-delay", "ReturnDelay", "C6000_RETURN_DELAY_OK"),
     case("preempted-jump", "PreemptedJump", "C6000_PREEMPTED_JUMP_OK", None, analysis=True),
+    case("preempted-link-copy", "PreemptedLinkCopy", "C6000_PREEMPTED_LINK_COPY_OK", None, analysis=True),
     case("parallel-read", "ParallelRead", "C6000_PARALLEL_READ_OK", "json"),
     case("packet-call", "PacketCall", "C6000_PACKET_CALL_OK"),
     # The refusal script constructs its own memory blocks outside this small image.
@@ -59,6 +60,9 @@ CORE = [
     case("in-sequence-jump", "InSequenceJump", "C6000_IN_SEQUENCE_JUMP_OK", None, analysis=True),
     case("shared-tail-packet", "SharedTailPacket", "C6000_SHARED_TAIL_PACKET_OK", None, analysis=True),
     case("call-arm", "CallArm", "C6000_CALL_ARM_OK", None, analysis=True),
+    case("shared-tail-arm", "SharedTailArm", "C6000_SHARED_TAIL_ARM_OK", None, analysis=True),
+    case("sequence-call", "SequenceCall", "C6000_SEQUENCE_CALL_OK", None, analysis=True),
+    case("pair-call", "PairCall", "C6000_PAIR_CALL_OK", None, analysis=True),
     case("merge-call-window", "MergeCallWindow", "C6000_MERGE_CALL_WINDOW_OK", None),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
     case("abi-pairs", "AbiPairs", "C6000_ABI_PAIRS_OK", None, analysis=True),
@@ -342,6 +346,14 @@ def main():
                     command += ["-preScript", "C6000SharedTailPacketTest.java", "prepare"]
                 elif fixture == "call-arm":
                     command += ["-preScript", "C6000CallArmTest.java", "prepare"]
+                elif fixture == "preempted-link-copy":
+                    command += ["-preScript", "C6000PreemptedLinkCopyTest.java", "prepare"]
+                elif fixture == "pair-call":
+                    command += ["-preScript", "C6000PairCallTest.java", "prepare"]
+                elif fixture == "sequence-call":
+                    command += ["-preScript", "C6000SequenceCallTest.java", "prepare"]
+                elif fixture == "shared-tail-arm":
+                    command += ["-preScript", "C6000SharedTailArmTest.java", "prepare"]
                 elif fixture not in ELF:
                     command += ["-preScript", "C6000SetEntry.java", "1000"]
                 for script, script_args, _ in scripts:

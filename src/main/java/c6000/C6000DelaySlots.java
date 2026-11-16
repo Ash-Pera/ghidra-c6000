@@ -36,7 +36,8 @@ public final class C6000DelaySlots {
     private record SavedInstruction(Address at, FlowOverride override, String[] comments,
             List<SavedRef> references, boolean fallThroughOverridden, Address fallThrough) { }
     /** arm: the c_arm value the issue needs so its window's inert branches parse inert there too (0: none). */
-    private record Window(Instruction branch, Address end, Function owner, int arm) { }
+    /** exact: the last packet ends on the branch's last delay cycle (no multicycle NOP outlasts it). */
+    private record Window(Instruction branch, Address end, Function owner, int arm, boolean exact) { }
 
     /** B/BNOP or CALLP; nested transfers and ownership conflicts are refused. */
     public static List<Repair> recover(Program program, TaskMonitor monitor, MessageLog log)
@@ -81,7 +82,7 @@ public final class C6000DelaySlots {
         while (it.hasNext()) {
             var ins = it.next();
             String full = ins.getMnemonicString(), name = C6000CallAnalyzer.baseName(ins);
-            if (full.startsWith("_") || flag(program, ins.getAddress(), "c_inert")) continue;
+            if (full.startsWith("_") || flag(program, ins.getAddress(), "c_inert") || flag(program, ins.getAddress(), "c_jcarry")) continue;
             if (!(name.equals("B.S1") || name.equals("B.S2") || name.equals("BNOP.S1") ||
                     name.equals("BNOP.S2") || name.equals("CALLP.S1") || name.equals("CALLP.S2"))) continue;
             var override = ins.getFlowOverride();
@@ -836,14 +837,14 @@ public final class C6000DelaySlots {
     }
 
     /**
-     * Local: a jump whose target runs transfer-free code until a register
-     * call issued in its window lands, the call taken exactly when the jump is
-     * and linked just past that code (C6000CallAnalyzer.TargetCall), calls
-     * from the target's last instruction (SPRUFE8B 3.5, 4.2.6 B). The call
-     * stops transferring (c_inert) but keeps the target it read at issue
-     * (C6000_CARRY), so the jump takes its whole window, and the instruction
-     * before the link carries the call (c_carry). Only the jump may reach the
-     * target's code: no other flow, and not sequential issue.
+     * Local: a jump whose target runs transfer-free code until a call issued
+     * in its window lands, the call taken exactly when the jump is and linked
+     * just past that code (C6000CallAnalyzer.TargetCall), calls from the
+     * target's last instruction (SPRUFE8B 3.5, 4.2.6 B). The call stops
+     * transferring (c_inert; a register call keeps the target it read at
+     * issue), so the jump takes its whole window, and the instruction before
+     * the link carries the call (c_carry, target by reference). Only the jump
+     * may reach the target's code: no other flow, and not sequential issue.
      */
     private static int carryTargetCalls(Program program, TaskMonitor monitor) throws Exception {
         var listing = program.getListing();
@@ -872,15 +873,77 @@ public final class C6000DelaySlots {
             Function there = functions.getFunctionContaining(target);
             if (there != null && !there.equals(owner) || functions.getFunctionAt(target) != null) continue;
             if (!onlyJumpReaches(program, jump, target, t.last()) || !sequentiallyUnreached(program, reader, target, monitor)) continue;
+            // Ghidra parses a jump's slots in the jump's context, where a same-sense displacement call stays a branch: that jump gets no native window.
+            Window carried = null;
+            C6000CallAnalyzer.CallArm arm = null;
             Address end = call.getMaxAddress().add(call.getPrototype().getDelaySlotByteCount());
-            redecode(program, call.getAddress(), end, "c_inert", monitor);
+            if (t.callee() != null) {
+                // The target runs whole packets for exactly the call's cycles: no multicycle NOP straddles its landing.
+                if (!jump.getMnemonicString().startsWith("[") || reader.cyclesThrough(target, t.last()) != t.cycle()) continue;
+                // A NOP-only target cut short before the jump's last slot is a preempted jump's (issue #50), which refuses calls.
+                if (reader.onlyNops(target, t.last()) && t.cycle() != 5) continue;
+                carried = reader.window(jump, monitor, call.getAddress());
+                if (carried == null) {
+                    // An opposite-sense call arm in the window is carried too (callArm skips the inert target call).
+                    redecode(program, call.getAddress(), end, "c_inert", monitor);
+                    arm = walker.callArm(listing.getInstructionAt(jump.getAddress()));
+                    Instruction armLast = arm == null ? null : listing.getInstructionAt(arm.last());
+                    if (arm != null) {
+                        reader.ignore = arm.call().getAddress();
+                        carried = reader.window(listing.getInstructionAt(jump.getAddress()), monitor);
+                        reader.ignore = null;
+                    }
+                    if (arm == null || armLast == null || carried == null || !carried.end().equals(arm.jumpEnd()) ||
+                        flag(program, arm.call().getAddress(), "c_inert") || flag(program, arm.last(), "c_carry") ||
+                        !java.util.Objects.equals(owner, functions.getFunctionContaining(arm.last())) ||
+                        entered(program, jump.getAddress(), armLast.getMaxAddress())) carried = null;
+                }
+                Instruction last = carried == null ? null : listing.getInstructionContaining(carried.end());
+                // The jump lands at a cycle boundary its last slot ends on: a multicycle NOP outlasting the window has none.
+                if (carried == null || !carried.exact() || !java.util.Objects.equals(carried.owner(), owner) ||
+                    carried.end().compareTo(call.getMaxAddress()) < 0 || last == null ||
+                    flag(program, last.getAddress(), "c_carry") || flag(program, last.getAddress(), "c_jcarry")) {
+                    if (flag(program, call.getAddress(), "c_inert")) redecode(program, call.getAddress(), call.getMaxAddress(), "c_inert", 0L, monitor);
+                    continue;
+                }
+                jump = listing.getInstructionAt(jump.getAddress());
+            }
+            if (!flag(program, call.getAddress(), "c_inert")) redecode(program, call.getAddress(), end, "c_inert", monitor);
             if (listing.getInstructionAt(t.last()) == null)
                 Disassembler.getDisassembler(program, monitor, null).disassemble(target, new AddressSet(target, t.last()), false);
             Instruction carrier = listing.getInstructionAt(t.last());
             if (carrier == null) throw new IllegalStateException("target call lost its carrier at " + t.last());
             redecode(program, t.last(), carrier.getMaxAddress(), "c_carry", monitor);
+            if (t.callee() != null) {
+                var r = program.getReferenceManager().addMemoryReference(t.last(), t.callee(),
+                    RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
+                program.getReferenceManager().setPrimary(r, true);
+            }
             // The target's code runs only after the jump: the jump's function owns it.
             var span = new AddressSet(target, t.last().add(3));
+            if (arm != null) {
+                // The arm runs only on the jump's fall-through: its last slot carries it, as carryCallArms does.
+                Instruction armCall = listing.getInstructionAt(arm.call().getAddress());
+                redecode(program, armCall.getAddress(), armCall.getMaxAddress().add(armCall.getPrototype().getDelaySlotByteCount()), "c_inert", monitor);
+                Instruction armLast = listing.getInstructionAt(arm.last());
+                if (armLast == null) throw new IllegalStateException("call arm lost its last slot at " + arm.last());
+                redecode(program, arm.last(), armLast.getMaxAddress(), "c_carry", monitor);
+                var ar = program.getReferenceManager().addMemoryReference(arm.last(), arm.callee(),
+                    RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
+                program.getReferenceManager().setPrimary(ar, true);
+                span.add(jump.getAddress(), armLast.getMaxAddress());
+            }
+            if (carried != null) {
+                // The jump latches its predicate and target at issue (c_jcarry 1); its window's last instruction takes it (c_jcarry 2).
+                redecode(program, jump.getAddress(), jump.getMaxAddress(), Map.of("c_jcarry", 1L, "c_arm", 0L), true, monitor);
+                Instruction last = listing.getInstructionContaining(carried.end());
+                if (last == null) throw new IllegalStateException("carried jump lost its last slot at " + carried.end());
+                redecode(program, last.getAddress(), last.getMaxAddress(), Map.of("c_jcarry", 2L), false, monitor);
+                var r = program.getReferenceManager().addMemoryReference(last.getAddress(), target,
+                    RefType.JUMP_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
+                program.getReferenceManager().setPrimary(r, true);
+                span.add(jump.getAddress(), carried.end());
+            }
             if (owner != null && !owner.getBody().contains(span)) {
                 try { owner.setBody(new AddressSet(owner.getBody()).union(span)); }
                 catch (ghidra.program.database.function.OverlappingFunctionException e) { }
@@ -1531,7 +1594,7 @@ public final class C6000DelaySlots {
                     issuePacket=false;
                 }while(remaining>0);
                 if(cut!=null&&!cut.equals(current.getMaxAddress()))return null;
-                return new Window(issue,current.getMaxAddress(),owner,arm);
+                return new Window(issue,current.getMaxAddress(),owner,arm,remaining==0);
             }catch(MemoryAccessException e){return null;}
         }
         int packetCycles(Instruction i)throws MemoryAccessException {
@@ -1826,5 +1889,20 @@ public final class C6000DelaySlots {
             }
         }
 
+        /** Whether every instruction from from through last is a NOP. */
+        boolean onlyNops(Address from,Address last){
+            for(Instruction i=decode(from);i!=null&&i.getMinAddress().compareTo(last)<=0;i=next(i))
+                if(!C6000CallAnalyzer.baseName(i).equals("NOP"))return false;
+            return true;}
+        /** Cycles of the whole packets from from through the one ending at last, or -1. */
+        int cyclesThrough(Address from,Address last){
+            try{int cycles=0,packet=0;
+                for(Instruction i=decode(from);i!=null&&i.getMinAddress().compareTo(last)<=0;i=next(i)){
+                    int c=packetCycles(i);if(c<0)return -1;packet=Math.max(packet,c);
+                    boolean more=C6000ExecutionPackets.parallelWithNext(program,i);
+                    if(!more){cycles+=packet;packet=0;}
+                    if(i.getMinAddress().equals(last))return more?-1:cycles;}
+                return -1;}
+            catch(MemoryAccessException e){return -1;}}
     }
 }

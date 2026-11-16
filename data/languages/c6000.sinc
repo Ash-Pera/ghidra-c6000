@@ -115,6 +115,8 @@ define register offset=0x3000 size=12 [ contextreg ];
 # PCE1 to instructions, while the emulator needs a distinct current PC.
 define register offset=0x3100 size=4 [ PC ];
 define register offset=0x3200 size=4 [ C6000_PIPE_RET C6000_PIPE_ILC C6000_PIPE_RILC C6000_CARRY ];
+# Local: a carried jump's predicate and target, latched at issue (C6000DelaySlots.carryTargetCalls).
+define register offset=0x3210 size=4 [ C6000_JCOND C6000_JTGT ];
 
 # Every field is `noflow`: each describes the fetch packet that physically
 # contains the slot, so it must never be inherited from the instruction that
@@ -151,6 +153,7 @@ define context contextreg
   c_pair = (82,82) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
   c_load_reg = (83,89) noflow # deferred load destination: GPR 1-64 or aligned pair 65-96 (gen_packet_sinc.py)
   c_load_mode = (90,91) noflow # 1: shadow this load's E5 result, 2: commit it before this packet
+  c_jcarry = (92,93) noflow # local: a jump with no native window latches its predicate (1); its last slot jumps (2) (C6000DelaySlots.carryTargetCalls)
 @else
   c_pkt_write0 = (32,38) noflow
   c_pkt_write1 = (39,45) noflow
@@ -160,6 +163,7 @@ define context contextreg
   c_pair = (64,64) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
   c_load_reg = (83,89) noflow # deferred load destination: GPR 1-64 or aligned pair 65-96 (gen_packet_sinc.py)
   c_load_mode = (90,91) noflow # 1: shadow this load's E5 result, 2: commit it before this packet
+  c_jcarry = (65,66) noflow # local: a jump with no native window latches its predicate (1); its last slot jumps (2) (C6000DelaySlots.carryTargetCalls)
 @endif
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"
@@ -622,6 +626,8 @@ define pcodeop c6000_nested_carry;
 # Local: the shared tail's last instruction, then the call both of its issuing branches pended (SPRUFE8B 3.5, 4.2.6 B).
 :^instruction is c_schedule_entry=0 & c_carry=1 & c_arm=15 & instruction [ c_carry=0; c_arm=0; ] { c6000_nested_carry(); build instruction; local nestedCarryEnd:1 = 0; }
 :^instruction is c_schedule_entry=0 & c_carry=1 & c_arm!=15 & instruction [ c_carry=0; ] { build instruction; call [C6000_CARRY]; }
+# Local: the last slot of a jump with no native window takes the jump on its latched predicate; the target is a JUMP_OVERRIDE reference (SPRUFE8B 3.5, 4.2.6 B).
+:^instruction is c_schedule_entry=0 & c_carry=0 & c_jcarry=2 & instruction [ c_jcarry=0; ] { build instruction; if (C6000_JCOND == 0) goto <skip>; goto [C6000_JTGT]; <skip> }
 # c_pkt_active selects this wrapper for parallel staging and E5 load deferral (SPRUFE8B 4.2.5); its operands read the load fields, so only c_pkt_active is cleared.
 :^instruction is c_pkt_active=1 & c_schedule_entry=0 & PktLoadCommit & PktIn0 & PktIn1 &
   PktLoadIn & PktOut0 & PktOut1 & PktCommit & PktLoadOut & instruction

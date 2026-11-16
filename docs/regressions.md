@@ -747,7 +747,7 @@ jump nor a context change in its constructor separates the two (tried: `c_tcall`
 removes the jump's own window). So that jump keeps no native window: it parses inert and
 latches its predicate and target (`c_jcarry=1`, `C6000_JCOND`/`C6000_JTGT`), every slot
 decodes in its own context, and its last slot takes the jump on the latched predicate
-(`c_jcarry=2`, target by `JUMP_OVERRIDE_UNCONDITIONAL`). An opposite-sense call arm in the
+(`c_jcarry=2`, with a conditional computed-jump reference to the target; an override reference reads as unconditional, and Ghidra's shared-return analysis then made it a tail call). An opposite-sense call arm in the
 same window (`tcboth`) is carried by its last slot as `carryCallArms` does. Both ends must
 fall on cycle boundaries: the target runs whole packets for exactly the call's cycles, and
 the jump's last packet ends on its fifth delay cycle. A NOP-only target the call cuts short

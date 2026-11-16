@@ -889,9 +889,9 @@ public final class C6000DelaySlots {
                 Instruction last = listing.getInstructionContaining(carried.end());
                 if (last == null) throw new IllegalStateException("carried jump lost its last slot at " + carried.end());
                 redecode(program, last.getAddress(), last.getMaxAddress(), Map.of("c_jcarry", 2L), false, monitor);
-                var r = program.getReferenceManager().addMemoryReference(last.getAddress(), target,
-                    RefType.JUMP_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
-                program.getReferenceManager().setPrimary(r, true);
+                // A conditional flow reference, not an override: an unconditional-looking jump becomes a shared-return tail call.
+                program.getReferenceManager().addMemoryReference(last.getAddress(), target,
+                    RefType.CONDITIONAL_COMPUTED_JUMP, SourceType.ANALYSIS, Reference.MNEMONIC);
                 span.add(jump.getAddress(), carried.end());
             }
             if (owner != null && !owner.getBody().contains(span)) {

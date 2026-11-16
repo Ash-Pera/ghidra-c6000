@@ -68,3 +68,28 @@ TC:
 FC:
  B.S2 B3
  NOP 5
+; gate ends in an unconditional jump, so no function falls through into arm E.
+ .global gate
+gate:
+ B.S1 FA
+ NOP 5
+; Arm E carries only once its function exists: prepare disassembles it without a function.
+ .global efn
+efn:
+ [B0] B.S1 TE
+ [!B0] B.S2 FE
+ NOP
+ NOP
+ NOP
+ [B0] B.S2 B3
+TE:
+ NOP 5
+ NOP 5
+ NOP 5
+ NOP 5
+ NOP 5
+ NOP 5
+ .global FE
+FE:
+ B.S2 B3
+ NOP 5

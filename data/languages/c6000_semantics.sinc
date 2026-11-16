@@ -2799,6 +2799,8 @@ macro c6000_sem_ldw(a, d) {
   local aligned:4 = a & 0xfffffffc;
   d = *[ram]:4 aligned;
 }
+# Through B15: SPRAB89 3.2 keeps SP 8-byte aligned, so no mask (a masked stack load hides the slot it reads).
+macro c6000_sem_ldw_sp(a, d) { d = *[ram]:4 a; }
 # SEM: LDDW
 macro c6000_sem_lddw(a, d) { d = *[ram]:8 a; }
 # SEM: LDNW

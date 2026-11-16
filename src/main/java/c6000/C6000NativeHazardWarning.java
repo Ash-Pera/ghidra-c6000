@@ -11,14 +11,10 @@ import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
 import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.listing.Program;
-import ghidra.program.model.pcode.PcodeOp;
-import ghidra.program.model.pcode.Varnode;
-import ghidra.util.exception.CancelledException;
 import ghidra.util.task.TaskMonitor;
 
-/** Default lifting is inexact here: a load read before it lands, or overlapping branch windows (SPRUFE8B 3.5, 4.2.6). */
+/** Default lifting is inexact here: a load read before it lands that C6000NativeLoadLatencyScheduler could not defer, or overlapping branch windows (SPRUFE8B 3.5, 4.2.6). */
 public final class C6000NativeHazardWarning {
-    private static final int LOAD_LATENCY = 5;   // result readable 5 cycles after issue
     private static final int BRANCH_WINDOW = 6;  // transfer 6 cycles after issue (Table 4-11)
 
     public record Finding(Address at, String reason) {}
@@ -36,7 +32,9 @@ public final class C6000NativeHazardWarning {
         List<Packet> timeline = timeline(program, function);
         Finding branches = overlappingBranchWindows(timeline);
         if (branches != null) return branches;
-        return unlandedLoad(program, timeline);
+        C6000NativeLoadLatencyScheduler.Finding load =
+            C6000NativeLoadLatencyScheduler.finding(program, function, TaskMonitor.DUMMY);
+        return load == null ? null : new Finding(load.at(), load.reason());
     }
 
     /** Straight-line execute packets of the body in address order, each with a start cycle. */
@@ -84,43 +82,6 @@ public final class C6000NativeHazardWarning {
         return null;
     }
 
-    private static Finding unlandedLoad(Program program, List<Packet> timeline) throws Exception {
-        for (int i = 0; i < timeline.size(); i++) {
-            for (Instruction load : timeline.get(i).members()) {
-                if (!op(load).startsWith("LD")) continue;
-                Set<String> written = writes(program, load);
-                if (written.isEmpty()) continue;
-                int landCycle = timeline.get(i).cycle() + LOAD_LATENCY;
-                for (int j = i; j < timeline.size(); j++) {
-                    int cycle = timeline.get(j).cycle();
-                    if (cycle >= landCycle) break;
-                    for (Instruction later : timeline.get(j).members()) {
-                        if (later.getAddress().equals(load.getAddress())) continue;
-                        if (branch(later)) return null;  // a window we did not model; do not assert
-                        var reads = reads(program, later);
-                        for (String name : written) {
-                            if (reads.contains(name)) {
-                                return new Finding(later.getAddress(),
-                                    "reads " + name + " before the load at " + load.getAddress()
-                                    + " lands; native lifting exposes the loaded value early "
-                                    + "(enable an exact schedule)");
-                            }
-                        }
-                    }
-                    // A plain (non-load) rewrite of the register ends the hazard for it.
-                    for (Instruction later : timeline.get(j).members()) {
-                        if (later.getAddress().equals(load.getAddress())) continue;
-                        if (!op(later).startsWith("LD")) {
-                            written.removeAll(writes(program, later));
-                        }
-                    }
-                    if (written.isEmpty()) break;
-                }
-            }
-        }
-        return null;
-    }
-
     /** Mnemonic without predicate or unit: "[A1] LDW.D1T1" -> "LDW", "B.S2" -> "B". */
     private static String op(Instruction instruction) {
         String name = C6000CallAnalyzer.baseName(instruction).trim();
@@ -140,27 +101,4 @@ public final class C6000NativeHazardWarning {
         return count != null && count.getUnsignedValue() > 1 ? (int) count.getUnsignedValue() : 1;
     }
 
-    private static Set<String> reads(Program program, Instruction instruction) {
-        Set<String> result = new LinkedHashSet<>();
-        for (PcodeOp op : instruction.getPcode(false)) {
-            for (Varnode input : op.getInputs()) result.addAll(gprs(program, input));
-        }
-        return result;
-    }
-
-    private static Set<String> writes(Program program, Instruction instruction) {
-        Set<String> result = new LinkedHashSet<>();
-        for (PcodeOp op : instruction.getPcode(false)) result.addAll(gprs(program, op.getOutput()));
-        return result;
-    }
-
-    private static Set<String> gprs(Program program, Varnode node) {
-        if (node == null || !node.isRegister() || !node.getAddress().getAddressSpace()
-                .equals(program.getAddressFactory().getRegisterSpace())) return Set.of();
-        var register = program.getRegister(node.getAddress(), node.getSize());
-        if (register == null) register = program.getRegister(node.getAddress());
-        String name = register == null ? null : register.getName();
-        return name != null && name.length() >= 2 && (name.charAt(0) == 'A' || name.charAt(0) == 'B')
-            && Character.isDigit(name.charAt(1)) ? Set.of(name) : Set.of();
-    }
 }

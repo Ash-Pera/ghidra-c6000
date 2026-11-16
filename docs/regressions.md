@@ -1014,8 +1014,37 @@ words in a one-packet loop that issues `[B0] B loop` every cycle with loads in f
 across the back edge (SPRUFE8B 3.5, 4.2.6). With the `C6000 Assumed-Drained Schedules`
 analyzer off (its default), `pipe` and `ldread` (10e0, a load result read three cycles
 early) carry an `C6000 Inexact Native Pipeline` warning; the straight-line functions do
-not. Enabled, the analyzer schedules `pipe`, bookmarks it, and the schedule's p-code
+not. `ldread` keeps its warning after native load deferral because its return issues in
+the load's window. Enabled, the analyzer schedules `pipe`, bookmarks it, and the schedule's p-code
 returns the sum for `n` of 5, 6, 9 and 16; the warning then clears. It must refuse
 `entered` (1088, issued in `plain`'s return window) and `branchy` (10a0, a branch in its
 entry packet), leave `proved` (10c0) on the review the test records first, and keep an
 unchanged schedule on a second run. Known-bads are in `mutants.sh` (local).
+
+## Native load-result deferral
+
+`native-load-latency.py IMAGE CASES.json [be]` assembles hand-written functions with
+`cl6x` 8.3.15 (`-mv6740 --no_compress`; big-endian swaps words). `C6000NativeLoadLatencyTest.java`
+creates the functions in its `prepare` pre-script and checks them after auto-analysis.
+Each case states the hardware result from SPRUFE8B 3.4, 3.6 and 4.2.5, and the test runs
+the listing p-code against it.
+
+- Exact cases must carry one shadow and one commit, no warning, and decompiled C without
+  the shadow registers. `ldw_e1`-`ldw_e4` read an `LDW` result one to four cycles after
+  issue (the fourth is the E5 cycle) and must see the old value, then read it again
+  five cycles after issue and must see the loaded word. `ldb_sign`, `ldbu_zero`,
+  `ldh_sign` and `ldhu_zero` cover sign and zero extension. `lddw_pair` covers a register
+  pair. `predicated` runs once with a true predicate and once with a false one.
+  `staged_issue` and `staged_landing` put the load or its landing packet in a staged
+  parallel-read packet.
+- Refused cases must keep native p-code and the warning: `branch_in_window`,
+  `branch_before` (the load in a branch's delay slots), `second_writer`,
+  `overlapping_loads`, `predicate_unstaged` (an unstaged packet writes the load's
+  predicate earlier) and `entered_window` (another function branches between the load and
+  its landing).
+- `ldw_after` and `swap_packet` have no hazard. Their C must match 7015913.
+
+`tools/load_latency_mutants.py` applies four known-bad scheduler mutants in turn: no
+branch-in-window refusal, commit one cycle early, commit one cycle late, and ignoring the
+load predicate. It runs the fixture in both endian modes and restores the source; each
+mutant must fail it.

@@ -101,16 +101,17 @@ falls into.
 
 | Model | Supported behavior | Boundary |
 |---|---|---|
-| Default instruction p-code | Instruction effects and proved native B/BNOP/CALLP delay windows. | Parallel instructions are lifted individually; ordinary writeback latency is not scheduled. A member that reads what an earlier member of its packet writes is warned (`C6000 Same-Packet Hazards`, issue #71). |
+| Default instruction p-code | Instruction effects, proved native B/BNOP/CALLP delay windows, staged parallel reads, and [load results read in their delay slots](internals.md#native-load-result-deferral) where the deferral is exact. | Refused loads, and all other writeback latency, are lifted at issue. A member that reads what an earlier member of its packet writes is warned (`C6000 Same-Packet Hazards`, issue #71). |
 | [Exact packet schedules](pipeline-schedules.md) | Supported parallel reads, pending branches and register/memory/status phases through E10; normal software loops. | Reviewed drained entry and incoming E1 hazards; only unchanged recorded contracts activate automatically. Unsupported or stale contracts are refused. |
 | [Loop replay](software-loop-conformance.md) | Buffer issue order, masks, loop counters and supported drain/restart behavior. | Does not execute instruction p-code, retire writes or enter interrupt handlers. |
 | Closed-call schedules | Pending effects through explicitly proved caller/callee boundaries; normal decompiler injection for complete reviewed callers. | Sequential leaf calls and pinned ownership/entry assumptions; explicit activation only. |
 | Read-only caller continuations | Pending effects through explicit immutable caller windows. | Bounded plans and entry proofs; not automatically installed as callee-only schedules. |
 
 Where default lifting is known to be inexact, the `C6000 Inexact Native Pipeline`
-analyzer (on by default) bookmarks a warning: a load result read before it lands, or two
-branch windows in flight at once (software-pipelined loops, nested windows). It changes no
-p-code. The opt-in `C6000 Assumed-Drained Schedules` analyzer (off by default;
+analyzer (on by default) first defers each load result read in its delay slots where it
+can prove the deferral exact. It then bookmarks a warning for a load result that is still
+read before it lands (the bookmark names the refusal), or for two branch windows in flight
+at once (software-pipelined loops, nested windows). It changes no other p-code. The opt-in `C6000 Assumed-Drained Schedules` analyzer (off by default;
 `-Dc6000.assumeDrainedSchedules=true` or `C6000ApplyAssumedSchedules.java`) applies an exact
 schedule to each unreviewed function under an assumed drained entry and bookmarks each one.
 That assumption is not a caller proof: a caller that enters with writes or branches in

@@ -258,7 +258,7 @@ public final class C6000PipelineCompiler {
         var at=entry.getNewAddress(pc);int length=closedPhysicalLength(at);var context=new ProcessorContextImpl(program.getLanguage());
         for(var field:C6000PacketContext.physicalDecodeFields(program,at).entrySet())context.setRegisterValue(new RegisterValue(program.getRegister(field.getKey()),BigInteger.valueOf(field.getValue())));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_inert"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_arm"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_pair"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_carry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
-        for(String name:C6000PacketContext.PACKET_FIELDS)context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
+        for(String name:C6000PacketContext.STAGING_FIELDS)context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         var memory=new DumbMemBufferImpl(program.getMemory(),at);var prototype=program.getLanguage().parse(memory,context,false);var instruction=new PseudoInstruction(program,at,prototype,memory,context);
         if(instruction.getLength()!=length)throw fail("caller-entry width conflicts with physical layout at "+at);validateWindowInstruction(instruction,window);return instruction;
     }
@@ -480,7 +480,7 @@ public final class C6000PipelineCompiler {
     // SPRUFE8B ANDN pp.145-146: .L/.S/.D read both inputs and write dst in E1.
     // SPRUFE8B PACK2 pp.397-398 / PACKL4 pp.407-408: E1 source reads and dst write.
     // SPRUFE8B ADDU pp.135-136, SUBC pp.539-540, SUBU pp.546-547, RCPSP pp.411-412, RSQRSP pp.420-421: single-cycle.
-    private static final Set<String> SINGLE=Set.of("ADD","ADDK","ADDAW","ADDAD","ADDAH","ADDAB","SUBAW","SUBAH","SUBAB","SUB","AND","ANDN","OR","XOR","NOT","MV","MVK","MVKH","MVKL","MVKLH","SHL","SHR","SHRU","EXT","EXTU","SET","CLR","CMPEQ","CMPGT","CMPLT","CMPEQSP","CMPGTSP","CMPLTSP","CMPGTU","CMPLTU","ZERO","NEG","ABS","NORM","LMBD","ABSSP","DINT","RINT","PACK2","PACKL4","ADDU","SUBU","SUBC","RCPSP","RSQRSP");
+    static final Set<String> SINGLE=Set.of("ADD","ADDK","ADDAW","ADDAD","ADDAH","ADDAB","SUBAW","SUBAH","SUBAB","SUB","AND","ANDN","OR","XOR","NOT","MV","MVK","MVKH","MVKL","MVKLH","SHL","SHR","SHRU","EXT","EXTU","SET","CLR","CMPEQ","CMPGT","CMPLT","CMPEQSP","CMPGTSP","CMPLTSP","CMPGTU","CMPLTU","ZERO","NEG","ABS","NORM","LMBD","ABSSP","DINT","RINT","PACK2","PACKL4","ADDU","SUBU","SUBC","RCPSP","RSQRSP");
     // SPRUFE8B MPYH..MPYLUHS pp.320-350: Multiply (16 x 16), E1 reads, dst in E2.
     private static final Set<String> MULTIPLY16=Set.of("MPY","MPYSU","MPYU","MPYUS","MPYH","MPYHU","MPYHUS","MPYHSU","MPYHL","MPYHLU","MPYHULS","MPYHSLU","MPYLH","MPYLHU","MPYLUHS","MPYLSHU");
 
@@ -584,7 +584,7 @@ public final class C6000PipelineCompiler {
         context.setRegisterValue(new RegisterValue(program.getRegister("c_flow_delay"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_schedule_entry"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_inert"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_arm"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_pair"),BigInteger.ZERO));context.setRegisterValue(new RegisterValue(program.getRegister("c_carry"),BigInteger.ZERO));
         context.setRegisterValue(new RegisterValue(program.getRegister("c_branch_terminal"),BigInteger.ONE));
-        for(String name:C6000PacketContext.PACKET_FIELDS)context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
+        for(String name:C6000PacketContext.STAGING_FIELDS)context.setRegisterValue(new RegisterValue(program.getRegister(name),BigInteger.ZERO));
         var memory=new DumbMemBufferImpl(program.getMemory(),at);
         var prototype=program.getLanguage().parse(memory,context,false);
         var ins=new PseudoInstruction(program,at,prototype,memory,context);

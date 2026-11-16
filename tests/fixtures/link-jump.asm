@@ -1,6 +1,6 @@
 ; link-jump fixture (hand-written, firmware-free)
         .text
-        .global h, g, ljloop, ljonly, ljwrite, ljbusy, ljpred, ljclob, ljfrag, lf_tail, ljuse, ljnocall, nc_tail
+        .global h, g, ljloop, ljonly, ljwrite, ljbusy, ljpred, ljclob, ljfrag, lf_tail, ljuse, ljnocall, nc_tail, ljepi, ep_tail
 h:      B       .S2     B3
         ADD     .L1     A4,A4,A4
         NOP     4
@@ -114,7 +114,11 @@ lu_one: B       .S1     lf_tail
         MVKL    .S2     lu_two,B3
         MVKH    .S2     lu_two,B3
         NOP     3
-lu_two: LDW     .D2T2   *++B15[2],B3
+lu_two: B       .S1     ep_tail
+        MVKL    .S2     lu_thr,B3
+        MVKH    .S2     lu_thr,B3
+        NOP     3
+lu_thr: LDW     .D2T2   *++B15[2],B3
         NOP     4
         B       .S2     B3
         NOP     5
@@ -134,3 +138,20 @@ ln_top: SUB     .L1     A2,1,A2
 nc_tail: B      .S2     B3
         ADD     .L1     A4,1,A4
         NOP     4
+        .align  32
+; known-bad: the target restores a link saved elsewhere (an epilogue)
+ljepi:  MV      .L2     B3,B6
+||      MV      .L1X    B4,A2
+        MVKL    .S2     le_top,B3
+        MVKH    .S2     le_top,B3
+le_top: SUB     .L1     A2,1,A2
+  [A2]  B       .S1     ep_tail
+  [!A2] MV      .L2     B6,B3
+        NOP     4
+        B       .S2     B3
+        NOP     5
+        .align  32
+ep_tail: LDW    .D2T2   *++B15[2],B3
+        NOP     4
+        B       .S2     B3
+        NOP     5

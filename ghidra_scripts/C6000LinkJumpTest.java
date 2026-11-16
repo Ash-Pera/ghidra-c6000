@@ -11,8 +11,8 @@ import ghidra.program.model.listing.Instruction;
 import ghidra.program.model.symbol.Reference;
 
 public class C6000LinkJumpTest extends GhidraScript {
-	private static final long[] ENTRIES = { 0x1000L, 0x1020L, 0x1040L, 0x1080L, 0x10c0L, 0x1100L, 0x1140L, 0x1180L, 0x11c0L, 0x1200L, 0x1220L, 0x1260L, 0x12a0L };
-	private static final String[] NAMES = { "h", "g", "ljloop", "ljonly", "ljwrite", "ljbusy", "ljpred", "ljclob", "ljfrag", "lf_tail", "ljuse", "ljnocall", "nc_tail" };
+	private static final long[] ENTRIES = { 0x1000L, 0x1020L, 0x1040L, 0x1080L, 0x10c0L, 0x1100L, 0x1140L, 0x1180L, 0x11c0L, 0x1200L, 0x1220L, 0x1280L, 0x12c0L, 0x12e0L, 0x1320L };
+	private static final String[] NAMES = { "h", "g", "ljloop", "ljonly", "ljwrite", "ljbusy", "ljpred", "ljclob", "ljfrag", "lf_tail", "ljuse", "ljnocall", "nc_tail", "ljepi", "ep_tail" };
 	private int checks;
 
 	@Override
@@ -39,7 +39,7 @@ public class C6000LinkJumpTest extends GhidraScript {
 		has(0x1040L, "\\bh\\(", "\\bg\\(", "while|do \\{|for \\(|goto", "== 0x1060\\b");
 		has(0x1080L, "\\bg\\(", "while|do \\{|for \\(|goto", "== 0x1090\\b");
 		// Known-bads: the jump keeps its transfer, its last slot carries nothing.
-		for (long[] k : new long[][] { { 0x10d4L, 0x10e4L }, { 0x1114L, 0x111cL }, { 0x1150L, 0x1158L }, { 0x1198L, 0x119cL }, { 0x11dcL, 0x11e4L }, { 0x1274L, 0x127cL } }) {
+		for (long[] k : new long[][] { { 0x10d4L, 0x10e4L }, { 0x1114L, 0x111cL }, { 0x1150L, 0x1158L }, { 0x1198L, 0x119cL }, { 0x11dcL, 0x11e4L }, { 0x1294L, 0x129cL }, { 0x12f4L, 0x12fcL } }) {
 			Instruction b = getInstructionAt(toAddr(k[0])), last = getInstructionAt(toAddr(k[1]));
 			if (b == null || !(b.getFlowType().isCall() || b.getFlowType().isJump()) || last != null && carries(last))
 				throw new AssertionError("known-bad at " + toAddr(k[0]) + ": " + b + " / " + last);

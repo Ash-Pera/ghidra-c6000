@@ -37,7 +37,7 @@ lo_top: SUB     .L1     A2,1,A2
         B       .S2     B3
         NOP     5
         .align  32
-; known-bad: the window builds another link on the taken path
+; known-bad: the window builds the link past it, an ordinary call
 ljwrite: MV     .L2     B3,B6
 ||      MV      .L1X    B4,A2
         MVKL    .S2     lw_top,B3

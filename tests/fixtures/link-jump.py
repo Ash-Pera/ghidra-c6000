@@ -16,7 +16,7 @@ jump is a loop call on one path and a tail call on the other.
   1080 ljonly   B3 = lo_top ; lo_top: SUB A2,1,A2 ; [A2] B g ; [!A2] MV B6,B3 ; NOP 4 ;
                 B B3: v + 3(n - 1) for n >= 1
   Known-bads, the jump keeps its transfer and its last slot carries nothing:
-  10c0 ljwrite  the window builds another link under the jump's predicate
+  10c0 ljwrite  the window builds the link past it: an ordinary call
   1100 ljbusy   the window holds another transfer
   1140 ljpred   the window rewrites the jump's predicate (upstream #66)
   1180 ljclob   the loop rewrites B3 between the link and the jump

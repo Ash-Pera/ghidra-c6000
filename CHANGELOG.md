@@ -89,6 +89,12 @@
   `[A1] B B4` and a return such as `[A1] B B3` were lifted with their slots on the
   not-taken path only. A predicated return whose cut window no cut supports any more is
   still released when its full window cannot be proven (issue #70).
+* An argument stored at entry SP and read back through a `B15` pop (`LDW *++B15[2]`)
+  is no longer dropped by the decompiler. `LDW` through `B15` now lifts without the
+  word-alignment mask, as `STW`/`STH`/`STDW` through `B15` already did: under the ABI
+  the stack pointer stays 8-byte aligned (SPRAB89 3.2), so the mask is a no-op that
+  only hid which stack slot the load reads. Loads through any other register keep it
+  (SPRUFE8B `LDW`).
 
 ## 1.3.0 - 2026-11-18
 

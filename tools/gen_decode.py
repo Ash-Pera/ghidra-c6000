@@ -874,7 +874,7 @@ def main():
                         placeholder_mnemonics.add(mnem)
                     w(":%s is %s { %s }" % (disp, " & ".join(pat), sem))
                     n += 1
-                    if mnem in {"STW", "STH", "STDW"} and (not short_memory or "i7=1" in pat):  # SPRAB89 3.2: B15 is 8-byte aligned, store unmasked
+                    if mnem in {"STW", "STH", "STDW", "LDW"} and (not short_memory or "i7=1" in pat):  # SPRAB89 3.2: B15 is 8-byte aligned, access unmasked
                         sp_pat = pat + (["base_idx=15"] if short_memory else ["i7=1"])
                         w(":%s is %s { %s }" % (disp, " & ".join(sp_pat), sem.replace("c6000_sem_%s(" % mnem.lower(), "c6000_sem_%s_sp(" % mnem.lower())))
                         n += 1

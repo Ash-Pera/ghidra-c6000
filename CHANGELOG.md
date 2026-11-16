@@ -112,6 +112,16 @@
   the stack pointer stays 8-byte aligned (SPRAB89 3.2), so the mask is a no-op that
   only hid which stack slot the load reads. Loads through any other register keep it
   (SPRUFE8B `LDW`).
+* A predicated return issued in another predicated return's delay window keeps both
+  windows when the register it tests is rewritten there under an unrelated guard and then
+  set to a constant under the outer return's own predicate: the last write to land
+  decides, and any later write that may run on the outer return's taken path still
+  refuses the carry. When the inner return's window issues one jump within the function,
+  the inner return is carried where that jump issues, if the jump is first in its execute
+  packet and it and every later slot are NOPs or false whenever the inner return is taken;
+  the jump stays native. The outer return may share its execute packet with instructions
+  that write neither its predicate nor B3. Both returns were lifted without delay slots,
+  dropping stores and return-value writes (SPRUFE8B 3.5, 4.2.6 B).
 
 ## 1.3.0 - 2026-11-18
 

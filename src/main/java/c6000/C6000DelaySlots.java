@@ -961,11 +961,13 @@ public final class C6000DelaySlots {
                     continue;
                 }
                 var arm = byOwner.get(at);
-                Address child = arm == null ? null : arm.inner().branch().getAddress();
-                Window window = reader.window(branch.branch(), monitor, (C6000CallAnalyzer.Preemption) null, child);
-                Instruction carrier = listing.getInstructionAt(branch.last());
+                // An owner's window holds its inner branch; an inner's, at most the jump it is carried at.
+                Address tolerate = arm == null ? branch.tolerated() : arm.inner().branch().getAddress();
+                Window window = reader.window(branch.branch(), monitor, (C6000CallAnalyzer.Preemption) null, tolerate);
+                Instruction last = listing.getInstructionAt(branch.last());
+                Instruction carrier = listing.getInstructionAt(branch.carrier());
                 Function owner = functions.getFunctionContaining(at);
-                if (window == null || carrier == null || !window.end().equals(carrier.getMaxAddress()) ||
+                if (window == null || last == null || carrier == null || !window.end().equals(last.getMaxAddress()) ||
                     owner == null || !owner.equals(window.owner()) || entered(program, at, window.end())) {
                     failed[i] = true;
                     continue;
@@ -975,13 +977,13 @@ public final class C6000DelaySlots {
         }
         for (int i = 0; i < count; i++) {
             for (var branch : armBranches.get(i)) {
-                if (branchAddrs.contains(branch.last()) || flag(program, branch.last(), "c_carry")) failed[i] = true;
+                if (branchAddrs.contains(branch.carrier()) || flag(program, branch.carrier(), "c_carry")) failed[i] = true;
             }
         }
         for (int i = 0; i < count; i++) {
             if (failed[i]) continue;
             for (var branch : armBranches.get(i)) {
-                Instruction carrier = listing.getInstructionAt(branch.last());
+                Instruction carrier = listing.getInstructionAt(branch.carrier());
                 if (carrier == null || !walker.canCarryBeforeCarrier(branch, carrier)) {
                     failed[i] = true;
                     break;
@@ -1006,7 +1008,7 @@ public final class C6000DelaySlots {
 
         Map<Address, List<C6000CallAnalyzer.CarryBranch>> carries = new LinkedHashMap<>();
         for (var branch : order)
-            carries.computeIfAbsent(branch.last(), ignored -> new ArrayList<>()).add(branch);
+            carries.computeIfAbsent(branch.carrier(), ignored -> new ArrayList<>()).add(branch);
         for (var group : carries.values())
             group.sort(Comparator.comparing(branch -> branch.branch().getAddress()));
 
@@ -1058,7 +1060,7 @@ public final class C6000DelaySlots {
     private static boolean sharesCarrier(List<C6000CallAnalyzer.CarryBranch> a, List<C6000CallAnalyzer.CarryBranch> b) {
         for (var x : a)
             for (var y : b)
-                if (x.last().equals(y.last())) return true;
+                if (x.carrier().equals(y.carrier())) return true;
         return false;
     }
 

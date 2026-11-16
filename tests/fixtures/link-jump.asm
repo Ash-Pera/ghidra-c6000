@@ -1,6 +1,6 @@
 ; link-jump fixture (hand-written, firmware-free)
         .text
-        .global h, g, ljloop, ljonly, ljwrite, ljbusy, ljpred, ljclob
+        .global h, g, ljloop, ljonly, ljwrite, ljbusy, ljpred, ljclob, ljfrag, lf_tail
 h:      B       .S2     B3
         ADD     .L1     A4,A4,A4
         NOP     4
@@ -85,3 +85,21 @@ lc_top: SUB     .L1     A2,1,A2
         NOP     5
         B       .S2     B3
         NOP     5
+        .align  32
+; known-bad: the caller also jumps to the target, its own code split off
+ljfrag: MV      .L2     B3,B6
+||      MV      .L1X    B4,A2
+  [!A2] B       .S1     lf_tail
+        NOP     5
+        MVKL    .S2     lf_top,B3
+        MVKH    .S2     lf_top,B3
+lf_top: SUB     .L1     A2,1,A2
+  [A2]  B       .S1     lf_tail
+  [!A2] MV      .L2     B6,B3
+        NOP     4
+        B       .S2     B3
+        NOP     5
+        .align  32
+lf_tail: B      .S2     B3
+        ADD     .L1     A4,1,A4
+        NOP     4

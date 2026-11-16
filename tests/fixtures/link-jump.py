@@ -20,6 +20,7 @@ jump is a loop call on one path and a tail call on the other.
   1100 ljbusy   the window holds another transfer
   1140 ljpred   the window rewrites the jump's predicate (upstream #66)
   1180 ljclob   the loop rewrites B3 between the link and the jump
+  11c0 ljfrag   the caller also jumps to the target (1200 lf_tail), its own code split off
 """
 
 from pathlib import Path
@@ -40,7 +41,10 @@ WORDS = [
     0x030C0FDB, 0x01101FD8, 0x0188A82A, 0x0180006A, 0xAFFFDC10, 0xA10BE058, 0x00006000, 0x00180362,
     0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x030C0FDB, 0x01101FD8, 0x0188C82A, 0x0180006A, 0x010BE058, 0x01980FDA, 0xAFFFD410, 0x00008000,
-    0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
+    0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x030C0FDB, 0x01101FD8, 0xB0000810, 0x00008000, 0x0188EC2A, 0x0180006A, 0x010BE058, 0xA0000810,
+    0xB1980FDA, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x000C0362, 0x02102058, 0x00006000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
 ]
 
 
@@ -48,7 +52,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x200)
+    image = bytearray(0x240)
     for index, word in enumerate(WORDS):
         struct.pack_into(endian + "I", image, 4 * index, word)
     Path(sys.argv[1]).write_bytes(image)

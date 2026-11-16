@@ -74,6 +74,8 @@ public final class C6000DelaySlots {
         if (arms > 0) log.appendMsg("C6000 Delay Slots", "carried " + arms + " call arm(s)");
         int nested = carryNestedTransfers(program, monitor);
         if (nested > 0) log.appendMsg("C6000 Delay Slots", "carried " + nested + " nested return/call branch(es)");
+        int linked = carryLinkJumps(program, monitor);
+        if (linked > 0) log.appendMsg("C6000 Delay Slots", "carried " + linked + " jump(s) to a function linked to a loop head");
         List<Address> candidates = new ArrayList<>(), stale = new ArrayList<>(), uncut = new ArrayList<>();
         var it = program.getListing().getInstructions(true);
         while (it.hasNext()) {
@@ -1054,6 +1056,54 @@ public final class C6000DelaySlots {
             }
         }
         return order.size();
+    }
+
+    /**
+     * Local: a predicated jump to another function where B3 may hold a loop head
+     * this function linked (C6000CallAnalyzer.LinkJump) calls that function, which
+     * returns to B3: to the loop head, or to the caller's link as a tail call
+     * (SPRUFE8B 3.5, 4.2.6 B). The jump stops transferring (c_inert) and its last
+     * slot carries the call and the return (C6000NestedCarryPayload action L).
+     * No other flow may enter the jump's window.
+     */
+    private static int carryLinkJumps(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        var functions = program.getFunctionManager();
+        var walker = new C6000CallAnalyzer.Walker(program);
+        var reader = new Reader(program);
+        List<C6000CallAnalyzer.LinkJump> found = new ArrayList<>();
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            var jump = it.next();
+            monitor.checkCancelled();
+            if (!C6000CallAnalyzer.Walker.displacementJump(jump) || continues(program, jump) ||
+                flag(program, jump.getAddress(), "c_inert")) continue;
+            var link = walker.linkJump(jump);
+            if (link != null) found.add(link);
+        }
+        var options = program.getOptions(C6000NestedCarryPayload.OPTIONS);
+        int count = 0;
+        for (var link : found) {
+            monitor.checkCancelled();
+            Address at = link.jump().getAddress();
+            Instruction jump = listing.getInstructionAt(at), carrier = listing.getInstructionAt(link.last());
+            if (jump == null || carrier == null || jump.isInDelaySlot() || flag(program, link.last(), "c_carry")) continue;
+            Function owner = functions.getFunctionContaining(at);
+            Window window = reader.window(jump, monitor);
+            if (owner == null || window == null || !owner.equals(window.owner()) ||
+                !window.end().equals(carrier.getMaxAddress()) || entered(program, at, window.end())) continue;
+            redecode(program, at, window.end(), Map.of("c_inert", 1L, "c_branch_terminal", 0L, "c_arm", 0L, "c_carry", 0L), true, monitor);
+            options.setString(C6000NestedCarryPayload.key(link.last()), "L," + link.predicate() + "," +
+                Long.toUnsignedString(link.callee().getOffset(), 16) + "," + Long.toUnsignedString(link.link().getOffset(), 16));
+            redecode(program, link.last(), carrier.getMaxAddress(), Map.of("c_carry", 1L, "c_arm", 15L), false, monitor);
+            var ref = program.getReferenceManager().addMemoryReference(link.last(), link.callee(),
+                RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
+            program.getReferenceManager().setPrimary(ref, true);
+            AddressSet body = new AddressSet(owner.getBody());
+            body.add(at, window.end());
+            owner.setBody(body);
+            count++;
+        }
+        return count;
     }
 
     /** Two candidates whose any branch shares a carry instruction. */

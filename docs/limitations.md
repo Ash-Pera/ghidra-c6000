@@ -105,6 +105,16 @@ in C identifiers, so their names cannot be told from a static function's.
 | Closed-call schedules | Pending effects through explicitly proved caller/callee boundaries; normal decompiler injection for complete reviewed callers. | Sequential leaf calls and pinned ownership/entry assumptions; explicit activation only. |
 | Read-only caller continuations | Pending effects through explicit immutable caller windows. | Bounded plans and entry proofs; not automatically installed as callee-only schedules. |
 
+Where default lifting is known to be inexact, the `C6000 Inexact Native Pipeline`
+analyzer (on by default) bookmarks a warning: a load result read before it lands, or two
+branch windows in flight at once (software-pipelined loops, nested windows). It changes no
+p-code. The opt-in `C6000 Assumed-Drained Schedules` analyzer (off by default;
+`-Dc6000.assumeDrainedSchedules=true` or `C6000ApplyAssumedSchedules.java`) applies an exact
+schedule to each unreviewed function under an assumed drained entry and bookmarks each one.
+That assumption is not a caller proof: a caller that enters with writes or branches in
+flight gets C that is exact only for a drained entry. It refuses an entry packet holding a
+branch and an entry issued within five cycles of one, and never replaces a recorded review.
+
 Native delay recovery remains conservative for nested transfers, register-target
 predicated branches that are not calls, and BDEC/BPOS. Ghidra's stock instruction-step
 emulator can fail on mixed-width delay windows; direct listing p-code execution and

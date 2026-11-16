@@ -103,6 +103,7 @@ CORE = [
                                     ("OpaqueCallLink", [], "C6000_OPAQUE_CALL_LINK_OK"),
                                     ("OpaqueCallProgram", [], "C6000_OPAQUE_CALL_PROGRAM_OK")], True),
     ("nested-window-schedule", [], [("WindowNeighbourBatch", [], "C6000_WINDOW_NEIGHBOUR_BATCH_OK")], True),
+    case("assumed-schedule", "AssumedSchedule", "C6000_ASSUMED_SCHEDULE_OK", None, analysis=True),
     case("pipeline-andn", "PipelineAndn", "C6000_PIPELINE_ANDN_OK", "json"),
     case("pipeline-pack", "PipelinePack", "C6000_PIPELINE_PACK_OK", "json"),
     case("pipeline-scalar-ops", "PipelineScalarOps", "C6000_PIPELINE_SCALAR_OPS_OK", "json"),
@@ -325,6 +326,8 @@ def main():
                     command += ["-preScript", "C6000EnteredIdleTailTest.java", "prepare"]
                 elif fixture == "delay-window-forms":
                     command += ["-preScript", "C6000DelayWindowFormsTest.java", "prepare"]
+                elif fixture == "assumed-schedule":
+                    command += ["-preScript", "C6000AssumedScheduleTest.java", "prepare"]
                 elif fixture == "nested-window-schedule":
                     command += ["-preScript", "C6000NestedWindowScheduleTest.java", "prepare"]
                 elif fixture == "constant-branch-target":

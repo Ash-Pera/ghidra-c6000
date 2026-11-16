@@ -731,20 +731,32 @@ call's last slot) must keep the call's own window.
 
 `jump-target-call.py IMAGE [be]` and `C6000JumpTargetCallTest.java` (with `prepare` as a
 pre-script) check `cl6x` 8.3.15 words of a jump whose target runs transfer-free code until
-a register call issued in its window, under the jump's own stable predicate, lands; the
-call's link is the address just past that code (SPRUFE8B 3.5, 4.2.6 B; issue #65's `pjreg`).
-Natively the jump kept no window and the call was lost. The call is now inert (`c_inert`)
+a call issued in its window, under the jump's own stable predicate, lands; the
+call's link is the address just past that code (SPRUFE8B 3.5, 4.2.6 B; issue #65).
+Natively the jump kept no window and the call was lost. A register call (`pjreg`) is inert (`c_inert`)
 but keeps the target it read at issue (`C6000_CARRY`), the jump lifts its whole window,
 and the target's last instruction carries the call (`c_carry`). `tcreg`, `tcarm` (with a
 call arm in the same window) and `tcbusy` (the target sets the link before the call
 lands) must decompile to both arms, with the jump's window in a body recomputed from flow.
-Known-bads keep the call's transfer: an independent predicate (`tcindep`), a link past
-the target's code (`tclink`), a target also reached in sequence (`tcfall`), an
-unconditional call (`tcuncond`), a target another function jumps into (`tcentry`), and
-displacement calls (`tcdir`, `tcearly`): Ghidra counts the jump's slots in the jump's
-context, where a same-sense displacement `B` parses as a branch, so the count and the
-flow body stop at it. A context change in the jump's `CFlowDelay` does not reach that
-parse (tried: the depth stays 3).
+A direct call (`tcdir`, issue #65's `pjcall`; `tcearly`) cannot ride the jump's native
+window: Ghidra parses delay slots in the owner's context (its `c_flow_delay`, `c_inert` and
+`c_arm`), where a same-sense displacement `B` is indistinguishable from the jump and stays
+a branch, so the slot count and the flow body stop at it. Neither a context field on the
+jump nor a context change in its constructor separates the two (tried: `c_tcall` keyed on
+`c_flow_delay=0`, which the slots inherit as the jump's value; `[c_flow_delay=0]`, which
+removes the jump's own window). So that jump keeps no native window: it parses inert and
+latches its predicate and target (`c_jcarry=1`, `C6000_JCOND`/`C6000_JTGT`), every slot
+decodes in its own context, and its last slot takes the jump on the latched predicate
+(`c_jcarry=2`, target by `JUMP_OVERRIDE_UNCONDITIONAL`). An opposite-sense call arm in the
+same window (`tcboth`) is carried by its last slot as `carryCallArms` does. Both ends must
+fall on cycle boundaries: the target runs whole packets for exactly the call's cycles, and
+the jump's last packet ends on its fifth delay cycle. A NOP-only target the call cuts short
+before the jump's last slot stays with preempted jumps (issue #50, `preempted-jump`'s
+`padcall`). Known-bads keep the call's transfer: an independent predicate (`tcindep`), a
+link past the target's code (`tclink`), a target also reached in sequence (`tcfall`), an
+unconditional call (`tcuncond`), a target another function jumps into (`tcentry`), a call
+landing inside the target's `NOP 2` (`tcmid`), and a jump whose last slot is a `NOP 2`
+outlasting its window (`tcover`).
 
 ## Additional decoder accuracy checks
 

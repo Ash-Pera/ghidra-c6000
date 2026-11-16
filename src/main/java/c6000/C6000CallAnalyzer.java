@@ -803,7 +803,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 
 		/**
 		 * Local: a predicated jump, alone in its packet, to another function's entry,
-		 * its window transfer-free with guard and link unchanged on the taken path,
+		 * its window (proven transfer-free by C6000DelaySlots) with its guard unchanged,
 		 * where B3 may hold the one link this function builds to a loop head that runs
 		 * to the jump with B3 unchanged: the callee returns there (SPRUFE8B 3.5, 4.2.6 B).
 		 */
@@ -825,21 +825,18 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			List<Instruction> slots = window(jump);
 			if (slots == null || slots.isEmpty()) return null;
 			for (Instruction slot : slots)
-				if (slot.getLength() != 4 || !untimed(slot) || transfer(slot) && !inert(slot)) return null;
+				if (slot.getLength() != 4 || !untimed(slot)) return null;
 			List<Instruction> path = new ArrayList<>(lookBack(jump));
 			int at = path.size();
 			path.add(jump);
 			path.addAll(slots);
 			int[] issue = issueCycles(path);
 			int last = path.size() - 1;
+			// The carrier reads the guard the jump read; it reads B3 after the window's writes, as the callee does.
 			Register guardRegister = program.getRegister(guard.replace("!", "")), b3 = program.getRegister("B3");
-			String opposite = guard.startsWith("!") ? guard.substring(1) : "!" + guard;
 			for (int i = 0; i < path.size(); i++) {
 				Instruction insn = path.get(i);
-				if (issue[i] > issue[last] || issue[i] + resultDelay(insn) < issue[at]) continue;
-				if (writes(insn, guardRegister)) return null;
-				// B3 changes only on the not-taken path: under the opposite guard, issued in the window.
-				if (writes(insn, b3) && (i <= at || !opposite.equals(predicate(insn)))) return null;
+				if (issue[i] <= issue[last] && issue[i] + resultDelay(insn) >= issue[at] && writes(insn, guardRegister)) return null;
 			}
 			Address link = loopLink(caller, jump, b3);
 			if (link == null) return null;

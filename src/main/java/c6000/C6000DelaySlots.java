@@ -722,57 +722,94 @@ public final class C6000DelaySlots {
         var functions = program.getFunctionManager();
         var walker = new C6000CallAnalyzer.Walker(program);
         var reader = new Reader(program);
-        Map<Address, C6000CallAnalyzer.NestedArm> arms = new LinkedHashMap<>();
-        Map<Address, C6000CallAnalyzer.CarryBranch> branches = new LinkedHashMap<>();
+        // Each arm is a candidate: owner branch, its one proven-false inner transfer, and the window each carries into.
+        List<C6000CallAnalyzer.NestedArm> armList = new ArrayList<>();
+        Set<Address> seenOwners = new HashSet<>();
         for (var it = listing.getInstructions(true); it.hasNext();) {
             monitor.checkCancelled();
             var arm = walker.nestedArm(it.next());
             if (arm == null) continue;
-            Address owner = arm.owner().branch().getAddress();
-            if (arms.putIfAbsent(owner, arm) != null) return 0;
-            branches.put(owner, arm.owner());
-            branches.put(arm.inner().branch().getAddress(), arm.inner());
+            if (seenOwners.add(arm.owner().branch().getAddress())) armList.add(arm);
         }
-        if (branches.isEmpty()) return 0;
+        if (armList.isEmpty()) return 0;
 
-        Map<Address, Window> windows = new LinkedHashMap<>();
-        for (var entry : branches.entrySet()) {
-            monitor.checkCancelled();
-            var branch = entry.getValue().branch();
-            if (flag(program, branch.getAddress(), "c_inert") || flag(program, branch.getAddress(), "c_carry") ||
-                branch.isInDelaySlot()) return 0;
-            var arm = arms.get(branch.getAddress());
-            Address child = arm == null ? null : arm.inner().branch().getAddress();
-            Window window = reader.window(branch, monitor, (C6000CallAnalyzer.Preemption) null, child);
-            Instruction carrier = listing.getInstructionAt(entry.getValue().last());
-            Function owner = functions.getFunctionContaining(branch.getAddress());
-            if (window == null || carrier == null || !window.end().equals(carrier.getMaxAddress()) ||
-                owner == null || !owner.equals(window.owner()) || entered(program, branch.getAddress(), window.end()))
-                return 0;
-            windows.put(entry.getKey(), window);
+        int count = armList.size();
+        List<List<C6000CallAnalyzer.CarryBranch>> armBranches = new ArrayList<>();
+        Map<Address, C6000CallAnalyzer.NestedArm> byOwner = new LinkedHashMap<>();
+        Set<Address> branchAddrs = new HashSet<>();
+        for (var arm : armList) {
+            armBranches.add(List.of(arm.owner(), arm.inner()));
+            byOwner.put(arm.owner().branch().getAddress(), arm);
+            branchAddrs.add(arm.owner().branch().getAddress());
+            branchAddrs.add(arm.inner().branch().getAddress());
         }
+
+        // A candidate that fails any check is skipped; the rest still carry. Each check stays exactly as strict.
+        boolean[] failed = new boolean[count];
+        Map<Address, Window> windows = new LinkedHashMap<>();
+        for (int i = 0; i < count; i++) {
+            for (var branch : armBranches.get(i)) {
+                monitor.checkCancelled();
+                Address at = branch.branch().getAddress();
+                if (flag(program, at, "c_inert") || flag(program, at, "c_carry") || branch.branch().isInDelaySlot()) {
+                    failed[i] = true;
+                    continue;
+                }
+                var arm = byOwner.get(at);
+                Address child = arm == null ? null : arm.inner().branch().getAddress();
+                Window window = reader.window(branch.branch(), monitor, (C6000CallAnalyzer.Preemption) null, child);
+                Instruction carrier = listing.getInstructionAt(branch.last());
+                Function owner = functions.getFunctionContaining(at);
+                if (window == null || carrier == null || !window.end().equals(carrier.getMaxAddress()) ||
+                    owner == null || !owner.equals(window.owner()) || entered(program, at, window.end())) {
+                    failed[i] = true;
+                    continue;
+                }
+                windows.put(at, window);
+            }
+        }
+        for (int i = 0; i < count; i++) {
+            for (var branch : armBranches.get(i)) {
+                if (branchAddrs.contains(branch.last()) || flag(program, branch.last(), "c_carry")) failed[i] = true;
+            }
+        }
+        for (int i = 0; i < count; i++) {
+            if (failed[i]) continue;
+            for (var branch : armBranches.get(i)) {
+                Instruction carrier = listing.getInstructionAt(branch.last());
+                if (carrier == null || !walker.canCarryBeforeCarrier(branch, carrier)) {
+                    failed[i] = true;
+                    break;
+                }
+            }
+        }
+
+        // Candidates sharing a carrier or overlapping windows carry or skip together.
+        int[] parent = new int[count];
+        for (int i = 0; i < count; i++) parent[i] = i;
+        for (int i = 0; i < count; i++)
+            for (int j = i + 1; j < count; j++)
+                if (sharesCarrier(armBranches.get(i), armBranches.get(j)) ||
+                    windowsOverlap(armBranches.get(i), armBranches.get(j), windows)) union(parent, i, j);
+        boolean[] groupFailed = new boolean[count];
+        for (int i = 0; i < count; i++) if (failed[i]) groupFailed[find(parent, i)] = true;
+
+        List<C6000CallAnalyzer.CarryBranch> order = new ArrayList<>();
+        for (int i = 0; i < count; i++)
+            if (!groupFailed[find(parent, i)]) order.addAll(armBranches.get(i));
+        if (order.isEmpty()) return 0;
 
         Map<Address, List<C6000CallAnalyzer.CarryBranch>> carries = new LinkedHashMap<>();
-        for (var branch : branches.values()) {
-            if (branches.containsKey(branch.last())) return 0;
-            if (flag(program, branch.last(), "c_carry")) return 0;
+        for (var branch : order)
             carries.computeIfAbsent(branch.last(), ignored -> new ArrayList<>()).add(branch);
-        }
         for (var group : carries.values())
             group.sort(Comparator.comparing(branch -> branch.branch().getAddress()));
-        for (var entry : carries.entrySet()) {
-            Instruction carrier = listing.getInstructionAt(entry.getKey());
-            if (carrier == null) return 0;
-            for (var branch : entry.getValue())
-                if (!walker.canCarryBeforeCarrier(branch, carrier)) return 0;
-        }
 
-        List<C6000CallAnalyzer.CarryBranch> order = new ArrayList<>(branches.values());
         order.sort((a, b) -> b.branch().getAddress().compareTo(a.branch().getAddress()));
         for (var branch : order) {
             monitor.checkCancelled();
             Address at = branch.branch().getAddress();
-            C6000CallAnalyzer.NestedArm arm = arms.get(at);
+            C6000CallAnalyzer.NestedArm arm = byOwner.get(at);
             long armCode = arm == null ? 0 : nestedArmCode(arm.inner().predicate());
             Map<String, Long> context = new LinkedHashMap<>();
             context.put("c_inert", 1L);
@@ -809,7 +846,40 @@ public final class C6000DelaySlots {
                 program.getReferenceManager().setPrimary(ref, true);
             }
         }
-        return branches.size();
+        return order.size();
+    }
+
+    /** Two candidates whose any branch shares a carry instruction. */
+    private static boolean sharesCarrier(List<C6000CallAnalyzer.CarryBranch> a, List<C6000CallAnalyzer.CarryBranch> b) {
+        for (var x : a)
+            for (var y : b)
+                if (x.last().equals(y.last())) return true;
+        return false;
+    }
+
+    /** Two candidates whose any proven windows overlap in bytes. */
+    private static boolean windowsOverlap(List<C6000CallAnalyzer.CarryBranch> a, List<C6000CallAnalyzer.CarryBranch> b,
+            Map<Address, Window> windows) {
+        for (var x : a) {
+            Window wx = windows.get(x.branch().getAddress());
+            if (wx == null) continue;
+            for (var y : b) {
+                Window wy = windows.get(y.branch().getAddress());
+                if (wy == null) continue;
+                if (x.branch().getAddress().compareTo(wy.end()) <= 0 &&
+                    y.branch().getAddress().compareTo(wx.end()) <= 0) return true;
+            }
+        }
+        return false;
+    }
+
+    private static int find(int[] parent, int i) {
+        while (parent[i] != i) i = parent[i] = parent[parent[i]];
+        return i;
+    }
+
+    private static void union(int[] parent, int i, int j) {
+        parent[find(parent, i)] = find(parent, j);
     }
 
     private static int nestedArmCode(String predicate) {

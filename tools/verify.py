@@ -156,6 +156,8 @@ TI = [
     case("store-mask-print", "StoreMaskPrint", "C6000_STORE_MASK_PRINT_OK", "json"),
     case("store-mask-schedule", "StoreMaskSchedule", "C6000_STORE_MASK_SCHEDULE_OK", "json"),
     case("nested-return-arm", "NestedReturnArm", "C6000_NESTED_RETURN_ARM_OK", None, analysis=True),
+    case("two-nested-arms", "TwoNestedArms", "C6000_TWO_NESTED_ARMS_OK", None, analysis=True),
+    case("grouped-nested-arms", "GroupedNestedArms", "C6000_GROUPED_NESTED_ARMS_OK", None, analysis=True),
 ]
 
 
@@ -346,6 +348,10 @@ def main():
                     command += ["-preScript", "C6000StackedReturnWindowsTest.java", "prepare"]
                 elif fixture == "nested-return-arm":
                     command += ["-preScript", "C6000NestedReturnArmTest.java", "prepare"]
+                elif fixture == "two-nested-arms":
+                    command += ["-preScript", "C6000TwoNestedArmsTest.java", "prepare"]
+                elif fixture == "grouped-nested-arms":
+                    command += ["-preScript", "C6000GroupedNestedArmsTest.java", "prepare"]
                 elif fixture == "call-arm":
                     command += ["-preScript", "C6000CallArmTest.java", "prepare"]
                 elif fixture not in ELF:

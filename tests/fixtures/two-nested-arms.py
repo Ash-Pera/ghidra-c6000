@@ -34,7 +34,7 @@ def main():
     if result.returncode:
         raise RuntimeError("TI assembly failed; see " + str(log_path))
     image = bytearray(object_sections(object_path)[".pf_two_nested_arms"])
-    if len(image) < 88 or len(image) % 4:
+    if len(image) < 144 or len(image) % 4:
         raise ValueError("Unexpected two-nested-arms section size")
     if len(sys.argv) == 3:
         image = b"".join(image[index:index + 4][::-1] for index in range(0, len(image), 4))

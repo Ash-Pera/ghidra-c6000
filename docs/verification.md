@@ -14,12 +14,13 @@ necessary. The runner checks this prerequisite.
 # Build and run the core suite in both endian modes.
 python3 tools/verify.py --jobs 2
 
-# Include the three additional fixtures that require TI's assembler.
+# Include the additional fixtures that require TI's assembler.
 python3 tools/verify.py --with-ti --jobs 2
 ```
 
 CI runs the core suite on Ghidra 12.1.4 and 12.2. The additional `--with-ti`
-checks cover predicate facts, caller continuations and post-loop dispatch. A requested
+checks cover predicate facts, caller continuations, post-loop dispatch and native
+load-result deferral, among others. A requested
 run fails if a required tool is missing.
 
 ### Tool configuration

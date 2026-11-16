@@ -83,7 +83,9 @@ define register offset=0x4100 size=4
     C6000_PKT_B20 C6000_PKT_B21 C6000_PKT_B22 C6000_PKT_B23
     C6000_PKT_B24 C6000_PKT_B25 C6000_PKT_B26 C6000_PKT_B27
     C6000_PKT_B28 C6000_PKT_B29 C6000_PKT_B30 C6000_PKT_B31 ];
-define register offset=0x4200 size=4 [ C6000_PKT_OLD0 C6000_PKT_OLD1 ];
+define register offset=0x4200 size=4
+  [ C6000_PKT_OLD0 C6000_PKT_OLD1 C6000_LOAD_OLD0 C6000_LOAD_OLD1
+    C6000_LOAD_VALUE0 C6000_LOAD_VALUE1 ];
 
 # ---------------------------------------------------------------------------
 # Control registers
@@ -144,6 +146,8 @@ define context contextreg
   c_pkt_commit1 = (71,77) noflow
   c_arm = (78,81) noflow # local: call arms 1-2, predicate-keyed nested arms 3-14, nested carrier 15 (C6000DelaySlots.carryCallArms, carryNestedTransfers)
   c_pair = (82,82) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
+  c_load_reg = (83,89) noflow # deferred load destination: GPR 1-64 or aligned pair 65-96 (gen_packet_sinc.py)
+  c_load_mode = (90,91) noflow # 1: shadow this load's E5 result, 2: commit it before this packet
 @else
   c_pkt_write0 = (32,38) noflow
   c_pkt_write1 = (39,45) noflow
@@ -151,6 +155,8 @@ define context contextreg
   c_pkt_commit1 = (53,59) noflow
   c_arm = (60,63) noflow # local: call arms 1-2, predicate-keyed nested arms 3-14, nested carrier 15 (C6000DelaySlots.carryCallArms, carryNestedTransfers)
   c_pair = (64,64) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
+  c_load_reg = (83,89) noflow # deferred load destination: GPR 1-64 or aligned pair 65-96 (gen_packet_sinc.py)
+  c_load_mode = (90,91) noflow # 1: shadow this load's E5 result, 2: commit it before this packet
 @endif
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"
@@ -613,15 +619,20 @@ define pcodeop c6000_nested_carry;
 # Local: the shared tail's last instruction, then the call both of its issuing branches pended (SPRUFE8B 3.5, 4.2.6 B).
 :^instruction is c_schedule_entry=0 & c_carry=1 & c_arm=15 & instruction [ c_carry=0; c_arm=0; ] { c6000_nested_carry(); build instruction; local nestedCarryEnd:1 = 0; }
 :^instruction is c_schedule_entry=0 & c_carry=1 & c_arm!=15 & instruction [ c_carry=0; ] { build instruction; call [C6000_CARRY]; }
-:^instruction is c_pkt_active=1 & c_schedule_entry=0 & PktIn0 & PktIn1 & PktOut0 & PktOut1 &
-  PktCommit & instruction [ c_pkt_active=0; ]
+# c_pkt_active selects this wrapper for parallel staging and E5 load deferral (SPRUFE8B 4.2.5); its operands read the load fields, so only c_pkt_active is cleared.
+:^instruction is c_pkt_active=1 & c_schedule_entry=0 & PktLoadCommit & PktIn0 & PktIn1 &
+  PktLoadIn & PktOut0 & PktOut1 & PktCommit & PktLoadOut & instruction
+  [ c_pkt_active=0; ]
 {
+  build PktLoadCommit;
   build PktIn0;
   build PktIn1;
+  build PktLoadIn;
   build instruction;
   build PktOut0;
   build PktOut1;
   build PktCommit;
+  build PktLoadOut;
 }
 with : c_schedule_entry=0 & c_carry=0 {
 # Figure F-8 pointer branches use op=110 (IRP) or 111 (NRP).

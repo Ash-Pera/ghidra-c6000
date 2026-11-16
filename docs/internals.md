@@ -70,11 +70,16 @@ out of band:
 A word's first compact instruction is its 16 LSBs in either byte order (SPRUFE8B
 3.10.2.3, Table 3-16). In big-endian memory that halfword is at byte offset +2, and the
 second instruction is before the slot that executes it, where SLEIGH cannot read. The
-big-endian languages therefore widen `contextreg` to 64 bits and add `c_h16`, which the
+big-endian languages therefore add `c_h16` to `contextreg`, which the
 primer sets to each compact slot's halfword. `tools/gen_compact_context.py` mirrors every
 `insn16` field onto `c_h16`, and a 16-bit pad token keeps each compact instruction two
-bytes long. Little-endian languages keep the `insn16` token and a 32-bit `contextreg`
-(issue #31). Java readers use `C6000PacketContext.halfword`.
+bytes long. Little-endian languages keep the `insn16` token (issue #31). Java readers use
+`C6000PacketContext.halfword`. Both languages use a 12-byte `contextreg`. SLEIGH silently
+aliases overlapping context fields, so `tools/check_context_fields.py` parses the
+`define context` block for each endianness, including the big-endian compact include. It
+fails on an overlap (other than a compact view inside `c_h16`) or on a field past the
+register. `--selftest` first proves that it catches broken copies; `tools/verify.py` runs
+it with `--selftest`.
 
 Only the eighth word of a compact fetch packet decodes as a 4-byte `CPKT` instruction.
 The `1110` prefix in bits 31..28 is the reserved predication encoding `creg=7, z=0`
@@ -105,10 +110,61 @@ two deferred outputs per writer or per packet, a terminal branch that writes a d
 register, a continuing writer predicated on its own register, or incoming targets into
 the staged packet interior are left unstaged. Prime-time references are checked before disassembly; the post-analysis
 audit also checks newly discovered targets, clears deferral, and re-decodes listed
-members. Exact pipeline-schedule p-code parsing normalizes these context fields to zero,
-so native staging is not applied a second time. Ordinary result latencies are still not
-scheduled by this native path; supported functions can instead use an explicitly enabled
-[exact packet schedule](pipeline-schedules.md), with a proved entry contract.
+members. Exact pipeline-schedule p-code parsing normalizes these context fields, and the
+load-deferral fields below, to zero, so native staging is not applied a second time. Other
+result latencies are not scheduled by this native path; supported functions can instead
+use an explicitly enabled [exact packet schedule](pipeline-schedules.md), with a proved
+entry contract.
+
+### Native load-result deferral
+
+A load writes its destination in E5. Packets issued one to four cycles after it, the E5
+cycle included, read the old value, and the packet issued five cycles after it is the first
+to read the loaded one (SPRUFE8B 3.4, Table 3-8; 4.2.5, Table 4-10). Default lifting
+writes at issue. The `C6000 Inexact Native Pipeline` analyzer runs
+`C6000NativeLoadLatencyScheduler` first. It walks each function's straight-line packets in
+address order, timed by `C6000ExecutionPackets.issueCycles`: NOP counts, protected loads
+and crossed headers. For a load whose destination is read before it lands, it marks the
+load with `c_load_mode=1` and the first member of the landing packet with `c_load_mode=2`.
+`c_load_reg` holds the destination, one GPR (1-64) or an aligned pair (65-96). It sets
+`c_pkt_active` on both, so the parallel-read wrapper applies. That wrapper saves the old
+register, builds the load, moves the result to `C6000_LOAD_VALUE*` and restores the old
+value. The landing member copies the shadow back before it is built, so every member of
+the landing packet reads the new value. A predicated load is exact: its predicate is
+sampled in E1 inside the load's own p-code (SPRUFE8B 3.6), so a false predicate shadows
+the unchanged register. The deferral shares the parallel-read wrapper rather than adding a
+context-only root constructor. In a test build, such a constructor multiplied the
+little-endian decision tree past what Ghidra 12.2 decodes from the `.sla` ("Expecting
+signed integer attribute"). The wrapper clears only `c_pkt_active`, because its operand
+tables read the load fields.
+
+The scheduler refuses, keeping native lifting and the warning (the bookmark names the reason), when:
+
+- the destination is not one register or an aligned pair, the function uses the SPLOOP
+  buffer, the load's p-code is opaque or leaves the instruction, or the load also updates
+  its destination in E1;
+- the load lands outside the decoded straight-line body;
+- a multicycle NOP generator other than `NOP n` (IDLE, CALLP, BNOP, ADDKPC), or two
+  conflicting generators, lies between the load and its landing packet;
+- a branch or call issues in the five cycles before the load (the load is in its delay
+  slots), or between the load and its landing packet;
+- another member of the load's packet reads or writes the destination, or an earlier member
+  of an unstaged packet writes the load's predicate or address input;
+- another instruction writes the destination after the load, through the landing packet;
+- a DP or MPYI instruction with a later source-read cycle reads the destination in the
+  window;
+- an earlier write of the destination is still in flight when the load issues;
+- any reference, external entry point or function start lies after the load, up to and
+  including the landing packet start;
+- the load or landing instruction carries a call-carry or exact-schedule wrapper;
+- another accepted load is in flight in an overlapping span: the language carries one
+  shadow.
+
+A function with an exact schedule entry is left to the schedule. Every analyzer pass
+re-plans the functions that hold marks, so a reference found later revokes a deferral.
+The warning clears only when the listing p-code shadows the result at the load and
+commits it at the landing packet. Like the rest of native lifting, deferral assumes a
+drained entry: a load in flight from the caller is not modelled.
 
 ### Native delay windows
 

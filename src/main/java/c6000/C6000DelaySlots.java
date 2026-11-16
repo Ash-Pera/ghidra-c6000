@@ -65,6 +65,8 @@ public final class C6000DelaySlots {
         if (preempted > 0) log.appendMsg("C6000 Delay Slots", "continued " + preempted + " preempted jump(s)");
         int carried = carryTails(program, monitor);
         if (carried > 0) log.appendMsg("C6000 Delay Slots", "carried " + carried + " shared call tail(s)");
+        int targets = carryTargetCalls(program, monitor);
+        if (targets > 0) log.appendMsg("C6000 Delay Slots", "carried " + targets + " call(s) into their jump's target");
         int arms = carryCallArms(program, monitor);
         if (arms > 0) log.appendMsg("C6000 Delay Slots", "carried " + arms + " call arm(s)");
         List<Address> candidates = new ArrayList<>(), stale = new ArrayList<>();
@@ -779,6 +781,91 @@ public final class C6000DelaySlots {
             count++;
         }
         return count;
+    }
+
+    /**
+     * Local: a jump whose target runs transfer-free code until a register
+     * call issued in its window lands, the call taken exactly when the jump is
+     * and linked just past that code (C6000CallAnalyzer.TargetCall), calls
+     * from the target's last instruction (SPRUFE8B 3.5, 4.2.6 B). The call
+     * stops transferring (c_inert) but keeps the target it read at issue
+     * (C6000_CARRY), so the jump takes its whole window, and the instruction
+     * before the link carries the call (c_carry). Only the jump may reach the
+     * target's code: no other flow, and not sequential issue.
+     */
+    private static int carryTargetCalls(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        var functions = program.getFunctionManager();
+        var walker = new C6000CallAnalyzer.Walker(program);
+        var reader = new Reader(program);
+        List<C6000CallAnalyzer.TargetCall> found = new ArrayList<>();
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            var jump = it.next();
+            monitor.checkCancelled();
+            if (!C6000CallAnalyzer.Walker.displacementJump(jump) || continues(program, jump) ||
+                jump.getPrototype().getDelaySlotByteCount() > parallelBytes(program, jump.getAddress())) continue;
+            var t = walker.targetCall(jump);
+            if (t != null) found.add(t);
+        }
+        int count = 0;
+        for (var t : found) {
+            monitor.checkCancelled();
+            Instruction jump = listing.getInstructionAt(t.jump().getAddress());
+            Instruction call = listing.getInstructionAt(t.call().getAddress());
+            if (jump == null || call == null || jump.isInDelaySlot() || call.isInDelaySlot() ||
+                flag(program, call.getAddress(), "c_inert") || flag(program, t.last(), "c_carry")) continue;
+            Address target = jump.getDefaultFlows()[0];
+            Function owner = functions.getFunctionContaining(jump.getAddress());
+            if (!java.util.Objects.equals(owner, functions.getFunctionContaining(call.getAddress()))) continue;
+            Function there = functions.getFunctionContaining(target);
+            if (there != null && !there.equals(owner) || functions.getFunctionAt(target) != null) continue;
+            if (!onlyJumpReaches(program, jump, target, t.last()) || !sequentiallyUnreached(program, reader, target, monitor)) continue;
+            Address end = call.getMaxAddress().add(call.getPrototype().getDelaySlotByteCount());
+            redecode(program, call.getAddress(), end, "c_inert", monitor);
+            if (listing.getInstructionAt(t.last()) == null)
+                Disassembler.getDisassembler(program, monitor, null).disassemble(target, new AddressSet(target, t.last()), false);
+            Instruction carrier = listing.getInstructionAt(t.last());
+            if (carrier == null) throw new IllegalStateException("target call lost its carrier at " + t.last());
+            redecode(program, t.last(), carrier.getMaxAddress(), "c_carry", monitor);
+            // The target's code runs only after the jump: the jump's function owns it.
+            var span = new AddressSet(target, t.last().add(3));
+            if (owner != null && !owner.getBody().contains(span)) {
+                try { owner.setBody(new AddressSet(owner.getBody()).union(span)); }
+                catch (ghidra.program.database.function.OverlappingFunctionException e) { }
+            }
+            count++;
+        }
+        return count;
+    }
+
+    /** No flow from outside [target, last] but jump enters it. */
+    private static boolean onlyJumpReaches(Program program, Instruction jump, Address target, Address last) {
+        var refs = program.getReferenceManager();
+        Address end = last.add(3);
+        for (var to = refs.getReferenceDestinationIterator(new AddressSet(target, end), true); to.hasNext();) {
+            for (var it = refs.getReferencesTo(to.next()); it.hasNext();) {
+                Reference r = it.next();
+                Address from = r.getFromAddress();
+                if (!r.getReferenceType().isFlow() || from.equals(jump.getAddress()) ||
+                    from.compareTo(target) >= 0 && from.compareTo(end) <= 0) continue;
+                return false;
+            }
+        }
+        return !program.getSymbolTable().isExternalEntryPoint(target);
+    }
+
+    /** The packet before target ends an unconditional branch's proven window: sequential issue never reaches target. */
+    private static boolean sequentiallyUnreached(Program program, Reader reader, Address target, TaskMonitor monitor) throws CancelledException {
+        Address before = target.previous();
+        for (int back = 4; back <= MAX_BYTES && target.getOffset() >= back; back += 4) {
+            Instruction d = reader.decode(target.subtract(back));
+            if (d == null || d.getMnemonicString().startsWith("[") || flag(program, d.getAddress(), "c_inert")) continue;
+            String name = C6000CallAnalyzer.baseName(d);
+            if (!(name.equals("B.S1") || name.equals("B.S2"))) continue;
+            Window w = reader.window(d, monitor);
+            if (w != null && w.end().equals(before)) return true;
+        }
+        return false;
     }
 
     /** The unconditional call whose window ends at the tail's last instruction, to the same callee and link, or null. */

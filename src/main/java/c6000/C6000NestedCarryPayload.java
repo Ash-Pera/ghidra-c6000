@@ -4,6 +4,7 @@ package c6000;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import ghidra.program.model.address.Address;
 import ghidra.program.model.lang.InjectContext;
 import ghidra.program.model.lang.InjectPayloadCallother;
 import ghidra.program.model.listing.Program;
@@ -49,7 +50,9 @@ public final class C6000NestedCarryPayload extends InjectPayloadCallother {
             String[] fields = action.split(",", -1);
             boolean call = fields.length == 3 && fields[0].equals("C");
             boolean returns = fields.length == 2 && fields[0].equals("R");
-            if ((!call && !returns) || !fields[1].matches("!?[AB][0-9]{1,2}"))
+            // L: call, then continue at the loop head when B3 held it, else return (C6000DelaySlots.carryLinkJumps).
+            boolean linked = fields.length == 4 && fields[0].equals("L");
+            if ((!call && !returns && !linked) || !fields[1].matches("!?[AB][0-9]{1,2}"))
                 throw new IOException("Invalid nested carry action at " + context.baseAddr);
             var guard = program.getRegister(fields[1].replace("!", ""));
             if (guard == null) throw new IOException("Unknown nested carry guard " + fields[1]);
@@ -64,6 +67,30 @@ public final class C6000NestedCarryPayload extends InjectPayloadCallother {
             int branchIndex = ops.size();
             ops.add(new PcodeOp(context.baseAddr, start + branchIndex, PcodeOp.CBRANCH,
                 new Varnode[] { new Varnode(constant.getAddress(0), 4), skip }, null));
+            if (linked) {
+                Address callee, head;
+                try {
+                    callee = program.getAddressFactory().getDefaultAddressSpace().getAddress(Long.parseUnsignedLong(fields[2], 16));
+                    head = program.getAddressFactory().getDefaultAddressSpace().getAddress(Long.parseUnsignedLong(fields[3], 16));
+                }
+                catch (NumberFormatException e) {
+                    throw new IOException("Invalid nested carry link at " + context.baseAddr, e);
+                }
+                var saved = new Varnode(unique.getAddress(temp), 4);
+                var away = new Varnode(unique.getAddress(temp + 4), 1);
+                temp += 16;
+                ops.add(new PcodeOp(context.baseAddr, start + ops.size(), PcodeOp.COPY, new Varnode[] { link }, saved));
+                ops.add(new PcodeOp(context.baseAddr, start + ops.size(), PcodeOp.CALL, new Varnode[] { new Varnode(callee, 4) }, null));
+                ops.add(new PcodeOp(context.baseAddr, start + ops.size(), PcodeOp.INT_NOTEQUAL, new Varnode[] {
+                    saved, new Varnode(constant.getAddress(head.getOffset()), 4) }, away));
+                ops.add(new PcodeOp(context.baseAddr, start + ops.size(), PcodeOp.CBRANCH, new Varnode[] {
+                    new Varnode(constant.getAddress(2), 4), away }, null));
+                ops.add(new PcodeOp(context.baseAddr, start + ops.size(), PcodeOp.BRANCH, new Varnode[] { new Varnode(head, 4) }, null));
+                ops.add(new PcodeOp(context.baseAddr, start + ops.size(), PcodeOp.RETURN, new Varnode[] { saved }, null));
+                int done = ops.size();
+                ops.get(branchIndex).setInput(new Varnode(constant.getAddress(done - branchIndex), 4), 0);
+                continue;
+            }
             if (call) {
                 long offset;
                 try {

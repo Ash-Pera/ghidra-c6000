@@ -1336,7 +1336,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			for (int i = at + 1; i < execution.size(); i++) {
 				Instruction slot = execution.get(i);
 				if (slot.getLength() != 4 || untimed(program, slot)) return null;
-				// A branch carryTails made inert (a shared tail's call, taken only with the jump) transfers nothing.
+				// A branch carryTails made inert (a shared tail's or a target call) transfers nothing.
 				if (!transfer(slot) || inert(slot)) continue;
 				// One transfer, a later packet, the opposite sense of the jump's unchanged predicate.
 				if (found >= 0 || issue[i] == issue[at] || !complementary(jump, slot) ||

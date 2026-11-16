@@ -833,6 +833,25 @@ in the body. `armcall` must decompile to both arms (8 from the jump's slots, or
 packet rewrites A1 before the call reads it) and `armentry` (another jump enters the
 call's last slot) must keep the call's own window.
 
+## Calls carried into a jump's target (local)
+
+`jump-target-call.py IMAGE [be]` and `C6000JumpTargetCallTest.java` (with `prepare` as a
+pre-script) check `cl6x` 8.3.15 words of a jump whose target runs transfer-free code until
+a register call issued in its window, under the jump's own stable predicate, lands; the
+call's link is the address just past that code (SPRUFE8B 3.5, 4.2.6 B; issue #65's `pjreg`).
+Natively the jump kept no window and the call was lost. The call is now inert (`c_inert`)
+but keeps the target it read at issue (`C6000_CARRY`), the jump lifts its whole window,
+and the target's last instruction carries the call (`c_carry`). `tcreg`, `tcarm` (with a
+call arm in the same window) and `tcbusy` (the target sets the link before the call
+lands) must decompile to both arms, with the jump's window in a body recomputed from flow.
+Known-bads keep the call's transfer: an independent predicate (`tcindep`), a link past
+the target's code (`tclink`), a target also reached in sequence (`tcfall`), an
+unconditional call (`tcuncond`), a target another function jumps into (`tcentry`), and
+displacement calls (`tcdir`, `tcearly`): Ghidra counts the jump's slots in the jump's
+context, where a same-sense displacement `B` parses as a branch, so the count and the
+flow body stop at it. A context change in the jump's `CFlowDelay` does not reach that
+parse (tried: the depth stays 3).
+
 ## Additional decoder accuracy checks
 
 The release runner includes compact stack offsets (`compact-dstk`), unscaled

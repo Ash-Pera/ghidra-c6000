@@ -2,7 +2,7 @@
 // @category C6000
 // A chained nested-arm pair sharing a carrier (tests/fixtures/grouped-nested-arms.asm). arm0's inner
 // (0x100c) is arm1's owner, so arm0 and arm1 share the carrier at 0x1020 and must be skipped together.
-// arm1 is refused because dent jumps into its window; correct carrying therefore skips arm0 too, so
+// arm1 is refused because dent jumps into its inner's window (0x1028), past arm0's windows; correct carrying therefore skips arm0 too, so
 // owner0 (0x1000) keeps its branch flow and carrier0 (0x1014) takes no call. A partial-group accept
 // would carry arm0 alone and break both.
 

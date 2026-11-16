@@ -1523,7 +1523,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				if (r.getReferenceType().isFlow() && !r.getFromAddress().equals(jump.getMinAddress()) && mine) return null;
 				called |= r.getReferenceType().isCall() && !mine;
 			}
-			if (!called) return null;
+			if (!called || restoresLink(target)) return null;
 			try {
 				if (!C6000ExecutionPackets.issuePrefix(program, jump.getMinAddress()).isEmpty() || parallelWithNext(jump)) return null;
 			}
@@ -1597,6 +1597,18 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				if (o instanceof Address address) return address.getOffset();
 			}
 			return null;
+		}
+
+		/** The code at target writes B3 before it saves it or transfers: an epilogue restoring a link saved elsewhere. */
+		private boolean restoresLink(Address target) {
+			Register b3 = program.getRegister("B3");
+			Instruction insn = decode(target);
+			for (int n = 0; insn != null && n < MAX_WINDOW; n++, insn = next(insn)) {
+				if (baseName(insn).startsWith("ST") && b3.equals(insn.getRegister(0))) return false;
+				if (writes(insn, b3)) return true;
+				if (transfer(insn) && !inert(insn)) return false;
+			}
+			return true;
 		}
 
 		/** insn writes register in E1 or, as a load, in E5. */

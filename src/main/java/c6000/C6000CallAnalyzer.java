@@ -259,10 +259,17 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	record CallArm(Instruction jump, Instruction call, Address callee, Address jumpEnd, Address last, Address landing) {
 	}
 
-	record CarryBranch(Instruction branch, String predicate, Address callTarget, Address last) {
+	/** carrier: where the transfer is emitted, last unless a proven-false in-function jump issues earlier in the window. */
+	record CarryBranch(Instruction branch, String predicate, Address callTarget, Address carrier, Address last) {
+		Address tolerated() {
+			return carrier.equals(last) ? null : carrier;
+		}
 	}
 
 	record NestedArm(CarryBranch owner, CarryBranch inner) {
+	}
+
+	private record PredicateWrite(int cycle, int index, Boolean executes, Long value) {
 	}
 
 	/**
@@ -726,6 +733,10 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 		}
 
 		private CarryBranch carryBranch(Instruction branch, boolean nested) {
+			return carryBranch(branch, nested, false);
+		}
+
+		private CarryBranch carryBranch(Instruction branch, boolean nested, boolean allowIssuePeers) {
 			String op = baseName(branch);
 			FlowOverride override = branch.getFlowOverride();
 			if (!(op.equals("B.S1") || op.equals("B.S2")) || branch.getLength() != 4 ||
@@ -736,7 +747,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			if (guard == null) return null;
 			try {
 				if (!C6000ExecutionPackets.issuePrefix(program, branch.getAddress()).isEmpty()) return null;
-				if (parallelWithNext(branch)) return null;
+				if (parallelWithNext(branch) && !allowIssuePeers) return null;
 			}
 			catch (MemoryAccessException e) {
 				return null;
@@ -769,12 +780,14 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Register link = program.getRegister("B3");
 			if (!noWritesDuring(path, issue, issue[branchIndex], issue[lastIndex], predicateRegister) ||
 				!noWritesDuring(path, issue, issue[branchIndex], issue[lastIndex], link)) return null;
-			return new CarryBranch(branch, guard, target, slots.get(slots.size() - 1).getAddress());
+			Address last = slots.get(slots.size() - 1).getAddress();
+			return new CarryBranch(branch, guard, target, last, last);
 		}
 
 		/** A branch whose only nested transfer is false whenever this branch is taken. */
 		NestedArm nestedArm(Instruction branch) {
-			CarryBranch owner = carryBranch(branch, true);
+			// Issue peers run whether or not the owner is taken; its predicate and link are checked through them.
+			CarryBranch owner = carryBranch(branch, true, true);
 			if (owner == null) return null;
 			List<Instruction> slots = window(branch);
 			if (slots == null) return null;
@@ -793,9 +806,40 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			CarryBranch inner = carryBranch(path.get(innerIndex), true);
 			if (inner == null ||
 				!falseOnTaken(path, ownerIndex, innerIndex, owner.predicate(), inner.predicate())) return null;
-			return new NestedArm(owner, inner);
+			return new NestedArm(owner, nestedJumpCarrier(inner));
 		}
 
+		/** A return whose window issues one in-function jump is carried where that jump issues. */
+		private CarryBranch nestedJumpCarrier(CarryBranch carry) {
+			if (carry.callTarget() != null) return carry;
+			Function caller = program.getFunctionManager().getFunctionContaining(carry.branch().getAddress());
+			if (caller == null) return carry;
+			List<Instruction> slots = window(carry.branch());
+			if (slots == null) return carry;
+			Instruction jump = null;
+			for (Instruction slot : slots) {
+				if (!inFunctionJump(slot, caller)) continue;
+				if (jump != null) return carry;
+				jump = slot;
+			}
+			return jump == null ? carry :
+				new CarryBranch(carry.branch(), carry.predicate(), carry.callTarget(), jump.getAddress(), carry.last());
+		}
+
+		private boolean inFunctionJump(Instruction jump, Function caller) {
+			String op = baseName(jump);
+			if (!(op.equals("B.S1") || op.equals("B.S2")) || jump.getLength() != 4 ||
+				jump.getRegister(0) != null || C6000DelaySlots.flag(program, jump.getAddress(), "c_inert") ||
+				C6000DelaySlots.flag(program, jump.getAddress(), "c_carry") || jump.getDefaultFlows().length != 1 ||
+				!jump.getFlowType().isJump()) return false;
+			Address target = jump.getDefaultFlows()[0];
+			var functions = program.getFunctionManager();
+			Function targetOwner = functions.getFunctionContaining(target);
+			return functions.getFunctionAt(target) == null && caller.getBody().contains(target) &&
+				caller.equals(targetOwner);
+		}
+
+		/** The carrier issues first in its packet; it and every later slot are NOPs or false on the carry's taken path. */
 		boolean canCarryBeforeCarrier(CarryBranch carry, Instruction carrier) {
 			try {
 				if (!C6000ExecutionPackets.issuePrefix(program, carrier.getAddress()).isEmpty()) return false;
@@ -803,21 +847,25 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			catch (MemoryAccessException e) {
 				return false;
 			}
-			if (baseName(carrier).equals("NOP")) return true;
-			String guard = predicate(carrier);
-			if (guard == null) return false;
 			List<Instruction> path = new ArrayList<>(lookBack(carry.branch()));
 			int branchIndex = path.size();
 			path.add(carry.branch());
 			List<Instruction> slots = window(carry.branch());
-			if (slots == null) return false;
+			if (slots == null || slots.isEmpty() ||
+				!slots.get(slots.size() - 1).getAddress().equals(carry.last())) return false;
 			int carrierIndex = -1;
 			for (Instruction slot : slots) {
 				path.add(slot);
 				if (slot.getAddress().equals(carrier.getAddress())) carrierIndex = path.size() - 1;
 			}
-			return carrierIndex > branchIndex &&
-				falseOnTaken(path, branchIndex, carrierIndex, carry.predicate(), guard);
+			if (carrierIndex <= branchIndex) return false;
+			for (int i = carrierIndex; i < path.size(); i++) {
+				Instruction slot = path.get(i);
+				if (baseName(slot).equals("NOP")) continue;
+				String guard = predicate(slot);
+				if (guard == null || !falseOnTaken(path, branchIndex, i, carry.predicate(), guard)) return false;
+			}
+			return true;
 		}
 
 		private boolean falseOnTaken(List<Instruction> path, int owner, int inner,
@@ -829,38 +877,49 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			if (innerRegister.equals(ownerRegister) &&
 				ownerPredicate.startsWith("!") != innerPredicate.startsWith("!")) {
 				for (int i = 0; i < inner; i++) {
-					if (cycles[i] < ownerCycle || cycles[i] >= innerCycle) continue;
+					if (cycles[i] + resultDelay(path.get(i)) < ownerCycle || cycles[i] >= innerCycle) continue;
 					for (Register written : issueWrites(path.get(i)))
 						if (overlaps(written, innerRegister)) return false;
 				}
 				return true;
 			}
-			Long value = null;
-			boolean wrote = false;
-			int previousWriteCycle = -1;
+			List<PredicateWrite> writes = new ArrayList<>();
 			for (int i = 0; i < inner; i++) {
-				int cycle = cycles[i], delay = resultDelay(path.get(i));
-				if (cycle + delay < ownerCycle || cycle >= innerCycle) continue;
-				if (cycle < ownerCycle || cycle + delay >= innerCycle) return false;
-				Register written = issueWrites(path.get(i)).stream()
-					.filter(r -> overlaps(r, innerRegister)).findFirst().orElse(null);
-				if (written == null) continue;
-				if (cycle == previousWriteCycle) return false;
-				String guard = predicate(path.get(i));
-				if (guard != null) {
-					if (guard.replace("!", "").equals(ownerRegister.getName())) {
-						if (guard.startsWith("!") != ownerPredicate.startsWith("!")) continue;
-					}
-					else return false;
-				}
-				value = constantWrite(path.get(i), innerRegister);
-				if (value == null) return false;
-				wrote = true;
-				previousWriteCycle = cycle;
+				Instruction insn = path.get(i);
+				int cycle = cycles[i], writeCycle = cycle + resultDelay(insn);
+				boolean written = issueWrites(insn).stream().anyMatch(r -> overlaps(r, innerRegister));
+				if (!written || cycle >= innerCycle || writeCycle < ownerCycle) continue;
+				if (writeCycle >= innerCycle) return false;
+				Boolean executes = executesOnTaken(path, i, owner, ownerPredicate);
+				if (Boolean.FALSE.equals(executes)) continue;
+				writes.add(new PredicateWrite(writeCycle, i, executes, constantWrite(insn, innerRegister)));
 			}
-			if (!wrote) return false;
+			writes.sort((a, b) -> {
+				int cycle = Integer.compare(a.cycle(), b.cycle());
+				return cycle != 0 ? cycle : Integer.compare(a.index(), b.index());
+			});
+			// The last write to land decides: a constant one run on every taken path, else unknown.
+			Long value = null;
+			for (int first = 0; first < writes.size();) {
+				int next = first + 1;
+				while (next < writes.size() && writes.get(next).cycle() == writes.get(first).cycle()) next++;
+				PredicateWrite write = writes.get(first);
+				boolean decides = next - first == 1 && Boolean.TRUE.equals(write.executes());
+				value = decides ? write.value() : null;
+				first = next;
+			}
+			if (value == null) return false;
 			boolean taken = innerPredicate.startsWith("!") ? value == 0 : value != 0;
 			return !taken;
+		}
+
+		/** Whether a write runs whenever the owner is taken: true, false, or null when undecided. */
+		private Boolean executesOnTaken(List<Instruction> path, int index, int owner, String ownerPredicate) {
+			String guard = predicate(path.get(index));
+			if (guard == null) return true;
+			if (!guard.replace("!", "").equals(ownerPredicate.replace("!", "")) ||
+				!stable(path, index, owner, ownerPredicate, true)) return null;
+			return guard.startsWith("!") == ownerPredicate.startsWith("!");
 		}
 
 		private boolean noWritesDuring(List<Instruction> path, int[] cycles, int first, int last,

@@ -164,6 +164,7 @@ TI = [
     case("nested-return-arm", "NestedReturnArm", "C6000_NESTED_RETURN_ARM_OK", None, analysis=True),
     case("two-nested-arms", "TwoNestedArms", "C6000_TWO_NESTED_ARMS_OK", None, analysis=True),
     case("grouped-nested-arms", "GroupedNestedArms", "C6000_GROUPED_NESTED_ARMS_OK", None, analysis=True),
+    case("overwritten-arm-predicate", "OverwrittenArmPredicate", "C6000_OVERWRITTEN_ARM_PREDICATE_OK", analysis=True),
 ]
 
 
@@ -362,6 +363,9 @@ def main():
                     command += ["-preScript", "C6000TwoNestedArmsTest.java", "prepare"]
                 elif fixture == "grouped-nested-arms":
                     command += ["-preScript", "C6000GroupedNestedArmsTest.java", "prepare"]
+                elif fixture == "overwritten-arm-predicate":
+                    command += ["-preScript", "C6000OverwrittenArmPredicateTest.java", "prepare",
+                                directory / "cases.tsv"]
                 elif fixture == "call-arm":
                     command += ["-preScript", "C6000CallArmTest.java", "prepare"]
                 elif fixture == "preempted-link-copy":

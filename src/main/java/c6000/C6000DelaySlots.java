@@ -69,6 +69,8 @@ public final class C6000DelaySlots {
         if (targets > 0) log.appendMsg("C6000 Delay Slots", "carried " + targets + " call(s) into their jump's target");
         int arms = carryCallArms(program, monitor);
         if (arms > 0) log.appendMsg("C6000 Delay Slots", "carried " + arms + " call arm(s)");
+        int nested = carryNestedTransfers(program, monitor);
+        if (nested > 0) log.appendMsg("C6000 Delay Slots", "carried " + nested + " nested return/call branch(es)");
         List<Address> candidates = new ArrayList<>(), stale = new ArrayList<>();
         var it = program.getListing().getInstructions(true);
         while (it.hasNext()) {
@@ -868,6 +870,188 @@ public final class C6000DelaySlots {
         return false;
     }
 
+    /**
+     * Carry predicated returns and tail jumps whose window contains one transfer
+     * proven false on the owner's taken path (SPRUFE8B 3.5, 3.6, 4.2, 4.2.6 B).
+     */
+    private static int carryNestedTransfers(Program program, TaskMonitor monitor) throws Exception {
+        var listing = program.getListing();
+        var functions = program.getFunctionManager();
+        var walker = new C6000CallAnalyzer.Walker(program);
+        var reader = new Reader(program);
+        // Each arm is a candidate: owner branch, its one proven-false inner transfer, and the window each carries into.
+        List<C6000CallAnalyzer.NestedArm> armList = new ArrayList<>();
+        Set<Address> seenOwners = new HashSet<>();
+        for (var it = listing.getInstructions(true); it.hasNext();) {
+            monitor.checkCancelled();
+            var arm = walker.nestedArm(it.next());
+            if (arm == null) continue;
+            if (seenOwners.add(arm.owner().branch().getAddress())) armList.add(arm);
+        }
+        if (armList.isEmpty()) return 0;
+
+        int count = armList.size();
+        List<List<C6000CallAnalyzer.CarryBranch>> armBranches = new ArrayList<>();
+        Map<Address, C6000CallAnalyzer.NestedArm> byOwner = new LinkedHashMap<>();
+        Set<Address> branchAddrs = new HashSet<>();
+        for (var arm : armList) {
+            armBranches.add(List.of(arm.owner(), arm.inner()));
+            byOwner.put(arm.owner().branch().getAddress(), arm);
+            branchAddrs.add(arm.owner().branch().getAddress());
+            branchAddrs.add(arm.inner().branch().getAddress());
+        }
+
+        // A candidate that fails any check is skipped; the rest still carry. Each check stays exactly as strict.
+        boolean[] failed = new boolean[count];
+        Map<Address, Window> windows = new LinkedHashMap<>();
+        for (int i = 0; i < count; i++) {
+            for (var branch : armBranches.get(i)) {
+                monitor.checkCancelled();
+                Address at = branch.branch().getAddress();
+                if (flag(program, at, "c_inert") || flag(program, at, "c_carry") || branch.branch().isInDelaySlot()) {
+                    failed[i] = true;
+                    continue;
+                }
+                var arm = byOwner.get(at);
+                Address child = arm == null ? null : arm.inner().branch().getAddress();
+                Window window = reader.window(branch.branch(), monitor, (C6000CallAnalyzer.Preemption) null, child);
+                Instruction carrier = listing.getInstructionAt(branch.last());
+                Function owner = functions.getFunctionContaining(at);
+                if (window == null || carrier == null || !window.end().equals(carrier.getMaxAddress()) ||
+                    owner == null || !owner.equals(window.owner()) || entered(program, at, window.end())) {
+                    failed[i] = true;
+                    continue;
+                }
+                windows.put(at, window);
+            }
+        }
+        for (int i = 0; i < count; i++) {
+            for (var branch : armBranches.get(i)) {
+                if (branchAddrs.contains(branch.last()) || flag(program, branch.last(), "c_carry")) failed[i] = true;
+            }
+        }
+        for (int i = 0; i < count; i++) {
+            if (failed[i]) continue;
+            for (var branch : armBranches.get(i)) {
+                Instruction carrier = listing.getInstructionAt(branch.last());
+                if (carrier == null || !walker.canCarryBeforeCarrier(branch, carrier)) {
+                    failed[i] = true;
+                    break;
+                }
+            }
+        }
+
+        // Candidates sharing a carrier or overlapping windows carry or skip together.
+        int[] parent = new int[count];
+        for (int i = 0; i < count; i++) parent[i] = i;
+        for (int i = 0; i < count; i++)
+            for (int j = i + 1; j < count; j++)
+                if (sharesCarrier(armBranches.get(i), armBranches.get(j)) ||
+                    windowsOverlap(armBranches.get(i), armBranches.get(j), windows)) union(parent, i, j);
+        boolean[] groupFailed = new boolean[count];
+        for (int i = 0; i < count; i++) if (failed[i]) groupFailed[find(parent, i)] = true;
+
+        List<C6000CallAnalyzer.CarryBranch> order = new ArrayList<>();
+        for (int i = 0; i < count; i++)
+            if (!groupFailed[find(parent, i)]) order.addAll(armBranches.get(i));
+        if (order.isEmpty()) return 0;
+
+        Map<Address, List<C6000CallAnalyzer.CarryBranch>> carries = new LinkedHashMap<>();
+        for (var branch : order)
+            carries.computeIfAbsent(branch.last(), ignored -> new ArrayList<>()).add(branch);
+        for (var group : carries.values())
+            group.sort(Comparator.comparing(branch -> branch.branch().getAddress()));
+
+        order.sort((a, b) -> b.branch().getAddress().compareTo(a.branch().getAddress()));
+        for (var branch : order) {
+            monitor.checkCancelled();
+            Address at = branch.branch().getAddress();
+            C6000CallAnalyzer.NestedArm arm = byOwner.get(at);
+            long armCode = arm == null ? 0 : nestedArmCode(arm.inner().predicate());
+            Map<String, Long> context = new LinkedHashMap<>();
+            context.put("c_inert", 1L);
+            context.put("c_branch_terminal", branch.branch().getRegister(0) == null ? 0L : 1L);
+            context.put("c_arm", armCode);
+            context.put("c_carry", 0L);
+            Window window = windows.get(at);
+            redecode(program, at, window.end(), context, true, monitor);
+            AddressSet body = new AddressSet(window.owner().getBody());
+            body.add(at, window.end());
+            window.owner().setBody(body);
+        }
+
+        var options = program.getOptions(C6000NestedCarryPayload.OPTIONS);
+        for (var entry : carries.entrySet()) {
+            monitor.checkCancelled();
+            Address at = entry.getKey();
+            Instruction carrier = listing.getInstructionAt(at);
+            if (carrier == null) throw new IllegalStateException("nested carry lost its carrier at " + at);
+            List<String> actions = new ArrayList<>();
+            Set<Address> callTargets = new LinkedHashSet<>();
+            for (var branch : entry.getValue()) {
+                String action = branch.callTarget() == null ? "R," + branch.predicate() :
+                    "C," + branch.predicate() + "," + Long.toUnsignedString(branch.callTarget().getOffset(), 16);
+                actions.add(action);
+                if (branch.callTarget() != null) callTargets.add(branch.callTarget());
+            }
+            options.setString(C6000NestedCarryPayload.key(at), String.join(";", actions));
+            redecode(program, at, carrier.getMaxAddress(),
+                Map.of("c_carry", 1L, "c_arm", 15L), false, monitor);
+            for (Address target : callTargets) {
+                var ref = program.getReferenceManager().addMemoryReference(at, target,
+                    RefType.CALL_OVERRIDE_UNCONDITIONAL, SourceType.ANALYSIS, Reference.MNEMONIC);
+                program.getReferenceManager().setPrimary(ref, true);
+            }
+        }
+        return order.size();
+    }
+
+    /** Two candidates whose any branch shares a carry instruction. */
+    private static boolean sharesCarrier(List<C6000CallAnalyzer.CarryBranch> a, List<C6000CallAnalyzer.CarryBranch> b) {
+        for (var x : a)
+            for (var y : b)
+                if (x.last().equals(y.last())) return true;
+        return false;
+    }
+
+    /** Two candidates whose any proven windows overlap in bytes. */
+    private static boolean windowsOverlap(List<C6000CallAnalyzer.CarryBranch> a, List<C6000CallAnalyzer.CarryBranch> b,
+            Map<Address, Window> windows) {
+        for (var x : a) {
+            Window wx = windows.get(x.branch().getAddress());
+            if (wx == null) continue;
+            for (var y : b) {
+                Window wy = windows.get(y.branch().getAddress());
+                if (wy == null) continue;
+                if (x.branch().getAddress().compareTo(wy.end()) <= 0 &&
+                    y.branch().getAddress().compareTo(wx.end()) <= 0) return true;
+            }
+        }
+        return false;
+    }
+
+    private static int find(int[] parent, int i) {
+        while (parent[i] != i) i = parent[i] = parent[parent[i]];
+        return i;
+    }
+
+    private static void union(int[] parent, int i, int j) {
+        parent[find(parent, i)] = find(parent, j);
+    }
+
+    private static int nestedArmCode(String predicate) {
+        int creg = switch (predicate.replace("!", "")) {
+            case "B0" -> 1;
+            case "B1" -> 2;
+            case "B2" -> 3;
+            case "A1" -> 4;
+            case "A2" -> 5;
+            case "A0" -> 6;
+            default -> throw new IllegalArgumentException("unsupported C6000 predicate " + predicate);
+        };
+        return 3 + (creg - 1) * 2 + (predicate.startsWith("!") ? 1 : 0);
+    }
+
     /** The unconditional call whose window ends at the tail's last instruction, to the same callee and link, or null. */
     private static Instruction tailOwner(Program program, Reader reader, C6000CallAnalyzer.Walker walker,
             C6000CallAnalyzer.SharedTail tail, TaskMonitor monitor) throws CancelledException {
@@ -910,15 +1094,21 @@ public final class C6000DelaySlots {
 
     /** Re-decode [at, end] with the context field set at at; a branch made inert keeps no flow references. */
     private static void redecode(Program p, Address at, Address end, String field, TaskMonitor monitor) throws Exception {
-        redecode(p, at, end, field, 1, monitor);
+        redecode(p, at, end, Map.of(field, 1L), true, monitor);
     }
 
     /** Re-decode [at, end] with the context field set to value at at. */
     private static void redecode(Program p, Address at, Address end, String field, long value, TaskMonitor monitor) throws Exception {
+        redecode(p, at, end, Map.of(field, value), true, monitor);
+    }
+
+    private static void redecode(Program p, Address at, Address end, Map<String, Long> context,
+            boolean removeFlow, TaskMonitor monitor) throws Exception {
         List<SavedInstruction> saved = snapshot(p, at, end);
         p.getListing().clearCodeUnits(at, end, false);
         p.getProgramContext().setValue(p.getRegister("c_flow_delay"), at, at, BigInteger.ZERO);
-        p.getProgramContext().setValue(p.getRegister(field), at, at, BigInteger.valueOf(value));
+        for (var entry : context.entrySet())
+            p.getProgramContext().setValue(p.getRegister(entry.getKey()), at, at, BigInteger.valueOf(entry.getValue()));
         Disassembler disassembler = Disassembler.getDisassembler(p, monitor, null);
         for (Address cursor = at; cursor.compareTo(end) <= 0;) {
             if (p.getListing().getInstructionContaining(cursor) == null)
@@ -928,7 +1118,7 @@ public final class C6000DelaySlots {
             cursor = ins.getMaxAddress().next();
         }
         // The issuing branch's own fall-through override went with its window.
-        restore(p, at, saved, true, saved.get(0).fallThrough());
+        restore(p, at, saved, removeFlow, removeFlow ? saved.get(0).fallThrough() : null);
     }
 
     /**

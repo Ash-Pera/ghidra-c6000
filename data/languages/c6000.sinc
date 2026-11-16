@@ -103,12 +103,8 @@ define register offset=0x2000 size=4
 # the C6000PacketAnalyzer / C6000PacketContext Java helper shipped in this
 # extension; with no context set, every word decodes as a normal 32-bit
 # instruction.  Big-endian adds a second word holding each compact slot's
-# halfword (issue #31).
-@if ENDIAN == "big"
+# halfword (issue #31); little-endian uses its third word for local fields.
 define register offset=0x3000 size=12 [ contextreg ];
-@else
-define register offset=0x3000 size=8 [ contextreg ];
-@endif
 
 # Synthetic execution address for Ghidra's p-code emulator.  C6000 exposes
 # PCE1 to instructions, while the emulator needs a distinct current PC.
@@ -146,15 +142,15 @@ define context contextreg
   c_pkt_write1 = (55,61) noflow
   c_pkt_commit0 = (64,70) noflow
   c_pkt_commit1 = (71,77) noflow
-  c_arm = (78,79) noflow # local: in this call-arm jump's window, a B with z=1 (1) or z=0 (2) is inert (C6000DelaySlots.carryCallArms)
-  c_pair = (80,80) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
+  c_arm = (78,81) noflow # local: call arms 1-2, predicate-keyed nested arms 3-14, nested carrier 15 (C6000DelaySlots.carryCallArms, carryNestedTransfers)
+  c_pair = (82,82) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
 @else
   c_pkt_write0 = (32,38) noflow
   c_pkt_write1 = (39,45) noflow
   c_pkt_commit0 = (46,52) noflow
   c_pkt_commit1 = (53,59) noflow
-  c_arm = (60,61) noflow # local: in this call-arm jump's window, a B with z=1 (1) or z=0 (2) is inert (C6000DelaySlots.carryCallArms)
-  c_pair = (62,62) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
+  c_arm = (60,63) noflow # local: call arms 1-2, predicate-keyed nested arms 3-14, nested carrier 15 (C6000DelaySlots.carryCallArms, carryNestedTransfers)
+  c_pair = (64,64) noflow # local: a register call whose packet's complementary jump is its not-taken path (C6000DelaySlots.pairCalls)
 @endif
 @if ENDIAN == "big"
 @include "c6000_compact_context.sinc"
@@ -609,12 +605,14 @@ PktInertCommit: is c_pkt_branch_end=1 & PktCommit0 & PktCommit1 { build PktCommi
 @include "c6000_flow_delay.sinc"
 @include "c6000_semantics.sinc"
 define pcodeop c6000_pipeline;
+define pcodeop c6000_nested_carry;
 # The unreachable explicit build prevents SLEIGH from implicitly building the
 # operand BEFORE the userop. The native return hides the physical CFG; dynamic
 # injection supplies the exact scheduled CFG and its captured return target.
 :^instruction is c_schedule_entry=1 & instruction [ c_schedule_entry=0; c_flow_delay=0; ] { c6000_pipeline(); return [C6000_PIPE_RET]; build instruction; }
 # Local: the shared tail's last instruction, then the call both of its issuing branches pended (SPRUFE8B 3.5, 4.2.6 B).
-:^instruction is c_schedule_entry=0 & c_carry=1 & instruction [ c_carry=0; ] { build instruction; call [C6000_CARRY]; }
+:^instruction is c_schedule_entry=0 & c_carry=1 & c_arm=15 & instruction [ c_carry=0; c_arm=0; ] { c6000_nested_carry(); build instruction; local nestedCarryEnd:1 = 0; }
+:^instruction is c_schedule_entry=0 & c_carry=1 & c_arm!=15 & instruction [ c_carry=0; ] { build instruction; call [C6000_CARRY]; }
 :^instruction is c_pkt_active=1 & c_schedule_entry=0 & PktIn0 & PktIn1 & PktOut0 & PktOut1 &
   PktCommit & instruction [ c_pkt_active=0; ]
 {

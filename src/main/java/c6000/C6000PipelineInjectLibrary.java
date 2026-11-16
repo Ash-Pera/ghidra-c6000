@@ -16,6 +16,7 @@ public class C6000PipelineInjectLibrary extends PcodeInjectLibrary {
     }
     @Override public InjectPayload allocateInject(String source,String name,int type){
         if(type==InjectPayload.CALLOTHERFIXUP_TYPE&&name.equals("c6000_pipeline"))return new C6000PipelinePayload(source);
+        if(type==InjectPayload.CALLOTHERFIXUP_TYPE&&name.equals("c6000_nested_carry"))return new C6000NestedCarryPayload(source);
         return super.allocateInject(source,name,type);
     }
 }

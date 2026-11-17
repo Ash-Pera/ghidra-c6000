@@ -4,6 +4,23 @@
 
 ### Added
 
+* Native lifting defers a load result read in its four delay slots. Default p-code wrote
+  the destination at issue, so a read in cycles 1-4 after the load, the E5 cycle included,
+  saw the loaded value and gave wrong C (SPRUFE8B 3.4, 4.2.5, Table 4-10). Where the
+  straight-line timing is provable, the load now shadows its result and the packet issued
+  five cycles later commits it. This covers byte, halfword, word and pair loads, predicated
+  loads, and loads or landings in staged parallel-read packets. The `C6000 Inexact Native
+  Pipeline` warning clears only where the listing p-code is deferred. It stays, with the
+  reason, when the scheduler refuses: a branch or call in or just before the window, a
+  flow target or function entry in the window, another write of the destination, more than
+  one deferred load in flight, an uncountable multicycle NOP, an input written earlier in
+  an unstaged packet, or a load with an exact schedule. Functions without the hazard are
+  unchanged. Context fields `c_load_mode` and `c_load_reg` (bits 83-91 in both endians)
+  are new.
+* `tools/check_context_fields.py` fails when two `contextreg` fields overlap, or one
+  lies past the register, in the little- or big-endian `define context` block. The
+  big-endian compact include counts; only its views of `c_h16` may alias. `--selftest`
+  proves the check catches broken copies. `tools/verify.py` runs it.
 * Exact schedules for `SAT`: E1 read and result, `CSR.SAT` and the `SSR` unit bit one
   cycle later (SPRUFE8B p. 437, Table 2-9, 2.9.13). Functions using it were refused as
   "unimplemented phase contract". An MVC write to CSR in the cycle the flags land, and a

@@ -28,6 +28,8 @@
     <register name="c_pkt_write1" hidden="true"/>
     <register name="c_pkt_commit0" hidden="true"/>
     <register name="c_pkt_commit1" hidden="true"/>
+    <register name="c_load_reg" hidden="true"/>
+    <register name="c_load_mode" hidden="true"/>
     <register name="C6000_PIPE_RET" hidden="true"/>
     <register name="C6000_PIPE_ILC" hidden="true"/>
     <register name="C6000_PIPE_RILC" hidden="true"/>
@@ -97,6 +99,10 @@
     <register name="C6000_PKT_B31" hidden="true"/>
     <register name="C6000_PKT_OLD0" hidden="true"/>
     <register name="C6000_PKT_OLD1" hidden="true"/>
+    <register name="C6000_LOAD_OLD0" hidden="true"/>
+    <register name="C6000_LOAD_OLD1" hidden="true"/>
+    <register name="C6000_LOAD_VALUE0" hidden="true"/>
+    <register name="C6000_LOAD_VALUE1" hidden="true"/>
   </register_data>
   <properties>
     <property key="pcodeInjectLibraryClass" value="c6000.C6000PipelineInjectLibrary"/>

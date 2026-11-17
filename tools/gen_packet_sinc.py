@@ -31,6 +31,20 @@ def register_tables():
         lines.append(f"PktCommit{slot}: is {commit}=0 {{ }}")
         for index, name in enumerate(REGISTERS, 1):
             lines.append(f"PktCommit{slot}: is {commit}={index} {{ {name} = C6000_PKT_{name}; }}")
+    # Load-result deferral: mode 1 shadows the E5 result at issue, mode 2 commits it before a packet.
+    lines += [f"{table}: is c_load_mode={mode} {{ }}"
+              for table, modes in (("PktLoadIn", (0, 2)), ("PktLoadOut", (0, 2)),
+                                   ("PktLoadCommit", (0, 1))) for mode in modes]
+    destinations = [[name] for name in REGISTERS]
+    destinations += [[f"{bank}{low}", f"{bank}{low + 1}"] for bank in "AB" for low in range(0, 32, 2)]
+    for index, names in enumerate(destinations, 1):
+        pairs = list(enumerate(names))
+        saves = " ".join(f"C6000_LOAD_OLD{k} = {name};" for k, name in pairs)
+        shadows = " ".join(f"C6000_LOAD_VALUE{k} = {name}; {name} = C6000_LOAD_OLD{k};" for k, name in pairs)
+        commits = " ".join(f"{name} = C6000_LOAD_VALUE{k};" for k, name in pairs)
+        lines += [f"PktLoadIn: is c_load_mode=1 & c_load_reg={index} {{ {saves} }}",
+                  f"PktLoadOut: is c_load_mode=1 & c_load_reg={index} {{ {shadows} }}",
+                  f"PktLoadCommit: is c_load_mode=2 & c_load_reg={index} {{ {commits} }}"]
     return "\n".join(lines) + "\n"
 
 

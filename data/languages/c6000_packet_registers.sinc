@@ -517,3 +517,297 @@ PktCommit1: is c_pkt_commit1=61 { B28 = C6000_PKT_B28; }
 PktCommit1: is c_pkt_commit1=62 { B29 = C6000_PKT_B29; }
 PktCommit1: is c_pkt_commit1=63 { B30 = C6000_PKT_B30; }
 PktCommit1: is c_pkt_commit1=64 { B31 = C6000_PKT_B31; }
+PktLoadIn: is c_load_mode=0 { }
+PktLoadIn: is c_load_mode=2 { }
+PktLoadOut: is c_load_mode=0 { }
+PktLoadOut: is c_load_mode=2 { }
+PktLoadCommit: is c_load_mode=0 { }
+PktLoadCommit: is c_load_mode=1 { }
+PktLoadIn: is c_load_mode=1 & c_load_reg=1 { C6000_LOAD_OLD0 = A0; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=1 { C6000_LOAD_VALUE0 = A0; A0 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=1 { A0 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=2 { C6000_LOAD_OLD0 = A1; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=2 { C6000_LOAD_VALUE0 = A1; A1 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=2 { A1 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=3 { C6000_LOAD_OLD0 = A2; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=3 { C6000_LOAD_VALUE0 = A2; A2 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=3 { A2 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=4 { C6000_LOAD_OLD0 = A3; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=4 { C6000_LOAD_VALUE0 = A3; A3 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=4 { A3 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=5 { C6000_LOAD_OLD0 = A4; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=5 { C6000_LOAD_VALUE0 = A4; A4 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=5 { A4 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=6 { C6000_LOAD_OLD0 = A5; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=6 { C6000_LOAD_VALUE0 = A5; A5 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=6 { A5 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=7 { C6000_LOAD_OLD0 = A6; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=7 { C6000_LOAD_VALUE0 = A6; A6 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=7 { A6 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=8 { C6000_LOAD_OLD0 = A7; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=8 { C6000_LOAD_VALUE0 = A7; A7 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=8 { A7 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=9 { C6000_LOAD_OLD0 = A8; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=9 { C6000_LOAD_VALUE0 = A8; A8 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=9 { A8 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=10 { C6000_LOAD_OLD0 = A9; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=10 { C6000_LOAD_VALUE0 = A9; A9 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=10 { A9 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=11 { C6000_LOAD_OLD0 = A10; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=11 { C6000_LOAD_VALUE0 = A10; A10 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=11 { A10 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=12 { C6000_LOAD_OLD0 = A11; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=12 { C6000_LOAD_VALUE0 = A11; A11 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=12 { A11 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=13 { C6000_LOAD_OLD0 = A12; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=13 { C6000_LOAD_VALUE0 = A12; A12 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=13 { A12 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=14 { C6000_LOAD_OLD0 = A13; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=14 { C6000_LOAD_VALUE0 = A13; A13 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=14 { A13 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=15 { C6000_LOAD_OLD0 = A14; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=15 { C6000_LOAD_VALUE0 = A14; A14 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=15 { A14 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=16 { C6000_LOAD_OLD0 = A15; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=16 { C6000_LOAD_VALUE0 = A15; A15 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=16 { A15 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=17 { C6000_LOAD_OLD0 = A16; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=17 { C6000_LOAD_VALUE0 = A16; A16 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=17 { A16 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=18 { C6000_LOAD_OLD0 = A17; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=18 { C6000_LOAD_VALUE0 = A17; A17 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=18 { A17 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=19 { C6000_LOAD_OLD0 = A18; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=19 { C6000_LOAD_VALUE0 = A18; A18 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=19 { A18 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=20 { C6000_LOAD_OLD0 = A19; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=20 { C6000_LOAD_VALUE0 = A19; A19 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=20 { A19 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=21 { C6000_LOAD_OLD0 = A20; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=21 { C6000_LOAD_VALUE0 = A20; A20 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=21 { A20 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=22 { C6000_LOAD_OLD0 = A21; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=22 { C6000_LOAD_VALUE0 = A21; A21 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=22 { A21 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=23 { C6000_LOAD_OLD0 = A22; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=23 { C6000_LOAD_VALUE0 = A22; A22 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=23 { A22 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=24 { C6000_LOAD_OLD0 = A23; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=24 { C6000_LOAD_VALUE0 = A23; A23 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=24 { A23 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=25 { C6000_LOAD_OLD0 = A24; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=25 { C6000_LOAD_VALUE0 = A24; A24 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=25 { A24 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=26 { C6000_LOAD_OLD0 = A25; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=26 { C6000_LOAD_VALUE0 = A25; A25 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=26 { A25 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=27 { C6000_LOAD_OLD0 = A26; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=27 { C6000_LOAD_VALUE0 = A26; A26 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=27 { A26 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=28 { C6000_LOAD_OLD0 = A27; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=28 { C6000_LOAD_VALUE0 = A27; A27 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=28 { A27 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=29 { C6000_LOAD_OLD0 = A28; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=29 { C6000_LOAD_VALUE0 = A28; A28 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=29 { A28 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=30 { C6000_LOAD_OLD0 = A29; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=30 { C6000_LOAD_VALUE0 = A29; A29 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=30 { A29 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=31 { C6000_LOAD_OLD0 = A30; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=31 { C6000_LOAD_VALUE0 = A30; A30 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=31 { A30 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=32 { C6000_LOAD_OLD0 = A31; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=32 { C6000_LOAD_VALUE0 = A31; A31 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=32 { A31 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=33 { C6000_LOAD_OLD0 = B0; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=33 { C6000_LOAD_VALUE0 = B0; B0 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=33 { B0 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=34 { C6000_LOAD_OLD0 = B1; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=34 { C6000_LOAD_VALUE0 = B1; B1 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=34 { B1 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=35 { C6000_LOAD_OLD0 = B2; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=35 { C6000_LOAD_VALUE0 = B2; B2 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=35 { B2 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=36 { C6000_LOAD_OLD0 = B3; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=36 { C6000_LOAD_VALUE0 = B3; B3 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=36 { B3 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=37 { C6000_LOAD_OLD0 = B4; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=37 { C6000_LOAD_VALUE0 = B4; B4 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=37 { B4 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=38 { C6000_LOAD_OLD0 = B5; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=38 { C6000_LOAD_VALUE0 = B5; B5 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=38 { B5 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=39 { C6000_LOAD_OLD0 = B6; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=39 { C6000_LOAD_VALUE0 = B6; B6 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=39 { B6 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=40 { C6000_LOAD_OLD0 = B7; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=40 { C6000_LOAD_VALUE0 = B7; B7 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=40 { B7 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=41 { C6000_LOAD_OLD0 = B8; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=41 { C6000_LOAD_VALUE0 = B8; B8 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=41 { B8 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=42 { C6000_LOAD_OLD0 = B9; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=42 { C6000_LOAD_VALUE0 = B9; B9 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=42 { B9 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=43 { C6000_LOAD_OLD0 = B10; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=43 { C6000_LOAD_VALUE0 = B10; B10 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=43 { B10 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=44 { C6000_LOAD_OLD0 = B11; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=44 { C6000_LOAD_VALUE0 = B11; B11 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=44 { B11 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=45 { C6000_LOAD_OLD0 = B12; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=45 { C6000_LOAD_VALUE0 = B12; B12 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=45 { B12 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=46 { C6000_LOAD_OLD0 = B13; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=46 { C6000_LOAD_VALUE0 = B13; B13 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=46 { B13 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=47 { C6000_LOAD_OLD0 = B14; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=47 { C6000_LOAD_VALUE0 = B14; B14 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=47 { B14 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=48 { C6000_LOAD_OLD0 = B15; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=48 { C6000_LOAD_VALUE0 = B15; B15 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=48 { B15 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=49 { C6000_LOAD_OLD0 = B16; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=49 { C6000_LOAD_VALUE0 = B16; B16 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=49 { B16 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=50 { C6000_LOAD_OLD0 = B17; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=50 { C6000_LOAD_VALUE0 = B17; B17 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=50 { B17 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=51 { C6000_LOAD_OLD0 = B18; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=51 { C6000_LOAD_VALUE0 = B18; B18 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=51 { B18 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=52 { C6000_LOAD_OLD0 = B19; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=52 { C6000_LOAD_VALUE0 = B19; B19 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=52 { B19 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=53 { C6000_LOAD_OLD0 = B20; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=53 { C6000_LOAD_VALUE0 = B20; B20 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=53 { B20 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=54 { C6000_LOAD_OLD0 = B21; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=54 { C6000_LOAD_VALUE0 = B21; B21 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=54 { B21 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=55 { C6000_LOAD_OLD0 = B22; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=55 { C6000_LOAD_VALUE0 = B22; B22 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=55 { B22 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=56 { C6000_LOAD_OLD0 = B23; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=56 { C6000_LOAD_VALUE0 = B23; B23 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=56 { B23 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=57 { C6000_LOAD_OLD0 = B24; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=57 { C6000_LOAD_VALUE0 = B24; B24 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=57 { B24 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=58 { C6000_LOAD_OLD0 = B25; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=58 { C6000_LOAD_VALUE0 = B25; B25 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=58 { B25 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=59 { C6000_LOAD_OLD0 = B26; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=59 { C6000_LOAD_VALUE0 = B26; B26 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=59 { B26 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=60 { C6000_LOAD_OLD0 = B27; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=60 { C6000_LOAD_VALUE0 = B27; B27 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=60 { B27 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=61 { C6000_LOAD_OLD0 = B28; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=61 { C6000_LOAD_VALUE0 = B28; B28 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=61 { B28 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=62 { C6000_LOAD_OLD0 = B29; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=62 { C6000_LOAD_VALUE0 = B29; B29 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=62 { B29 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=63 { C6000_LOAD_OLD0 = B30; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=63 { C6000_LOAD_VALUE0 = B30; B30 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=63 { B30 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=64 { C6000_LOAD_OLD0 = B31; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=64 { C6000_LOAD_VALUE0 = B31; B31 = C6000_LOAD_OLD0; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=64 { B31 = C6000_LOAD_VALUE0; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=65 { C6000_LOAD_OLD0 = A0; C6000_LOAD_OLD1 = A1; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=65 { C6000_LOAD_VALUE0 = A0; A0 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A1; A1 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=65 { A0 = C6000_LOAD_VALUE0; A1 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=66 { C6000_LOAD_OLD0 = A2; C6000_LOAD_OLD1 = A3; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=66 { C6000_LOAD_VALUE0 = A2; A2 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A3; A3 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=66 { A2 = C6000_LOAD_VALUE0; A3 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=67 { C6000_LOAD_OLD0 = A4; C6000_LOAD_OLD1 = A5; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=67 { C6000_LOAD_VALUE0 = A4; A4 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A5; A5 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=67 { A4 = C6000_LOAD_VALUE0; A5 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=68 { C6000_LOAD_OLD0 = A6; C6000_LOAD_OLD1 = A7; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=68 { C6000_LOAD_VALUE0 = A6; A6 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A7; A7 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=68 { A6 = C6000_LOAD_VALUE0; A7 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=69 { C6000_LOAD_OLD0 = A8; C6000_LOAD_OLD1 = A9; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=69 { C6000_LOAD_VALUE0 = A8; A8 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A9; A9 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=69 { A8 = C6000_LOAD_VALUE0; A9 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=70 { C6000_LOAD_OLD0 = A10; C6000_LOAD_OLD1 = A11; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=70 { C6000_LOAD_VALUE0 = A10; A10 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A11; A11 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=70 { A10 = C6000_LOAD_VALUE0; A11 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=71 { C6000_LOAD_OLD0 = A12; C6000_LOAD_OLD1 = A13; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=71 { C6000_LOAD_VALUE0 = A12; A12 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A13; A13 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=71 { A12 = C6000_LOAD_VALUE0; A13 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=72 { C6000_LOAD_OLD0 = A14; C6000_LOAD_OLD1 = A15; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=72 { C6000_LOAD_VALUE0 = A14; A14 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A15; A15 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=72 { A14 = C6000_LOAD_VALUE0; A15 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=73 { C6000_LOAD_OLD0 = A16; C6000_LOAD_OLD1 = A17; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=73 { C6000_LOAD_VALUE0 = A16; A16 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A17; A17 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=73 { A16 = C6000_LOAD_VALUE0; A17 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=74 { C6000_LOAD_OLD0 = A18; C6000_LOAD_OLD1 = A19; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=74 { C6000_LOAD_VALUE0 = A18; A18 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A19; A19 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=74 { A18 = C6000_LOAD_VALUE0; A19 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=75 { C6000_LOAD_OLD0 = A20; C6000_LOAD_OLD1 = A21; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=75 { C6000_LOAD_VALUE0 = A20; A20 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A21; A21 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=75 { A20 = C6000_LOAD_VALUE0; A21 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=76 { C6000_LOAD_OLD0 = A22; C6000_LOAD_OLD1 = A23; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=76 { C6000_LOAD_VALUE0 = A22; A22 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A23; A23 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=76 { A22 = C6000_LOAD_VALUE0; A23 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=77 { C6000_LOAD_OLD0 = A24; C6000_LOAD_OLD1 = A25; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=77 { C6000_LOAD_VALUE0 = A24; A24 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A25; A25 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=77 { A24 = C6000_LOAD_VALUE0; A25 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=78 { C6000_LOAD_OLD0 = A26; C6000_LOAD_OLD1 = A27; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=78 { C6000_LOAD_VALUE0 = A26; A26 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A27; A27 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=78 { A26 = C6000_LOAD_VALUE0; A27 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=79 { C6000_LOAD_OLD0 = A28; C6000_LOAD_OLD1 = A29; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=79 { C6000_LOAD_VALUE0 = A28; A28 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A29; A29 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=79 { A28 = C6000_LOAD_VALUE0; A29 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=80 { C6000_LOAD_OLD0 = A30; C6000_LOAD_OLD1 = A31; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=80 { C6000_LOAD_VALUE0 = A30; A30 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = A31; A31 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=80 { A30 = C6000_LOAD_VALUE0; A31 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=81 { C6000_LOAD_OLD0 = B0; C6000_LOAD_OLD1 = B1; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=81 { C6000_LOAD_VALUE0 = B0; B0 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B1; B1 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=81 { B0 = C6000_LOAD_VALUE0; B1 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=82 { C6000_LOAD_OLD0 = B2; C6000_LOAD_OLD1 = B3; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=82 { C6000_LOAD_VALUE0 = B2; B2 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B3; B3 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=82 { B2 = C6000_LOAD_VALUE0; B3 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=83 { C6000_LOAD_OLD0 = B4; C6000_LOAD_OLD1 = B5; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=83 { C6000_LOAD_VALUE0 = B4; B4 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B5; B5 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=83 { B4 = C6000_LOAD_VALUE0; B5 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=84 { C6000_LOAD_OLD0 = B6; C6000_LOAD_OLD1 = B7; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=84 { C6000_LOAD_VALUE0 = B6; B6 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B7; B7 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=84 { B6 = C6000_LOAD_VALUE0; B7 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=85 { C6000_LOAD_OLD0 = B8; C6000_LOAD_OLD1 = B9; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=85 { C6000_LOAD_VALUE0 = B8; B8 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B9; B9 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=85 { B8 = C6000_LOAD_VALUE0; B9 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=86 { C6000_LOAD_OLD0 = B10; C6000_LOAD_OLD1 = B11; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=86 { C6000_LOAD_VALUE0 = B10; B10 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B11; B11 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=86 { B10 = C6000_LOAD_VALUE0; B11 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=87 { C6000_LOAD_OLD0 = B12; C6000_LOAD_OLD1 = B13; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=87 { C6000_LOAD_VALUE0 = B12; B12 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B13; B13 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=87 { B12 = C6000_LOAD_VALUE0; B13 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=88 { C6000_LOAD_OLD0 = B14; C6000_LOAD_OLD1 = B15; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=88 { C6000_LOAD_VALUE0 = B14; B14 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B15; B15 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=88 { B14 = C6000_LOAD_VALUE0; B15 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=89 { C6000_LOAD_OLD0 = B16; C6000_LOAD_OLD1 = B17; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=89 { C6000_LOAD_VALUE0 = B16; B16 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B17; B17 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=89 { B16 = C6000_LOAD_VALUE0; B17 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=90 { C6000_LOAD_OLD0 = B18; C6000_LOAD_OLD1 = B19; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=90 { C6000_LOAD_VALUE0 = B18; B18 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B19; B19 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=90 { B18 = C6000_LOAD_VALUE0; B19 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=91 { C6000_LOAD_OLD0 = B20; C6000_LOAD_OLD1 = B21; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=91 { C6000_LOAD_VALUE0 = B20; B20 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B21; B21 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=91 { B20 = C6000_LOAD_VALUE0; B21 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=92 { C6000_LOAD_OLD0 = B22; C6000_LOAD_OLD1 = B23; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=92 { C6000_LOAD_VALUE0 = B22; B22 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B23; B23 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=92 { B22 = C6000_LOAD_VALUE0; B23 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=93 { C6000_LOAD_OLD0 = B24; C6000_LOAD_OLD1 = B25; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=93 { C6000_LOAD_VALUE0 = B24; B24 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B25; B25 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=93 { B24 = C6000_LOAD_VALUE0; B25 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=94 { C6000_LOAD_OLD0 = B26; C6000_LOAD_OLD1 = B27; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=94 { C6000_LOAD_VALUE0 = B26; B26 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B27; B27 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=94 { B26 = C6000_LOAD_VALUE0; B27 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=95 { C6000_LOAD_OLD0 = B28; C6000_LOAD_OLD1 = B29; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=95 { C6000_LOAD_VALUE0 = B28; B28 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B29; B29 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=95 { B28 = C6000_LOAD_VALUE0; B29 = C6000_LOAD_VALUE1; }
+PktLoadIn: is c_load_mode=1 & c_load_reg=96 { C6000_LOAD_OLD0 = B30; C6000_LOAD_OLD1 = B31; }
+PktLoadOut: is c_load_mode=1 & c_load_reg=96 { C6000_LOAD_VALUE0 = B30; B30 = C6000_LOAD_OLD0; C6000_LOAD_VALUE1 = B31; B31 = C6000_LOAD_OLD1; }
+PktLoadCommit: is c_load_mode=2 & c_load_reg=96 { B30 = C6000_LOAD_VALUE0; B31 = C6000_LOAD_VALUE1; }

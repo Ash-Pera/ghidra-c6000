@@ -165,6 +165,8 @@ TI = [
     case("nested-return-arm", "NestedReturnArm", "C6000_NESTED_RETURN_ARM_OK", None, analysis=True),
     case("two-nested-arms", "TwoNestedArms", "C6000_TWO_NESTED_ARMS_OK", None, analysis=True),
     case("grouped-nested-arms", "GroupedNestedArms", "C6000_GROUPED_NESTED_ARMS_OK", None, analysis=True),
+    case("native-load-latency", "NativeLoadLatency", "C6000_NATIVE_LOAD_LATENCY_OK",
+         "json", ["cases.json"], analysis=True),
 ]
 
 
@@ -257,6 +259,8 @@ def main():
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     (ROOT / "scratch").mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="verify-", dir=ROOT / "scratch"))
+    # SLEIGH aliases overlapping context fields silently; the selftest proves the check can fail.
+    run([sys.executable, ROOT / "tools/check_context_fields.py", "--selftest"], work / "context-fields.log", env, args.timeout)
     env["GHIDRA_INSTALL_DIR"] = str(ghidra)
     env["GHIDRA_WORK"] = str(work / "build")
     env.setdefault("GRADLE_USER_HOME", str(ROOT / "scratch/build/gradle"))
@@ -315,6 +319,9 @@ def main():
                     command += ["-noanalysis"]
                 elif fixture == "delayed-call-timing":
                     command += ["-preScript", "C6000DelayedCallTimingTest.java", "prepare", directory / "cases.json"]
+                elif fixture == "native-load-latency":
+                    command += ["-preScript", "C6000NativeLoadLatencyTest.java", "prepare",
+                                directory / "cases.json"]
                 elif fixture == "preempted-jump":
                     command += ["-preScript", "C6000PreemptedJumpTest.java", "prepare"]
                 elif fixture == "register-branch-tail":

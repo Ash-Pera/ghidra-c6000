@@ -216,6 +216,19 @@ public final class C6000ExecutionPackets {
         }
     }
 
+    /** Next instruction start after {@code last}, skipping a crossed fetch-packet header. */
+    static Address nextIssue(Program program, Address last) throws MemoryAccessException {
+        Slot next = slot(program, following(slot(program, last)));
+        return next.header() ? slot(program, following(next)).at() : next.at();
+    }
+
+    /** Issue cycles of a physical packet (SPRUFE8B 3.8.10, 4.4.2); -1 when a generator has no fixed count. */
+    static int issueCycles(Program program, List<Address> members) throws MemoryAccessException {
+        int generator = 0;
+        for (Address member : members) generator = mergeGenerator(generator, nopGenerator(program, slot(program, member)));
+        return generator < 0 ? -1 : Math.max(1, generator);
+    }
+
     /** Bytes after this instruction through its execute-packet end, including crossed headers. */
     public static int parallelBytes(Program program, Address at) throws MemoryAccessException {
         Slot current = slot(program, at);

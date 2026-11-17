@@ -84,9 +84,10 @@ available independently of this optional GUI plugin.
 
 Main limitations:
 
-- Default instruction lifting handles each instruction separately; packet
-  parallelism and result latency require a supported, explicitly enabled
-  [exact packet schedule](docs/pipeline-schedules.md) with a proved entry contract.
+- Default instruction lifting handles each instruction separately, apart from
+  staged parallel reads and load results read in their delay slots, which are deferred
+  where that is provably exact. Other result latency requires a supported, explicitly
+  enabled [exact packet schedule](docs/pipeline-schedules.md) with a proved entry contract.
   Proven unconditional B/BNOP windows and CALLP packet companions use native
   delay p-code; see the documented mixed-width emulator limitation.
 - Closed-call decompilation requires explicit plans and reviewed entry assumptions.

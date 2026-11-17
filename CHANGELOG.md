@@ -11,6 +11,12 @@
 
 ### Fixed
 
+* An argument stored at entry SP and read back through a `B15` pop (`LDW *++B15[2]`)
+  is no longer dropped by the decompiler. `LDW` through `B15` now lifts without the
+  word-alignment mask, as `STW`/`STH`/`STDW` through `B15` already did: under the ABI
+  the stack pointer stays 8-byte aligned (SPRAB89 3.2), so the mask is a no-op that
+  only hid which stack slot the load reads. Loads through any other register keep it
+  (SPRUFE8B `LDW`).
 * Exact schedules refuse `B IRP` and `B NRP` as "unresolved branch target" instead of
   failing with a NullPointerException: their target is IRP or NRP, neither a register
   operand nor a displacement (SPRUFE8B pp. 155, 157).

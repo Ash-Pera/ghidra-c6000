@@ -21,6 +21,12 @@
   lies past the register, in the little- or big-endian `define context` block. The
   big-endian compact include counts; only its views of `c_h16` may alias. `--selftest`
   proves the check catches broken copies. `tools/verify.py` runs it.
+* Exact schedules for functions whose entry packet issues a branch or call. Enabling
+  re-decodes the entry's native delay-slot window as ordinary instructions the schedule
+  issues, and disabling restores the native window and its annotations exactly. A window
+  another function owns or starts in, or that any other reference enters, is refused.
+  Such entries were refused as "Entry must be a defined instruction without native delay
+  slots" (SPRUFE8B 3.5, 4.2.6).
 * Exact schedules for `SAT`: E1 read and result, `CSR.SAT` and the `SSR` unit bit one
   cycle later (SPRUFE8B p. 437, Table 2-9, 2.9.13). Functions using it were refused as
   "unimplemented phase contract". An MVC write to CSR in the cycle the flags land, and a
@@ -34,6 +40,18 @@
   the stack pointer stays 8-byte aligned (SPRAB89 3.2), so the mask is a no-op that
   only hid which stack slot the load reads. Loads through any other register keep it
   (SPRUFE8B `LDW`).
+* Exact schedules keep a predicate register's known truth across a backward branch when
+  every write to it in the loop is predicated on that register with a condition false
+  under that truth (`[R]` while R is zero, `[!R]` while nonzero), and no write to it is
+  in flight: a predicated instruction whose condition is false does not write its
+  destination, so the truth holds on every later pass (SPRUFE8B 3.5). A software-pipelined
+  `[A1] SUB A1,1,A1` / `[A1] B loop` countdown whose epilogue issues a call was refused as
+  "opaque call lacks an exact B3 link proof": after a loop branch fell through, the
+  widened facts let the next one be taken and land the call inside the loop. Any other
+  write to the register, a guard on another register, or the opposite sense still widens.
+* Retain a known predicate truth across an unknown-predicated write only when both the
+  prior and written values have that truth; different-truth and unknown writes still
+  widen facts, and nonzero writes break old-value aliases (SPRUFE8B 3.5, 3.7, 4.2.5).
 * Exact schedules refuse `B IRP` and `B NRP` as "unresolved branch target" instead of
   failing with a NullPointerException: their target is IRP or NRP, neither a register
   operand nor a displacement (SPRUFE8B pp. 155, 157).

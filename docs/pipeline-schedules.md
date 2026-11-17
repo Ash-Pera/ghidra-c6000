@@ -212,6 +212,17 @@ physical code, and records the contract in program options. Repeating the same e
 operation is idempotent. Only the entry instruction's opt-in context changes; ordinary
 raw instruction semantics stay available at every physical address.
 
+An entry packet may issue a branch or call. Its native delay-slot window is then
+re-decoded as ordinary instructions, which the schedule issues itself, and disabling
+re-decodes the native window from the unchanged decode context, restoring flow and
+fall-through overrides, references and equates. Enabling refuses a window that is not
+the branch's own straight-line slots, that another function owns or starts in, or that
+any reference from outside the entry and its slots targets (SPRUFE8B 3.5, 4.2.6).
+`pipeline-entry-delay.py` / `C6000PipelineEntryDelayTest.java` check a TI-assembled
+entry call through review, record and activation, its executed p-code, a listing
+identical after disable, and refusals for a body reference and an outside jump into
+the slots.
+
 ### Review, record and apply
 
 `C6000ReviewPipelineSchedules.java MANIFEST REPORT` produces a read-only plan.
@@ -361,7 +372,11 @@ retain the existing resource rejection.
 
 A separate finite zero/nonzero domain tracks the six predicate GPRs and old-value copy
 aliases. Facts fork on the pre-E1 snapshot, invalidate at actual commit phases, and
-widen at backward transfers and loop-time wraps. Counter branches retain their actual
+widen at backward transfers and loop-time wraps. A backward branch keeps the truth of a
+register whose every write from the target through the branching packet is predicated
+on itself with a condition false under that truth (`[R]` while zero, `[!R]` while
+nonzero), with no write to it in flight; a predicated instruction whose condition is
+false does not write its destination (SPRUFE8B 3.5). Counter branches retain their actual
 raw taken condition and do not infer predicate truth from a failed sign test. This
 pruning never permits a resource collision or flushes a pending effect early.
 
@@ -369,7 +384,10 @@ pruning never permits a resource collision or flushes a pending effect early.
 counts, both parallel setup forms, E4 counter visibility and preserved refusals.
 `pipeline-predicate-facts.py` / `C6000PredicateFactsTest.java` check old-value copies,
 parallel predicate changes, delayed writes, unknown arithmetic and conservative
-widening. The latter fixture uses TI's assembler (`TI_C6000_BIN` can select it). The
+widening. `pipeline-selfguard-loop.py` / `C6000SelfGuardLoopTest.java` check a
+software-pipelined `[A1] SUB A1,1,A1` / `[A1] B` countdown whose epilogue call lands once,
+after the loop, and refuse an unpredicated, other-register, inverted or in-flight write.
+Both fixtures use TI's assembler (`TI_C6000_BIN` can select it). The
 pending-return guard remains required: stores and other effects may genuinely cross a
 function boundary, requiring a caller continuation rather than an early writeback
 approximation.

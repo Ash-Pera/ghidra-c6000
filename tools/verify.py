@@ -154,10 +154,13 @@ TI = [
     case("pipeline-store-tail", "PipelineStoreTail", "C6000_PIPELINE_STORE_TAIL_OK", "json", ["cases.json", "results.json"]),
     case("caller-tail", "CallerTail", "C6000_CALLER_TAIL_OK", "json", ["cases.json", "results.json"]),
     case("pipeline-predicate-facts", "PredicateFacts", "PREDICATE_FACTS_TEST_OK", "json"),
+    case("pipeline-entry-delay", "PipelineEntryDelay", "C6000_PIPELINE_ENTRY_DELAY_OK", "json",
+         ["cases.json"], analysis=True),
     case("pipeline-caller-continuation", "CallerContinuation", "CONTINUATION_CONTRACT_TEST_OK",
          "json", ["cases.json", "results.json"]),
     case("pipeline-postloop", "PostLoopDispatch", "C6000_POSTLOOP_OK", "json"),
     case("pipeline-predicated-collision", "PredicatedCollision", "C6000_PREDICATED_COLLISION_OK", "json"),
+    case("pipeline-selfguard-loop", "SelfGuardLoop", "C6000_SELFGUARD_LOOP_OK", "json"),
     # Local: execute-packet completion (docs/execute-packet-recovery.md) under packet staging.
     case("parallel-peers", "ParallelPeerAnalyzer", "C6000_PARALLEL_PEER_ANALYZER_OK", "json", ["cases.json", "peers.out"]),
     case("store-mask-print", "StoreMaskPrint", "C6000_STORE_MASK_PRINT_OK", "json"),
@@ -385,6 +388,8 @@ def main():
                     command += ["-preScript", "C6000PairCallTest.java", "prepare"]
                 elif fixture == "sequence-call":
                     command += ["-preScript", "C6000SequenceCallTest.java", "prepare"]
+                elif fixture == "pipeline-entry-delay":
+                    command += ["-preScript", "C6000PipelineEntryDelayTest.java", "prepare", directory / "cases.json"]
                 elif fixture == "shared-tail-arm":
                     command += ["-preScript", "C6000SharedTailArmTest.java", "prepare"]
                 elif fixture not in ELF:

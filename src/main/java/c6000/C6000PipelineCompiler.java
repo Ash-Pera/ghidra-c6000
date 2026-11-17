@@ -1553,7 +1553,10 @@ public final class C6000PipelineCompiler {
                 long offset=program.getRegister((index<3?"A":"B")+(index%3)).getAddress().getOffset();
                 if(offset>=destination.offset()+destination.size()||destination.offset()>=offset+4)continue;
                 var value=destination.sourceWrite()<0&&destination.size()==4&&destination.offset()==offset&&destination.mask()==-1?outputFact(instruction,before,token++):new PredicateValue(token++,-1);
-                if(written.contains(index)||truth<0&&!value.equals(before.values().get(index)))value=new PredicateValue(token++,-1);
+                var prior=before.values().get(index);
+                // A predicated write selects the E1-old or written value; retain only a common truth (SPRUFE8B 3.5, 3.7).
+                if(!written.contains(index)&&truth<0&&value.truth()>=0&&value.truth()==prior.truth())value=value.truth()==0?prior:new PredicateValue(token++,1);
+                else if(written.contains(index)||truth<0&&!value.equals(prior))value=new PredicateValue(token++,-1);
                 after.set(index,value);written.add(index);
             }
         }
@@ -1563,15 +1566,41 @@ public final class C6000PipelineCompiler {
         var facts=advanceFacts(source,pack,before);
         if(before!=source.facts())returnFlow=withLink(source,pack,before,returnFlow); // the issue packet's B3 writes on this fork
         // A backward redirect or buffered time wrap must not turn an entry fact
-        // into a loop invariant. Widen to independent unknown values there.
+        // into a loop invariant. Widen to independent unknown values there,
+        // but keep a branch loop's truths that only self-guarded writes reach.
         boolean widen=pc<source.pc()||loop!=null&&source.loop()!=null&&loop.time()<source.loop().time();
-        if(widen)facts=PredicateFacts.unknown();
+        if(widen)facts=loop==null&&source.loop()==null&&0<=pc&&pc<source.pc()?selfGuardedFacts(facts,pc,source.pc(),pack,flights,before):PredicateFacts.unknown(); // a negative pc marks a call or return, no code
         var names=facts.names();
         List<Flight> captured=new ArrayList<>();for(var flight:flights){var instruction=instructions.get(flight.pc());boolean fresh=flight.age()==1&&pack.contains(instruction);
             int truth=fresh?predicateTruth(instruction,before):flight.predicateTruth(),token=fresh?predicateToken(instruction,before):flight.predicateToken();
             captured.add(new Flight(flight.pc(),flight.age(),truth,truth<0&&token>=0&&!widen?names.getOrDefault(token,-1):-1));} // the sampled value, while a predicate GPR still holds it
         State target=new State(pc,idle,List.copyOf(captured),List.copyOf(branches),List.copyOf(hazards),loop,facts.canonical(),returnFlow);
         b.jump(PcodeOp.BRANCH,"node"+state(target),null);
+    }
+
+    /** Widened facts keeping only a truth no loop write can change: one predicated on that register, false under it (SPRUFE8B 3.5). */
+    private PredicateFacts selfGuardedFacts(PredicateFacts facts,long pc,long source,List<Insn> pack,List<Flight> flights,PredicateFacts before){
+        var kept=new ArrayList<>(PredicateFacts.unknown().values());
+        for(int index=0;index<6;index++){int truth=facts.values().get(index).truth();if(truth>=0&&selfGuarded(index,truth,pc,source,pack,flights,before))kept.set(index,new PredicateValue(index,truth));}
+        return new PredicateFacts(List.copyOf(kept));
+    }
+    /** Every write to predicate index from pc through the source packet is disabled under truth, and none is pending. */
+    private boolean selfGuarded(int index,int truth,long pc,long source,List<Insn> pack,List<Flight> flights,PredicateFacts before){
+        long reg=program.getRegister((index<3?"A":"B")+(index%3)).getAddress().getOffset();
+        for(var flight:flights){var instruction=instructions.get(flight.pc());boolean fresh=flight.age()==1&&pack.contains(instruction);
+            if((fresh?predicateTruth(instruction,before):flight.predicateTruth())!=0&&instruction.outputs().stream().anyMatch(d->d.phase()>flight.age()&&!d.flags()&&d.offset()<reg+4&&reg<d.offset()+d.size()))return false;}
+        for(long at=pc;;){
+            var instruction=instructions.get(at);
+            if(instruction==null){if((at&31)==28&&fetchHeader(at)){at+=4;continue;}return false;} // only code this compile decoded
+            boolean writes=instruction.outputs().stream().anyMatch(d->!d.flags()&&d.offset()<reg+4&&reg<d.offset()+d.size());
+            var guard=instruction.predicate();
+            if(writes&&(guard==null||predicateIndex(guard.getAddress().getOffset())!=index||(instruction.inverted()?1-truth:truth)!=0))return false;
+            try{if(at>=source&&!C6000ExecutionPackets.parallelWithNext(program,instruction.instruction()))return true;}catch(ghidra.program.model.mem.MemoryAccessException error){return false;}
+            at=instruction.instruction().getMaxAddress().getOffset()+1;
+        }
+    }
+    private boolean fetchHeader(long at){
+        try{return (program.getMemory().getInt(entry.getNewAddress(at))>>>28)==0xe;}catch(ghidra.program.model.mem.MemoryAccessException error){return false;}
     }
 
     private record MultiplyPortWrite(int owner,Insn instruction,int age) {}

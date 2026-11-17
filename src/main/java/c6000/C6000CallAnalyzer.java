@@ -18,6 +18,7 @@ package c6000;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -270,6 +271,10 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 	}
 
 	private record PredicateWrite(int cycle, int index, Boolean executes, Long value) {
+	}
+
+	/** Local: a jump to another function whose link B3 may be {@code link}, a loop head this function built; {@code last} carries it (C6000DelaySlots.carryLinkJumps). */
+	record LinkJump(Instruction jump, String predicate, Address callee, Address last, Address link) {
 	}
 
 	/**
@@ -837,6 +842,113 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 			Function targetOwner = functions.getFunctionContaining(target);
 			return functions.getFunctionAt(target) == null && caller.getBody().contains(target) &&
 				caller.equals(targetOwner);
+		}
+
+		/**
+		 * Local: a predicated jump, alone in its packet, to another function's entry,
+		 * its window (proven transfer-free by C6000DelaySlots) with its guard unchanged,
+		 * where B3 may hold the one link this function builds to a loop head that runs
+		 * to the jump with B3 unchanged: the callee returns there (SPRUFE8B 3.5, 4.2.6 B).
+		 */
+		LinkJump linkJump(Instruction jump) {
+			if (!displacementJump(jump)) return null;
+			String guard = predicate(jump);
+			if (guard == null) return null;
+			Address target = jump.getDefaultFlows()[0];
+			var functions = program.getFunctionManager();
+			Function caller = functions.getFunctionContaining(jump.getMinAddress());
+			Function callee = functions.getFunctionAt(target);
+			if (caller == null || callee == null || callee.equals(caller)) return null;
+			// A callee another function calls returns through its link; code the caller also reaches by other flow is the caller's own, split off.
+			boolean called = false;
+			for (Reference r : program.getReferenceManager().getReferencesTo(target)) {
+				boolean mine = caller.getBody().contains(r.getFromAddress());
+				if (r.getReferenceType().isFlow() && !r.getFromAddress().equals(jump.getMinAddress()) && mine) return null;
+				called |= r.getReferenceType().isCall() && !mine;
+			}
+			if (!called || restoresLink(target)) return null;
+			try {
+				if (!C6000ExecutionPackets.issuePrefix(program, jump.getMinAddress()).isEmpty() || parallelWithNext(jump)) return null;
+			}
+			catch (MemoryAccessException e) {
+				return null;
+			}
+			List<Instruction> slots = window(jump);
+			if (slots == null || slots.isEmpty()) return null;
+			for (Instruction slot : slots)
+				if (slot.getLength() != 4 || !untimed(slot)) return null;
+			List<Instruction> path = new ArrayList<>(lookBack(jump));
+			int at = path.size();
+			path.add(jump);
+			path.addAll(slots);
+			int[] issue = issueCycles(path);
+			int last = path.size() - 1;
+			// The carrier reads the guard the jump read; it reads B3 after the window's writes, as the callee does.
+			Register guardRegister = program.getRegister(guard.replace("!", "")), b3 = program.getRegister("B3");
+			for (int i = 0; i < path.size(); i++) {
+				Instruction insn = path.get(i);
+				if (issue[i] <= issue[last] && issue[i] + resultDelay(insn) >= issue[at] && writes(insn, guardRegister)) return null;
+			}
+			Address link = loopLink(caller, jump, b3);
+			if (link == null) return null;
+			Instruction carrier = slots.get(slots.size() - 1);
+			if (!canCarryBeforeCarrier(new CarryBranch(jump, guard, target, carrier.getAddress(), carrier.getAddress()), carrier)) return null;
+			return new LinkJump(jump, guard, target, carrier.getAddress(), link);
+		}
+
+		/** The one MVK(L)/MVKH B3 constant in caller that addresses a packet running to jump with B3 and flow unchanged, else null. */
+		private Address loopLink(Function caller, Instruction jump, Register b3) {
+			Set<Address> links = new LinkedHashSet<>();
+			Long low = null;
+			for (Instruction insn : listing.getInstructions(caller.getBody(), true)) {
+				String name = baseName(insn);
+				if (predicate(insn) != null || insn.getLength() != 4) { if (writes(insn, b3)) low = null; continue; }
+				if ((name.startsWith("MVK.S") || name.startsWith("MVKL.S")) && b3.equals(insn.getRegister(1)) && insn.getScalar(0) != null)
+					low = insn.getScalar(0).getValue() & 0xffff;
+				else if (name.startsWith("MVKH.S") && b3.equals(insn.getRegister(1)) && low != null) {
+					Long high = constant(insn);
+					if (high != null) links.add(jump.getMinAddress().getNewAddress(((high & 0xffff) << 16) | low));
+					low = null;
+				}
+				else if (writes(insn, b3)) low = null;
+			}
+			Address found = null;
+			for (Address link : links) {
+				if (!caller.getBody().contains(link) || link.compareTo(jump.getMinAddress()) > 0) continue;
+				Instruction head = listing.getInstructionAt(link), before = listing.getInstructionBefore(link);
+				if (head == null || head.isInDelaySlot()) continue;
+				try {
+					if (before != null && before.getMaxAddress().next().equals(link) && parallelWithNext(before)) continue;
+				}
+				catch (MemoryAccessException e) {
+					continue;
+				}
+				boolean clear = true;
+				for (Instruction insn = head; clear && insn != null && insn.getMinAddress().compareTo(jump.getMinAddress()) < 0; insn = listing.getInstructionAfter(insn.getMinAddress()))
+					clear = !writes(insn, b3) && insn.getDelaySlotDepth() == 0 && !(transfer(insn) && !inert(insn));
+				if (!clear) continue;
+				if (found != null) return null;
+				found = link;
+			}
+			return found;
+		}
+
+		/** The code at target writes B3 before it saves it or transfers: an epilogue restoring a link saved elsewhere. */
+		private boolean restoresLink(Address target) {
+			Register b3 = program.getRegister("B3");
+			Instruction insn = decode(target);
+			for (int n = 0; insn != null && n < MAX_WINDOW; n++, insn = next(insn)) {
+				if (baseName(insn).startsWith("ST") && b3.equals(insn.getRegister(0))) return false;
+				if (writes(insn, b3)) return true;
+				if (transfer(insn) && !inert(insn)) return false;
+			}
+			return true;
+		}
+
+		/** insn writes register in E1 or, as a load, in E5. */
+		private boolean writes(Instruction insn, Register register) {
+			Register load = loadDestination(insn);
+			return load != null && overlaps(load, register) || issueWrites(insn).stream().anyMatch(r -> overlaps(r, register));
 		}
 
 		/** The carrier issues first in its packet; it and every later slot are NOPs or false on the carry's taken path. */

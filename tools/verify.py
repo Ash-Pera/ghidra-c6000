@@ -64,6 +64,7 @@ CORE = [
     case("sequence-call", "SequenceCall", "C6000_SEQUENCE_CALL_OK", None, analysis=True),
     case("pair-call", "PairCall", "C6000_PAIR_CALL_OK", None, analysis=True),
     case("jump-target-call", "JumpTargetCall", "C6000_JUMP_TARGET_CALL_OK", None, analysis=True),
+    case("link-jump", "LinkJump", "C6000_LINK_JUMP_OK", None, analysis=True),
     case("stacked-return-windows", "StackedReturnWindows", "C6000_STACKED_RETURN_WINDOWS_OK", None, analysis=True),
     case("merge-call-window", "MergeCallWindow", "C6000_MERGE_CALL_WINDOW_OK", None),
     case("delayed-call-safety", "DelayedCallSafety", "C6000_DELAYED_CALL_SAFETY_OK", "json"),
@@ -349,6 +350,8 @@ def main():
                     command += ["-preScript", "C6000IdleCallTest.java", "prepare"]
                 elif fixture == "jump-target-call":
                     command += ["-preScript", "C6000JumpTargetCallTest.java", "prepare"]
+                elif fixture == "link-jump":
+                    command += ["-preScript", "C6000LinkJumpTest.java", "prepare"]
                 elif fixture == "abi-pairs":
                     command += ["-preScript", "C6000AbiPairsTest.java", "prepare"]
                 elif fixture == "tail-call-slots":

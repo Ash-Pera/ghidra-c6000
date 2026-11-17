@@ -17,6 +17,15 @@
 
 ### Fixed
 
+* Exact schedules keep a predicate register's known truth across a backward branch when
+  every write to it in the loop is predicated on that register with a condition false
+  under that truth (`[R]` while R is zero, `[!R]` while nonzero), and no write to it is
+  in flight: a predicated instruction whose condition is false does not write its
+  destination, so the truth holds on every later pass (SPRUFE8B 3.5). A software-pipelined
+  `[A1] SUB A1,1,A1` / `[A1] B loop` countdown whose epilogue issues a call was refused as
+  "opaque call lacks an exact B3 link proof": after a loop branch fell through, the
+  widened facts let the next one be taken and land the call inside the loop. Any other
+  write to the register, a guard on another register, or the opposite sense still widens.
 * Retain a known predicate truth across an unknown-predicated write only when both the
   prior and written values have that truth; different-truth and unknown writes still
   widen facts, and nonzero writes break old-value aliases (SPRUFE8B 3.5, 3.7, 4.2.5).

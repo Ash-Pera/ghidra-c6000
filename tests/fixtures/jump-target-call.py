@@ -6,9 +6,10 @@ Load at 0x1000 with auto-analysis; C6000JumpTargetCallTest.java prepare declares
 functions, as ELF symbols would. Words are TI cl6x 8.3.15 output (-mv6740
 --no_compress, linked at 0x1000), listed by dis6x. The call is taken exactly when
 the jump is; the jump's target runs transfer-free code until the call lands, and
-the call's link is the address just past it (SPRUFE8B 3.5, 4.2.6 B). Only a
-register call is carried: Ghidra counts the jump's slots in the jump's context,
-where a displacement B issued under the jump's predicate parses as a branch.
+the call's link is the address just past it (SPRUFE8B 3.5, 4.2.6 B). Ghidra parses a
+jump's slots in the jump's context, where a displacement B under the jump's predicate
+stays a branch: with a direct call the jump keeps no native window, and its last slot
+takes it.
 
   1000 h        B B3 ; ADD A4,A4,A4 ; NOP 4
   1020 g        B B3 ; ADD A4,3,A4 ; NOP 4
@@ -18,15 +19,20 @@ where a displacement B issued under the jump's predicate parses as a branch.
                 last slot: c ? g(v) + 16 : h(v) + 1
   1180 tcbusy   [A1] B bu_tgt ; MVKL/MVKH h,A3 ; [A1] B A3 ; NOP 2 ; ... bu_tgt: MVKL/MVKH
                 bu_ret,B3 ; ADD 2,A4 ; bu_ret: ADD 1,A4: c ? h(v + 2) + 1 : v + 7
-  Known-bads, the call keeps its transfer (register calls but tcdir and tcearly):
   1040 tcdir    tcreg with the displacement call [!A1] B h
+  13c0 tcearly  tcbusy with the displacement call [A1] B h
+  1420 tcboth   [A1] B bo_tgt ; [!A1] B g (a call arm) ; [A1] B h ; [!A1] MVKL/MVKH
+                bo_gret,B3 ; NOP ; NOP ... bo_tgt: MVKL bo_ret,B3 || ADD 2,A4 ; MVKH:
+                c ? h(v + 2) + 1 : g(v) + 16
+  Known-bads, the call keeps its transfer (register calls):
   11e0 tcindep  the call is under [B0], independent of the jump's [!A1]
   1240 tclink   the link is one packet past the target's NOPs
   12a0 tcfall   the target's NOPs are also reached in sequence
   12e0 tcuncond the call is unconditional, so taken on the jump's fall-through too,
                 past a NOP 5 that idles as the target does
   1340 tcentry  as tcreg, with 13a0 tcenter jumping into its target's NOPs
-  13c0 tcearly  tcbusy with the displacement call [A1] B h
+  1480 tcmid    tcearly whose call lands inside the target's NOP 2
+  14e0 tcover   a direct call whose jump's last slot is a NOP 2 outlasting its window
 """
 
 from pathlib import Path
@@ -66,6 +72,15 @@ WORDS = [
     0x0FFFFB10, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000610, 0x00002000, 0x8FFF8810, 0x00002000, 0x0210E058,
     0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x0189FE2A, 0x0180006A, 0x02104058, 0x02102058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000810, 0x9FFF8010, 0x8FFF7C10, 0x918A242A, 0x9180006A,
+    0x00000000, 0x00000000, 0x02000851, 0x00000000, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000,
+    0x018A362B, 0x02104058, 0x0180006A, 0x02102058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000610, 0x8180006A, 0x8FFF7010, 0x00004000, 0x0210E058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x018A5E2B, 0x02104058, 0x00002000, 0x02102058,
+    0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x01BC54F7, 0x00900FD8, 0x02101FD8, 0x80000710, 0x8FFF6410, 0x818A8E2A, 0x8180006A, 0x00000000,
+    0x00002000, 0x0210E058, 0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x02104058, 0x02102058,
     0x01BC52E6, 0x00006000, 0x000C0362, 0x00008000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
 ]
 
@@ -74,7 +89,7 @@ def main():
     if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "be"):
         raise SystemExit(__doc__)
     endian = ">" if len(sys.argv) == 3 else "<"
-    image = bytearray(0x420)
+    image = bytearray(0x540)
     for index, word in enumerate(WORDS):
         struct.pack_into(endian + "I", image, 4 * index, word)
     Path(sys.argv[1]).write_bytes(image)

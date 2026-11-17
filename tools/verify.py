@@ -163,6 +163,7 @@ TI = [
          "json", ["cases.json", "results.json"]),
     case("pipeline-postloop", "PostLoopDispatch", "C6000_POSTLOOP_OK", "json"),
     case("pipeline-selfguard-loop", "SelfGuardLoop", "C6000_SELFGUARD_LOOP_OK", "json"),
+    case("pipeline-selfguard-opaque", "SelfGuardOpaque", "C6000_SELFGUARD_OPAQUE_OK", "json"),  # local: opaque calls (f59d9c5)
     case("nested-window", "NestedWindow", "C6000_NESTED_WINDOW_OK", "json", analysis=True),
     case("bnop-call", "BnopCall", "C6000_BNOP_CALL_OK", "json", analysis=True),
     case("predicated-register-jump", "PredicatedRegisterJump", "C6000_PREDICATED_REGISTER_JUMP_OK", "json", analysis=True),

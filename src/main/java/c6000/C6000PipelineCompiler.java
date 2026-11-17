@@ -1571,7 +1571,7 @@ public final class C6000PipelineCompiler {
         // but keep a branch loop's truths that only self-guarded writes reach.
         boolean backward=pc<source.pc();
         boolean widen=backward||loop!=null&&source.loop()!=null&&loop.time()<source.loop().time();
-        if(widen)facts=backward&&loop==null&&source.loop()==null?selfGuardedFacts(facts,pc,source.pc(),pack,flights,before):PredicateFacts.unknown();
+        if(widen)facts=backward&&0<=pc&&loop==null&&source.loop()==null?selfGuardedFacts(facts,pc,source.pc(),pack,flights,before):PredicateFacts.unknown(); // a negative pc marks a call or return, no code (local)
         var names=facts.names();
         List<Flight> captured=new ArrayList<>();for(var flight:flights){var instruction=instructions.get(flight.pc());boolean fresh=flight.age()==1&&pack.contains(instruction);
             int truth=fresh?predicateTruth(instruction,before):flight.predicateTruth(),token=fresh?predicateToken(instruction,before):flight.predicateToken();

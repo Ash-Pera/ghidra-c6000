@@ -22,6 +22,8 @@ import sys
 # name, accepted, decrement (k1), extra kernel op (k2), A1 truths the compiler may hold at the kernel (-1 unknown)
 SPECS = [
     ("self_guarded", True, " [A1] SUB.L1 A1,1,A1", " NOP", [-1, 0]),
+    # the call issues first in the epilogue, at a word whose opaque-call marker ends like a fetch-packet header slot
+    ("call_at_slot_one", True, " [A1] SUB.L1 A1,1,A1", " NOP", [-1, 0]),
     ("unpredicated_decrement", False, " SUB.L1 A1,1,A1", " NOP", [-1]),
     ("other_register_guard", False, " [A2] SUB.L1 A1,1,A1", " NOP", [-1]),
     ("inverted_guard", False, " [!A1] SUB.L1 A1,1,A1", " NOP", [-1, 1]),
@@ -31,10 +33,17 @@ SPECS = [
 ]
 SIZE = 0x200
 KERNEL, RETURN, CALLEE, END = 0x10, 0x40, 0x80, 0x87
+EARLY = {"call_at_slot_one"}
+
+
+def returns(name):
+    return RETURN - 4 if name in EARLY else RETURN
 
 
 def case(name, base, decrement, extra):
-    tag, link = "pf_" + name, base + RETURN
+    tag, link = "pf_" + name, base + returns(name)
+    call = [" B.S2 " + tag + "_callee", " MV.L1X B3,A4", " NOP", " NOP"] if name in EARLY else \
+        [" MV.L1X B3,A4", " B.S2 " + tag + "_callee", " NOP", " NOP", " NOP"]
     return [' .sect ".' + tag + '"', " .nocmp", tag + ":",
             " MV.L2 B3,B13",            # save the caller link
             " ZERO.L2 B3",              # B3 is the iteration counter
@@ -45,18 +54,13 @@ def case(name, base, decrement, extra):
             decrement,
             extra,
             " NOP",
-            " [A1] B.S1 " + tag + "_kernel",
-            " MV.L1X B3,A4",            # epilogue: the final untaken branch's slots
-            " B.S2 " + tag + "_callee",
-            " NOP",
-            " NOP",
-            " NOP",
+            " [A1] B.S1 " + tag + "_kernel"] + call + [  # epilogue: the final untaken branch's slots
             " MVK.S2 0x%x,B3" % link,   # the call's own slots set its link
             " MVKH.S2 0x%x,B3" % link,
             " MV.L2 B13,B3",
             " B.S2 B3",
             " NOP 5",
-            " .space %d" % (CALLEE - 0x4c),
+            " .space %d" % (CALLEE - (returns(name) + 0xc)),
             tag + "_callee:",
             " B.S2 B3",
             " NOP 5"]
@@ -74,8 +78,8 @@ def main():
     for index, (name, accepted, decrement, extra, truths) in enumerate(SPECS):
         base = 0x1000 + index * SIZE
         lines += case(name, base, decrement, extra)
-        manifest.append(dict(name=name, at=base, body_end=base + RETURN + 0xb, callee=base + CALLEE,
-                             callee_end=base + END, link=base + RETURN, kernel=base + KERNEL,
+        manifest.append(dict(name=name, at=base, body_end=base + returns(name) + 0xb, callee=base + CALLEE,
+                             callee_end=base + END, link=base + returns(name), kernel=base + KERNEL,
                              kernel_truths=truths, accepted=accepted))
     assembly.write_text("\n".join(lines) + "\n")
     binary = Path(os.environ.get("TI_C6000_BIN", "/Applications/ti/ti-cgt-c6000_8.3.15/bin"))

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+* A shared call tail is lifted with its call. The compiler can end two call sites with one
+  tail: a jump into the last cycles of a call's window, with a call to the same function
+  and return address issued in the jump's own window, runs the tail and then that call
+  (SPRUFE8B 3.5, 4.2.6 B). No native window lifts both, so the call inside a loop was
+  lost. Two new context fields carry it: `c_carry` makes the tail's last instruction
+  call (target by reference), and `c_inert` makes both issuing branches transfer
+  nothing. The owning call must be unconditional, and any other entry into its window is
+  refused (issue #73).
+
 ## 1.3.0 - 2026-11-18
 
 ### Changed

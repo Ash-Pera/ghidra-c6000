@@ -82,8 +82,9 @@ bytes long. Little-endian languages keep the `insn16` token (issue #31). Java re
 `C6000PacketContext.halfword`.
 
 Since language version 2 in both byte orders, `contextreg` is 64 bits and each field has
-the same position in both. Bits 0-23 hold the decode and recovery fields and big-endian
-bits 32-47 hold `c_h16`; bits 24-31 and 48-63 are free. New fields are `noflow` with a
+the same position in both. Bits 0-25 hold the decode and recovery fields (24 and 25 are
+issue #73's `c_inert` and `c_carry`) and big-endian bits 32-47 hold `c_h16`; bits 26-31
+and 48-63 are free. New fields are `noflow` with a
 `c_` prefix, unless they really must flow.
 
 Only the eighth word of a compact fetch packet decodes as a 4-byte `CPKT` instruction.
@@ -127,6 +128,13 @@ edge to the NOPs is dropped, so no jump enters the delay slots of the return tha
 The jump is continued only once the return's window is proven to end where the jump lands
 on every path and that window is laid, and an analysis override whose condition no longer
 holds is removed. When issue #52's release takes the return's window, the jump gets its edge back.
+A shared call tail (issue #73) is a jump into the last cycles of an unconditional call's
+window, with a call to the same function and return address issued in the jump's own
+window and taken exactly when the jump is: the tail runs, then that call. No native
+window lifts both, so `C6000DelaySlots.carryTails` re-decodes both issuing branches with
+`c_inert` (no transfer) and the tail's last instruction with `c_carry`, which calls the
+target of its primary `CALL_OVERRIDE_UNCONDITIONAL` reference after it. The jump keeps
+its own window. Any other flow into the owning call's window leaves all of them native.
 Register-target predicated branches that are not calls or such returns, and
 BDEC/BPOS, retain conservative native treatment. Exact scheduling handles its own
 supported branch phases.

@@ -447,7 +447,10 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 				boolean register = branch.getRegister(0) != null;
 				Address target = register || C6000PacketStagingAnalyzer.hardware(branch).getDefaultFlows().length != 1 ? null : C6000PacketStagingAnalyzer.hardware(branch).getDefaultFlows()[0];
 				if (!register && target == null) return null;
-				int kind = flow.isCall() ? 2 : register && flow.isTerminal() ? 3 : 1;
+				// A B through B3 returns wherever it issues, as C6000ReturnAnalyzer classifies one outside a window (SPRUFE8B 3.5, 4.2.6).
+				boolean ret = register && (flow.isTerminal() || "B3".equals(branch.getDefaultOperandRepresentation(0)) &&
+					(branch.getFlowOverride() == FlowOverride.NONE || branch.getFlowOverride() == FlowOverride.RETURN));
+				int kind = flow.isCall() ? 2 : ret ? 3 : 1;
 				latches.add(new Latch(branch, latches.size(), behind, kind, target));
 			}
 			return latches.isEmpty() ? null : new Lifting(first, stretch.get(stretch.size() - 1).getMaxAddress(), latches);

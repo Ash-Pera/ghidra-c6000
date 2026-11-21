@@ -1097,7 +1097,7 @@ public class C6000CallAnalyzer extends AbstractAnalyzer {
 						issued.add(insn);
 						cycles[index] = cycle;
 						Boolean runs = executes(issued, index, facts);
-						if (transfer(insn)) {
+						if (transfer(insn) && !inert(insn)) { // local: a c_inert branch transfers nothing
 							// One that may be taken with the branch lands in the callee: no call to place here.
 							if (!Boolean.FALSE.equals(runs) && !valuesOnly) return null;
 							if (partner == null && complementary(branch, insn)) partner = insn;

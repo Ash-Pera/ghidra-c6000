@@ -593,7 +593,7 @@ public final class C6000DelaySlots {
                 if (jump == null || !new Reader(program).inSequence(jump, monitor)) continue;
                 Address landing = jump.getDefaultFlows()[0];
                 Address end = setInert(program, jump, true, monitor);
-                Disassembler disassembler = Disassembler.getDisassembler(program, monitor, null);
+                Disassembler disassembler = Disassembler.getDisassembler(program, TaskMonitor.DUMMY, null);
                 // The packets it seemed to skip: decode them in sequence.
                 Address gap = end.next();
                 while (listing.getInstructionAt(gap) != null && gap.compareTo(landing) < 0) gap = listing.getInstructionAt(gap).getMaxAddress().next();
@@ -706,7 +706,7 @@ public final class C6000DelaySlots {
         listing.clearCodeUnits(start, end, false);
         program.getProgramContext().setValue(program.getRegister("c_flow_delay"), at, at, BigInteger.ZERO);
         program.getProgramContext().setValue(program.getRegister("c_inert"), at, at, on ? BigInteger.ONE : BigInteger.ZERO);
-        Disassembler disassembler = Disassembler.getDisassembler(program, monitor, null);
+        Disassembler disassembler = Disassembler.getDisassembler(program, TaskMonitor.DUMMY, null);
         for (Address cursor = start; cursor.compareTo(end) <= 0;) {
             if (listing.getInstructionContaining(cursor) == null)
                 disassembler.disassemble(cursor, new AddressSet(cursor, end), false);
@@ -910,7 +910,7 @@ public final class C6000DelaySlots {
             }
             if (!flag(program, call.getAddress(), "c_inert")) redecode(program, call.getAddress(), end, "c_inert", monitor);
             if (listing.getInstructionAt(t.last()) == null)
-                Disassembler.getDisassembler(program, monitor, null).disassemble(target, new AddressSet(target, t.last()), false);
+                Disassembler.getDisassembler(program, TaskMonitor.DUMMY, null).disassemble(target, new AddressSet(target, t.last()), false);
             Instruction carrier = listing.getInstructionAt(t.last());
             if (carrier == null) throw new IllegalStateException("target call lost its carrier at " + t.last());
             redecode(program, t.last(), carrier.getMaxAddress(), "c_carry", monitor);
@@ -1272,7 +1272,7 @@ public final class C6000DelaySlots {
         p.getProgramContext().setValue(p.getRegister("c_flow_delay"), at, at, BigInteger.ZERO);
         for (var entry : context.entrySet())
             p.getProgramContext().setValue(p.getRegister(entry.getKey()), at, at, BigInteger.valueOf(entry.getValue()));
-        Disassembler disassembler = Disassembler.getDisassembler(p, monitor, null);
+        Disassembler disassembler = Disassembler.getDisassembler(p, TaskMonitor.DUMMY, null);
         for (Address cursor = at; cursor.compareTo(end) <= 0;) {
             if (p.getListing().getInstructionContaining(cursor) == null)
                 disassembler.disassemble(cursor, new AddressSet(cursor, end), false);

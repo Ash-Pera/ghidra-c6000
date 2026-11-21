@@ -1060,3 +1060,14 @@ the listing p-code against it.
 branch-in-window refusal, commit one cycle early, commit one cycle late, and ignoring the
 load predicate. It runs the fixture in both endian modes and restores the source; each
 mutant must fail it.
+
+## Opaque-call variants of the entry-delay and self-guard fixtures (local)
+
+Upstream #74 and #75 replaced `pipeline-entry-delay.py` and `pipeline-selfguard-loop.py`
+with branch-only versions. The local versions, which issue a call and run under the opaque-call
+gate model (`-Dc6000.opaqueCalls`), stay as `pipeline-entry-delay-opaque.py` with
+`C6000PipelineEntryDelayOpaqueTest.java` (an entry packet that issues a delayed call) and
+`pipeline-selfguard-opaque.py` with `C6000SelfGuardOpaqueTest.java` (the loop's epilogue call
+lands once, after the loop; `call_at_slot_one` issues the call first in the epilogue, at a
+word whose call marker ends in 28 mod 32, which failed with AddressOutOfBoundsException
+before f59d9c5).

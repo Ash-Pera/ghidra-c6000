@@ -159,6 +159,8 @@ TI = [
     case("pipeline-predicate-facts", "PredicateFacts", "PREDICATE_FACTS_TEST_OK", "json"),
     case("pipeline-entry-delay", "PipelineEntryDelay", "C6000_PIPELINE_ENTRY_DELAY_OK", "json",
          ["cases.json"], analysis=True),
+    case("pipeline-entry-delay-opaque", "PipelineEntryDelayOpaque", "C6000_PIPELINE_ENTRY_DELAY_OPAQUE_OK", "json",
+         ["cases.json"], analysis=True),  # local: entry call under opaque calls (250f039)
     case("pipeline-caller-continuation", "CallerContinuation", "CONTINUATION_CONTRACT_TEST_OK",
          "json", ["cases.json", "results.json"]),
     case("pipeline-postloop", "PostLoopDispatch", "C6000_POSTLOOP_OK", "json"),
@@ -371,6 +373,8 @@ def main():
                     command += ["-preScript", "C6000PacketWindowFallthroughTest.java", "prepare"]
                 elif fixture == "pipeline-entry-delay":
                     command += ["-preScript", "C6000PipelineEntryDelayTest.java", "prepare", directory / "cases.json"]
+                elif fixture == "pipeline-entry-delay-opaque":
+                    command += ["-preScript", "C6000PipelineEntryDelayOpaqueTest.java", "prepare", directory / "cases.json"]
                 elif fixture == "nested-window":
                     command += ["-preScript", "C6000NestedWindowTest.java", "prepare", directory / "cases.json"]
                 elif fixture == "bnop-call":

@@ -138,6 +138,9 @@
 * A nest that issues as the last branch of a latched one lands is lifted with it: the landing that one
   put outside the stretch is the plan's own and is replaced, where the latch it reads is set by a
   branch the plan latches, for the same target. The plan was refused (issue #139).
+* Two writes to a predicate register in one packet under opposite predicates (SPRUFE8B 3.8.8) leave the
+  one that runs, where the path says which; it was given up, so an outcome that cannot happen was run
+  and a nest kept its warning (issue #138).
 * A stretch is planned and checked from every place it can be entered, not only from its
   start: code behind a return or an unconditional jump inside it is reached some other way,
   and its branches were latched as jumps without any run saying how they land. Calls there
